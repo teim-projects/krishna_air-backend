@@ -7,9 +7,15 @@ from google.oauth2 import id_token  # type: ignore
 from google.auth.transport import requests  # type: ignore
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.views import APIView
+from rest_framework.views import APIView 
+from rest_framework import viewsets
 from .serializers import PasswordResetRequestSerializer, PasswordResetConfirmSerializer
 import os
+from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.authentication import JWTAuthentication 
+from .models import CustomUser, Role
+from .serializers import AddStaffSerializer, RoleSerializer
+from .permissions import IsAdminOrSubAdmin ,StaffObjectPermission
 
 User = get_user_model()
 
@@ -89,3 +95,31 @@ class PasswordResetConfirmView(APIView):
         serializer = PasswordResetConfirmSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         return Response(serializer.validated_data, status=status.HTTP_200_OK)
+
+
+# Role section
+class RoleViewSet(viewsets.ModelViewSet):
+    """
+    CRUD for Role model.
+    Only accessible to admin/subadmin or superuser.
+    """
+    queryset = Role.objects.all().order_by('id')
+    serializer_class = RoleSerializer
+    authentication_classes = [JWTAuthentication]   
+    permission_classes = [IsAuthenticated, IsAdminOrSubAdmin]
+
+
+# Add Staff section
+
+class StaffViewSet(viewsets.ModelViewSet):
+    serializer_class = AddStaffSerializer
+    permission_classes = [IsAuthenticated, IsAdminOrSubAdmin, StaffObjectPermission]
+    authentication_classes = [JWTAuthentication]   # <- explicit JWT auth
+
+    def get_queryset(self):
+        return CustomUser.objects.filter(is_staff=True)
+
+    def perform_create(self, serializer):
+        serializer.save()
+
+

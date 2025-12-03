@@ -2,19 +2,15 @@ from dj_rest_auth.registration.serializers import RegisterSerializer
 from dj_rest_auth.serializers import LoginSerializer
 from dj_rest_auth.serializers import UserDetailsSerializer
 from django.conf import settings
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, authenticate
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from rest_framework import serializers
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
-
-# from dj_rest_auth.serializers import 
-
-from rest_framework import serializers
-from django.contrib.auth import authenticate, get_user_model
-from .models import CustomUser
+from .models import CustomUser, Role
+from rest_framework.exceptions import ValidationError
 
 class CustomRegisterSerializer(RegisterSerializer):
     username = None  # disable username completely
@@ -30,8 +26,6 @@ class CustomRegisterSerializer(RegisterSerializer):
         user.mobile_no = self.validated_data.get('mobile_no', '')
         user.save()
         return user
-
-
 
 
 User = get_user_model()
@@ -96,9 +90,6 @@ class CustomUserDetailsSerializer(UserDetailsSerializer):
     
 
 
-
-
-
 User = get_user_model()
 
 
@@ -133,7 +124,6 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         return {"detail": "Password reset email sent successfully."}
 
 
-# accounts/serializers.py (continued)
 class PasswordResetConfirmSerializer(serializers.Serializer):
     uidb64 = serializers.CharField()
     token = serializers.CharField()
@@ -158,3 +148,113 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         user.save()
 
         return {"detail": "Password has been reset successfully."}
+
+# ---RoleSerializer----
+class RoleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Role
+        fields = ('id', 'name')
+        read_only_fields = ('id',)
+
+# Staff Profile section
+class RoleFlexibleField(serializers.RelatedField):
+    """
+    Accepts either:
+      - integer id (e.g. 3)
+      - string id (e.g. "3")
+      - role name (e.g. "staff" or "Staff")
+    Represents role in responses as {"id": id, "name": name}
+    """
+    def to_internal_value(self, data):
+        # integer id or numeric string -> pk
+        if isinstance(data, int) or (isinstance(data, str) and data.isdigit()):
+            try:
+                pk = int(data)
+                return Role.objects.get(pk=pk)
+            except Role.DoesNotExist:
+                raise ValidationError(f"Role with id={data} does not exist.")
+        # string -> treat as name (case-insensitive)
+        if isinstance(data, str):
+            try:
+                return Role.objects.get(name__iexact=data)
+            except Role.DoesNotExist:
+                raise ValidationError(f"Role with name='{data}' does not exist.")
+        raise ValidationError("Invalid role value. Provide a role id or name.")
+
+    def to_representation(self, value):
+        return {"id": value.id, "name": value.name}
+
+
+class AddStaffSerializer(serializers.ModelSerializer):
+    role = RoleFlexibleField(queryset=Role.objects.all(), required=True)
+    password = serializers.CharField(write_only=True, required=True, min_length=6)
+
+    class Meta:
+        model = CustomUser
+        fields = ('id', 'email', 'mobile_no', 'first_name', 'last_name', 'role', 'password')
+        read_only_fields = ('id',)
+
+    def validate(self, attrs):
+        if not attrs.get('email') and not attrs.get('mobile_no'):
+            raise serializers.ValidationError("Either email or mobile_no is required.")
+        return attrs
+
+    def _creator_is_admin_or_subadmin_or_super(self, creator):
+        """
+        Return True if the creator is superuser OR has role 'admin' OR has role 'subadmin'.
+        These creators are allowed to assign ANY existing Role.
+        """
+        if creator is None:
+            return False
+        if getattr(creator, 'is_superuser', False):
+            return True
+        creator_role_name = getattr(getattr(creator, 'role', None), 'name', '') or ''
+        return creator_role_name.lower() in ('admin', 'subadmin')
+
+    def create(self, validated_data):
+        request = self.context.get('request', None)
+        creator = getattr(request, 'user', None)
+
+        requested_role = validated_data.pop('role')  # Role instance from RoleFlexibleField
+        password = validated_data.pop('password')
+
+        # If creator is not admin/subadmin/superuser, block assignment (or adjust policy)
+        if not self._creator_is_admin_or_subadmin_or_super(creator):
+            raise ValidationError("You do not have permission to assign roles.")
+
+        # Create user via manager (which can accept role instance)
+        user = CustomUser.objects.create_user(role=requested_role, password=password, **validated_data)
+        user.is_staff = True
+        user.save()
+        return user
+
+    def update(self, instance, validated_data):
+        """
+        Update instance. If role is present, check creator permission and apply.
+        Other fields updated normally. Password is supported here as well.
+        """
+        request = self.context.get('request', None)
+        creator = getattr(request, 'user', None)
+
+        # Role change requested?
+        requested_role = validated_data.get('role', None)
+        if requested_role is not None:
+            # Only admin/subadmin/superuser allowed to change role to anything
+            if not self._creator_is_admin_or_subadmin_or_super(creator):
+                raise ValidationError("You do not have permission to change role.")
+            instance.role = requested_role
+            # remove from dict so loop below doesn't try to set it again
+            validated_data.pop('role', None)
+
+        # Password handling
+        if 'password' in validated_data:
+            instance.set_password(validated_data.pop('password'))
+
+        # Update other fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        instance.save()
+        return instance
+    
+
