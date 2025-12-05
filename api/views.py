@@ -13,10 +13,12 @@ from .serializers import PasswordResetRequestSerializer, PasswordResetConfirmSer
 import os
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication 
+from rest_framework import filters
+from django_filters.rest_framework import DjangoFilterBackend
 from .models import CustomUser, Role
 from .serializers import AddStaffSerializer, RoleSerializer
 from .permissions import IsAdminOrSubAdmin ,StaffObjectPermission
-
+from .pagination import StaffPagination
 User = get_user_model()
 
 class GoogleLogin(SocialLoginView):
@@ -107,6 +109,7 @@ class RoleViewSet(viewsets.ModelViewSet):
     serializer_class = RoleSerializer
     authentication_classes = [JWTAuthentication]   
     permission_classes = [IsAuthenticated, IsAdminOrSubAdmin]
+    pagination_class = None
 
 
 # Add Staff section
@@ -114,7 +117,11 @@ class RoleViewSet(viewsets.ModelViewSet):
 class StaffViewSet(viewsets.ModelViewSet):
     serializer_class = AddStaffSerializer
     permission_classes = [IsAuthenticated, IsAdminOrSubAdmin, StaffObjectPermission]
-    authentication_classes = [JWTAuthentication]   # <- explicit JWT auth
+    authentication_classes = [JWTAuthentication]  
+    pagination_class = StaffPagination 
+    filter_backends = [DjangoFilterBackend , filters.SearchFilter]
+    search_fields = ['^first_name', '=email', 'mobile_no']
+    filterset_fields = ['role']
 
     def get_queryset(self):
         return CustomUser.objects.filter(is_staff=True)

@@ -11,6 +11,8 @@ from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from .models import CustomUser, Role
 from rest_framework.exceptions import ValidationError
+from django.core.validators import RegexValidator
+import re
 
 class CustomRegisterSerializer(RegisterSerializer):
     username = None  # disable username completely
@@ -185,7 +187,22 @@ class RoleFlexibleField(serializers.RelatedField):
         return {"id": value.id, "name": value.name}
 
 
+PHONE_10_DIGIT_RE = r'^\d{10}$'
+phone_validator = RegexValidator(
+    regex=PHONE_10_DIGIT_RE,
+    message='Mobile number must consist of exactly 10 digits.'
+)
+
 class AddStaffSerializer(serializers.ModelSerializer):
+    # enforce 10 digits at serializer level
+    mobile_no = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=10,
+        validators=[phone_validator],
+        help_text="10 digit mobile number (digits only)."
+    )
+
     role = RoleFlexibleField(queryset=Role.objects.all(), required=True)
     password = serializers.CharField(write_only=True, required=True, min_length=6)
 
@@ -195,15 +212,30 @@ class AddStaffSerializer(serializers.ModelSerializer):
         read_only_fields = ('id',)
 
     def validate(self, attrs):
+        # strip whitespace from mobile if present
+        mobile = attrs.get('mobile_no')
+        if mobile is not None:
+            mobile = mobile.strip()
+            if mobile == '':
+                # treat blank as not provided
+                attrs.pop('mobile_no', None)
+            else:
+                attrs['mobile_no'] = mobile
+
+        # require at least one contact
         if not attrs.get('email') and not attrs.get('mobile_no'):
             raise serializers.ValidationError("Either email or mobile_no is required.")
+
+        # mobile_no validator will have already run via field validators; 
+        # but double-check defensive: ensure digits only and length 10 if present
+        mobile = attrs.get('mobile_no')
+        if mobile:
+            if not re.match(PHONE_10_DIGIT_RE, mobile):
+                raise serializers.ValidationError({"mobile_no": "Mobile number must be exactly 10 digits."})
+
         return attrs
 
     def _creator_is_admin_or_subadmin_or_super(self, creator):
-        """
-        Return True if the creator is superuser OR has role 'admin' OR has role 'subadmin'.
-        These creators are allowed to assign ANY existing Role.
-        """
         if creator is None:
             return False
         if getattr(creator, 'is_superuser', False):
@@ -218,43 +250,35 @@ class AddStaffSerializer(serializers.ModelSerializer):
         requested_role = validated_data.pop('role')  # Role instance from RoleFlexibleField
         password = validated_data.pop('password')
 
-        # If creator is not admin/subadmin/superuser, block assignment (or adjust policy)
         if not self._creator_is_admin_or_subadmin_or_super(creator):
             raise ValidationError("You do not have permission to assign roles.")
 
-        # Create user via manager (which can accept role instance)
+        # create user via manager
         user = CustomUser.objects.create_user(role=requested_role, password=password, **validated_data)
         user.is_staff = True
         user.save()
         return user
 
     def update(self, instance, validated_data):
-        """
-        Update instance. If role is present, check creator permission and apply.
-        Other fields updated normally. Password is supported here as well.
-        """
         request = self.context.get('request', None)
         creator = getattr(request, 'user', None)
 
-        # Role change requested?
         requested_role = validated_data.get('role', None)
         if requested_role is not None:
-            # Only admin/subadmin/superuser allowed to change role to anything
             if not self._creator_is_admin_or_subadmin_or_super(creator):
                 raise ValidationError("You do not have permission to change role.")
             instance.role = requested_role
-            # remove from dict so loop below doesn't try to set it again
             validated_data.pop('role', None)
 
-        # Password handling
         if 'password' in validated_data:
             instance.set_password(validated_data.pop('password'))
 
-        # Update other fields
+        # ensure mobile_no whitespace trimmed if present
+        if 'mobile_no' in validated_data and isinstance(validated_data['mobile_no'], str):
+            validated_data['mobile_no'] = validated_data['mobile_no'].strip()
+
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
         instance.save()
         return instance
-    
-
