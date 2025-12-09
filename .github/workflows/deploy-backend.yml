@@ -1,0 +1,38 @@
+name: Deploy Backend (krisna)
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rsync files and restart backend
+        uses: appleboy/ssh-action@v0.1.9
+        with:
+          host: ${{ secrets.SSH_HOST }}        
+          username: ${{ secrets.SSH_USER }}    
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            set -e
+            cd /root/projects/dsaqua/backend
+            # make sure repo exists; if first-time clone:
+            if [ ! -d .git ]; then
+              https://github.com/teim-projects/krishna_air-backend.git .
+            fi
+            git fetch --all
+            git reset --hard origin/main
+            source /root/krishna_air/krishna_air-backend/venv/bin/activate || true
+            pip install -r requirements.txt
+            python manage.py migrate --noinput
+            python manage.py collectstatic --noinput
+            # restart systemd service
+            systemctl restart krisna-backend
+            # optional: show status
+            systemctl status krisna-backend --no-pager
