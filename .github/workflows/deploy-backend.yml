@@ -12,27 +12,36 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Rsync files and restart backend
+      - name: Deploy via SSH (server-side git)
         uses: appleboy/ssh-action@v0.1.9
         with:
-          host: ${{ secrets.SSH_HOST }}        
-          username: ${{ secrets.SSH_USER }}    
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
             set -e
-            cd /root/krishna_air/
-            # make sure repo exists; if first-time clone:
+            # change to the folder that should contain the backend repo
+            cd /root/krishna_air/krishna_air-backend
+
+            # if repo missing, clone it (server must have access to GitHub or repo is public)
             if [ ! -d .git ]; then
-              https://github.com/teim-projects/krishna_air-backend.git .
+              git clone https://github.com/teim-projects/krishna_air-backend.git .
             fi
+
+            # ensure latest code
             git fetch --all
             git reset --hard origin/main
-            source /root/krishna_air/krishna_air-backend/venv/bin/activate || true
+
+            # enter venv and install deps
+            source venv/bin/activate || true
             pip install -r requirements.txt
+
+            # django tasks
             python manage.py migrate --noinput
             python manage.py collectstatic --noinput
-            # restart systemd service
+
+            # restart systemd
+            systemctl daemon-reload || true
             systemctl restart krisna-backend
-            # optional: show status
             systemctl status krisna-backend --no-pager
