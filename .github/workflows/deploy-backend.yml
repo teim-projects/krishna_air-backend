@@ -21,7 +21,7 @@ jobs:
           port: 22
           script: |
             set -e
-            cd /root/projects/dsaqua/backend
+            cd /root/krishna_air/
             # make sure repo exists; if first-time clone:
             if [ ! -d .git ]; then
               https://github.com/teim-projects/krishna_air-backend.git .
