@@ -4,9 +4,6 @@ from django.core.exceptions import ValidationError
 # Create your models here.
 User = get_user_model()
 
-
-
-
 class Customer(models.Model):
   name = models.CharField(max_length=200)
   contact_number = models.CharField(max_length=20, blank=True, null=True)
@@ -49,7 +46,7 @@ class lead_management(models.Model):
   date = models.DateField(blank=True, null=True)
   followup_date = models.DateField(blank=True, null=True)
   remarks = models.TextField(blank=True, null=True)
-
+  creatd_by = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name='lead_created')
   def __str__(self):
         return f"Lead #{self.pk} - {self.customer.name or self.customer.email or self.customer.contact_number} - {self.get_status_display()}"
 
@@ -63,4 +60,87 @@ class lead_management(models.Model):
       self.full_clean()
       super().save(*args, **kwargs)
 
+class LeadFollowUp(models.Model):
+    lead = models.ForeignKey(
+        lead_management,
+        on_delete=models.CASCADE,
+        related_name='followups'
+    )
+    followup_date = models.DateField()
+    next_followup_date = models.DateField(blank=True, null=True)
+    remarks = models.TextField(blank=True, null=True)
+    status = models.CharField(
+        max_length=200,
+        choices=LeadStatus.choices,
+        default=LeadStatus.OPEN,
+    )
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='lead_followups_created'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Follow-up for Lead #{self.lead_id} on {self.followup_date}"
+
+    def save(self, *args, **kwargs):
+        # first save the followup itself
+        super().save(*args, **kwargs)
+
+        # ---- update main lead from this followup ----
+        lead = self.lead
+
+        # status always comes from followup
+        lead.status = self.status
+
+        # followup_date on lead = next_followup_date if given, else this followup_date
+        lead.followup_date = self.next_followup_date or self.followup_date
+
+        # optionally override remarks if you want the latest remarks on lead
+        if self.remarks:
+            lead.remarks = self.remarks
+
+        lead.save(update_fields=["status", "followup_date", "remarks"])
    
+class LeadFAQ(models.Model):
+    """
+    Master list of standard FAQ questions for leads.
+    Example: "Customer budget?", "Decision maker name?"
+    """
+    question = models.CharField(max_length=255, unique=True)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order', 'id']
+
+    def __str__(self):
+        return self.question
+
+
+class LeadFollowUpFAQAnswer(models.Model):
+    """
+    Stores answers to standard FAQs for a particular follow-up.
+    """
+    followup = models.ForeignKey(
+        LeadFollowUp,
+        on_delete=models.CASCADE,
+        related_name='faq_answers'
+    )
+    faq = models.ForeignKey(
+        LeadFAQ,
+        on_delete=models.CASCADE,
+        related_name='answers'
+    )
+    answer = models.TextField(blank=True)
+
+    class Meta:
+        unique_together = ('followup', 'faq')
+
+    def __str__(self):
+        return f"Q: {self.faq.question} | Lead #{self.followup.lead_id}"
+    
+
