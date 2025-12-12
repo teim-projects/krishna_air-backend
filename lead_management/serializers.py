@@ -113,6 +113,8 @@ class LeadSerializer(serializers.ModelSerializer):
             "capacity_required",
             "lead_source",
             "status",
+            "project_name",
+            "project_adderess",
             "date",
             "followup_date",
             "remarks",

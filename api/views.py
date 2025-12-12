@@ -120,7 +120,7 @@ class StaffViewSet(viewsets.ModelViewSet):
     authentication_classes = [JWTAuthentication]  
     pagination_class = StaffPagination 
     filter_backends = [DjangoFilterBackend , filters.SearchFilter]
-    search_fields = ['^first_name', '=email', 'mobile_no']
+    search_fields = ['^first_name', '=email', 'mobile_no','role__name']
     filterset_fields = ['role']
 
     def get_queryset(self):
@@ -129,4 +129,11 @@ class StaffViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save()
 
+from rest_framework.views import APIView
 
+class MeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = AddStaffSerializer(request.user)
+        return Response(serializer.data)

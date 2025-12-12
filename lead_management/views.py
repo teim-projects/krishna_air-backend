@@ -15,14 +15,68 @@ class CustomerViewsets(viewsets.ModelViewSet):
   authentication_classes = [JWTAuthentication]   
   permission_classes = [IsAuthenticated]
   filter_backends = [filters.SearchFilter]
-  search_fields = ['^name', '=email', 'contact_number', 'city','state' ,'site_city','site_state']
+  search_fields = ['name', '=email', 'contact_number','poc_name', 'poc_contact_number', 'land_line_no' ,'city','state' ,'site_city','site_state', 'pin_code']
+
+# class LeadViewSet(viewsets.ModelViewSet):
+#     queryset = lead_management.objects.all()
+#     serializer_class = LeadSerializer
+#     authentication_classes = [JWTAuthentication]  
+#     permission_classes = [IsAuthenticated]
+#     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+#     filterset_fields = ['assign_to','status','lead_source']
+#     search_fields = ['customer__id','customer__name','customer__contact_number','customer__email',"project_name"]
+
+#     def perform_create(self, serializer):
+#         user = self.request.user
+#         # defensive: ensure role exists, compare name case-insensitively
+#         is_sales = False
+#         if getattr(user, "role", None) and getattr(user.role, "name", None):
+#             is_sales = user.role.name.strip().lower() == "sales"
+
+#         if is_sales:
+#             # Sales user -> assign lead to themselves regardless of payload
+#             serializer.save(creatd_by=user, assign_to=user)
+#         else:
+#             # Non-sales -> set creatd_by and allow assign_to from payload (if provided)
+#             assign_to = serializer.validated_data.get("assign_to", None)
+#             serializer.save(creatd_by=user, assign_to=assign_to)
+
 
 class LeadViewSet(viewsets.ModelViewSet):
     queryset = lead_management.objects.all()
     serializer_class = LeadSerializer
-    # authentication_classes = [JWTAuthentication]  
-    permission_classes = []
+    authentication_classes = [JWTAuthentication] 
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['assign_to','status','lead_source']
+    search_fields = ['customer__id','customer__name','customer__contact_number','customer__email',"project_name"]
 
+  
+    def get_queryset(self):
+        user = self.request.user
+        queryset = super().get_queryset()
+
+        if user.is_authenticated and hasattr(user, 'role') and user.role:
+            
+            is_sales = False
+            if getattr(user.role, "name", None):
+                is_sales = user.role.name.strip().lower() == "sales"
+            
+            if is_sales:
+                return queryset.filter(assign_to=user)
+        return queryset
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        is_sales = False
+        if getattr(user, "role", None) and getattr(user.role, "name", None):
+            is_sales = user.role.name.strip().lower() == "sales"
+
+        if is_sales:
+            serializer.save(creatd_by=user, assign_to=user) 
+        else:
+            assign_to = serializer.validated_data.get("assign_to", None)
+            serializer.save(creatd_by=user, assign_to=assign_to)
 
 class LeadFAQViewSet(viewsets.ModelViewSet):
     """
@@ -31,7 +85,7 @@ class LeadFAQViewSet(viewsets.ModelViewSet):
     """
     queryset = LeadFAQ.objects.all().order_by("sort_order", "id")
     serializer_class = LeadFAQSerializer
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
 
 class LeadFollowUpViewSet(viewsets.ModelViewSet):

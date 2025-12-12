@@ -8,6 +8,9 @@ class Customer(models.Model):
   name = models.CharField(max_length=200)
   contact_number = models.CharField(max_length=20, blank=True, null=True)
   email = models.EmailField(blank=True, null=True)
+  poc_name = models.CharField(max_length=200, blank=True, null=True)
+  poc_contact_number = models.CharField(max_length=20, blank=True, null=True)
+  land_line_no = models.CharField(max_length=50 , blank=True, null=True)
   address = models.TextField(blank=True)
   city = models.CharField(max_length=100,blank=True)
   state = models.CharField(max_length=100, blank=True)
@@ -46,7 +49,10 @@ class lead_management(models.Model):
   date = models.DateField(blank=True, null=True)
   followup_date = models.DateField(blank=True, null=True)
   remarks = models.TextField(blank=True, null=True)
+  project_name = models.CharField(max_length=100, blank=True, null=True)
+  project_adderess = models.CharField(max_length=500, blank=True, null=True)
   creatd_by = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name='lead_created')
+
   def __str__(self):
         return f"Lead #{self.pk} - {self.customer.name or self.customer.email or self.customer.contact_number} - {self.get_status_display()}"
 
