@@ -30,7 +30,7 @@ SECRET_KEY = 'django-insecure-enn@a0!v4mho+wm@l@r9=(_^jy(2n+^7#49a4l!2g+%=p+-zv7
 DEBUG = True
 
 # Add allowed hosts
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ["www.api.dsaqua.online","api.dsaqua.online","localhost"]
 
 
 # Application definition
