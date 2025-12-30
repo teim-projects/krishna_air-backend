@@ -19,6 +19,7 @@ from .models import CustomUser, Role
 from .serializers import AddStaffSerializer, RoleSerializer
 from .permissions import IsAdminOrSubAdmin ,StaffObjectPermission
 from .pagination import StaffPagination
+from rest_framework.decorators import action
 User = get_user_model()
 
 class GoogleLogin(SocialLoginView):
@@ -128,6 +129,14 @@ class StaffViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save()
+
+    @action(detail=False, methods=['get'], url_path='all')
+    def all_staff(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
 
 from rest_framework.views import APIView
 

@@ -8,6 +8,7 @@ class Customer(models.Model):
   name = models.CharField(max_length=200)
   contact_number = models.CharField(max_length=20, blank=True, null=True)
   email = models.EmailField(blank=True, null=True)
+  secondary_email = models.EmailField(blank=True, null=True)
   poc_name = models.CharField(max_length=200, blank=True, null=True)
   poc_contact_number = models.CharField(max_length=20, blank=True, null=True)
   land_line_no = models.CharField(max_length=50 , blank=True, null=True)
@@ -43,7 +44,7 @@ class lead_management(models.Model):
   requirements_details = models.TextField(blank=True)
   hvac_application = models.CharField(max_length=200, blank=True)
   capacity_required =  models.CharField(max_length=200, blank=True)
-  lead_source = models.CharField(max_length=200, choices=LeadSource)
+  lead_source = models.CharField(max_length=200)
   status = models.CharField(max_length=200, choices=LeadStatus)
   assign_to = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name='lead_assignment')
   date = models.DateField(blank=True, null=True)
@@ -52,6 +53,7 @@ class lead_management(models.Model):
   project_name = models.CharField(max_length=100, blank=True, null=True)
   project_adderess = models.CharField(max_length=500, blank=True, null=True)
   creatd_by = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name='lead_created')
+  referance_by = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name='lead_referance')
 
   def __str__(self):
         return f"Lead #{self.pk} - {self.customer.name or self.customer.email or self.customer.contact_number} - {self.get_status_display()}"

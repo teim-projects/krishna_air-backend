@@ -96,13 +96,23 @@ class LeadFollowUpSerializer(serializers.ModelSerializer):
 
 
 class LeadSerializer(serializers.ModelSerializer):
+
+    
+    FIXED_SOURCES = [
+        'google_ads',
+        'indiamart',
+        'bni',
+        'other',
+    ]
     # Customer fields
     customer_name = serializers.CharField(source="customer.name", read_only=True)
     customer_contact = serializers.CharField(source="customer.contact_number", read_only=True)
     customer_email = serializers.EmailField(source="customer.email", read_only=True)
+    customer_secondary_email = serializers.EmailField(source="customer.secondary_email", read_only=True)
 
     assign_to_details = CustomUserDetailsSerializer(source="assign_to", read_only=True)
     creatd_by_details = CustomUserDetailsSerializer(source="creatd_by", read_only=True)
+    referance_by_details = CustomUserDetailsSerializer(source="referance_by", read_only=True)
     followups = LeadFollowUpSerializer(many=True, read_only=True)
     class Meta:
         model = lead_management
@@ -122,13 +132,26 @@ class LeadSerializer(serializers.ModelSerializer):
             "customer_name",
             "customer_contact",
             "customer_email",
+            "customer_secondary_email",
             "assign_to",        
-            "creatd_by", 
+            "creatd_by",
+            'referance_by', 
             "assign_to_details",
             "creatd_by_details",
+            "referance_by_details",
             "followups",    
          
         ]
         read_only_fields = ("id",) 
+
+
+        def validate_lead_source(self, value):
+            value = value.strip()
+
+            # allow fixed sources
+            if value in self.FIXED_SOURCES:
+                return value
+            
+    
 
 
