@@ -7,7 +7,9 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
 from .models import Customer , lead_management , LeadFAQ ,LeadFollowUp
 from .serializers import CustomerSerializer , LeadSerializer ,   LeadFollowUpSerializer, LeadFAQSerializer
-from django.db.models import Q
+from django.db.models import Q ,Case, When, Value, IntegerField
+from django.utils import timezone
+from .filters import LeadFilter
 
 class CustomerViewsets(viewsets.ModelViewSet):
   queryset = Customer.objects.all().order_by('id')
@@ -19,64 +21,57 @@ class CustomerViewsets(viewsets.ModelViewSet):
 
 
 
+
+
 # class LeadViewSet(viewsets.ModelViewSet):
-#     queryset = lead_management.objects.all()
+#     queryset = lead_management.objects.all().order_by("-followup_date","-date")
 #     serializer_class = LeadSerializer
-#     authentication_classes = [JWTAuthentication] 
+#     authentication_classes = [JWTAuthentication]
 #     permission_classes = [IsAuthenticated]
 #     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-#     filterset_fields = ['assign_to','status']
-#     search_fields = ['customer__id','customer__name','customer__contact_number','customer__email',"project_name"]
-  
+#     filterset_fields = ['assign_to', 'status']
+#     search_fields = [
+#         'customer__id',
+#         'customer__name',
+#         'customer__contact_number',
+#         'customer__email',
+#         'project_name',
+#         'lead_source'
+#     ]
+
 #     def get_queryset(self):
 #         user = self.request.user
 #         queryset = super().get_queryset()
 
-#         if user.is_authenticated and hasattr(user, 'role') and user.role:
-            
-#             is_sales = False
-#             if getattr(user.role, "name", None):
-#                 is_sales = user.role.name.strip().lower() == "sales"
-            
-#             if is_sales:
-#                 return queryset.filter(assign_to=user)
-            
-#          # 🔹 lead_source FILTER (from serializer)
-#         fixed_sources = self.get_serializer_class().FIXED_SOURCES
-        
+#         # 🔹 SALES USER FILTER
+#         if getattr(user, 'role', None) and getattr(user.role, "name", "").lower() == "sales":
+#             queryset = queryset.filter(assign_to=user)
+
+#         # 🔹 lead_source FILTER
+#         lead_source = self.request.query_params.get("lead_source")
+
 #         if lead_source:
 #             lead_source = lead_source.strip().lower()
-
 #             fixed_sources = self.get_serializer_class().FIXED_SOURCES
 
-#             if lead_source in fixed_sources:
-#                 queryset = queryset.filter(lead_source=lead_source)
+#             if lead_source == "other":
+#                 # ✅ ALL NON-FIXED lead sources
+#                 queryset = queryset.exclude(lead_source__in=fixed_sources)
 #             else:
-#                 queryset = queryset.filter(lead_source="other")
+#                 # ✅ FIXED lead source
+#                 queryset = queryset.filter(lead_source=lead_source)
+
 #         return queryset
-
-#     def perform_create(self, serializer):
-#         user = self.request.user
-#         is_sales = False
-#         if getattr(user, "role", None) and getattr(user.role, "name", None):
-#             is_sales = user.role.name.strip().lower() == "sales"
-
-#         if is_sales:
-#             serializer.save(creatd_by=user, assign_to=user) 
-#         else:
-#             assign_to = serializer.validated_data.get("assign_to", None)
-#             serializer.save(creatd_by=user, assign_to=assign_to)
-
-
 
 
 class LeadViewSet(viewsets.ModelViewSet):
-    queryset = lead_management.objects.all()
     serializer_class = LeadSerializer
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    filterset_fields = ['assign_to', 'status']
+    filterset_class = LeadFilter
+
+    filterset_fields = ['assign_to', 'status','followup_date','date']
     search_fields = [
         'customer__id',
         'customer__name',
@@ -85,30 +80,51 @@ class LeadViewSet(viewsets.ModelViewSet):
         'project_name',
         'lead_source'
     ]
-
     def get_queryset(self):
         user = self.request.user
-        queryset = super().get_queryset()
+        today = timezone.localdate()
+
+        queryset = (
+            lead_management.objects
+            .annotate(
+                followup_priority=Case(
+                    # 1️⃣ Today's followups
+                    When(followup_date=today, then=Value(3)),
+
+                    # 2️⃣ Future followups
+                    When(followup_date__gt=today, then=Value(2)),
+
+                    # 3️⃣ No followup
+                    When(followup_date__isnull=True, then=Value(0)),
+
+                    default=Value(1),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by(
+                "-followup_priority",
+                "-followup_date",
+                "-date"
+            )
+        )
 
         # 🔹 SALES USER FILTER
-        if getattr(user, 'role', None) and getattr(user.role, "name", "").lower() == "sales":
+        if getattr(user, 'role', None) and user.role.name.lower() == "sales":
             queryset = queryset.filter(assign_to=user)
 
         # 🔹 lead_source FILTER
         lead_source = self.request.query_params.get("lead_source")
-
         if lead_source:
             lead_source = lead_source.strip().lower()
             fixed_sources = self.get_serializer_class().FIXED_SOURCES
 
             if lead_source == "other":
-                # ✅ ALL NON-FIXED lead sources
                 queryset = queryset.exclude(lead_source__in=fixed_sources)
             else:
-                # ✅ FIXED lead source
                 queryset = queryset.filter(lead_source=lead_source)
 
         return queryset
+
 
 class LeadFAQViewSet(viewsets.ModelViewSet):
     """
