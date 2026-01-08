@@ -109,7 +109,7 @@ class LeadSerializer(serializers.ModelSerializer):
     customer_contact = serializers.CharField(source="customer.contact_number", read_only=True)
     customer_email = serializers.EmailField(source="customer.email", read_only=True)
     customer_secondary_email = serializers.EmailField(source="customer.secondary_email", read_only=True)
-
+    customer_address = serializers.EmailField(source="customer.address", read_only=True)
     assign_to_details = CustomUserDetailsSerializer(source="assign_to", read_only=True)
     creatd_by_details = CustomUserDetailsSerializer(source="creatd_by", read_only=True)
     referance_by_details = CustomUserDetailsSerializer(source="referance_by", read_only=True)
@@ -126,12 +126,14 @@ class LeadSerializer(serializers.ModelSerializer):
             "project_name",
             "project_adderess",
             "date",
+            "enquiry_date",
             "followup_date",
             "remarks",
             "customer",        
             "customer_name",
             "customer_contact",
             "customer_email",
+            "customer_address",
             "customer_secondary_email",
             "assign_to",        
             "creatd_by",
@@ -142,7 +144,7 @@ class LeadSerializer(serializers.ModelSerializer):
             "followups",    
          
         ]
-        read_only_fields = ("id",) 
+        read_only_fields = ("id","creatd_by","date") 
 
 
         def validate_lead_source(self, value):

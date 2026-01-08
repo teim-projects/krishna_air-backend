@@ -45,9 +45,11 @@ class lead_management(models.Model):
   hvac_application = models.CharField(max_length=200, blank=True)
   capacity_required =  models.CharField(max_length=200, blank=True)
   lead_source = models.CharField(max_length=200)
+  lead_source_input = models.CharField(max_length=200, blank=True, null=True)
   status = models.CharField(max_length=200, choices=LeadStatus)
   assign_to = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name='lead_assignment')
   date = models.DateField(blank=True, null=True)
+  enquiry_date = models.DateField(blank=True, null=True)
   followup_date = models.DateField(blank=True, null=True)
   remarks = models.TextField(blank=True, null=True)
   project_name = models.CharField(max_length=100, blank=True, null=True)
@@ -64,7 +66,6 @@ class lead_management(models.Model):
           raise ValidationError({"followup_date": "followup_date cannot be before date."})
   
   def save(self, *args, **kwargs):
-      # call full_clean to trigger model validation before saving (optional)
       self.full_clean()
       super().save(*args, **kwargs)
 

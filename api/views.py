@@ -130,7 +130,7 @@ class StaffViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save()
 
-    @action(detail=False, methods=['get'], url_path='all')
+    @action(detail=False, methods=['get'], url_path='all' , permission_classes=[IsAuthenticated])
     def all_staff(self, request):
         queryset = self.filter_queryset(self.get_queryset())
         serializer = self.get_serializer(queryset, many=True)
