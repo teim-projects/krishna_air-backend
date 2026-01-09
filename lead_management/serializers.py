@@ -122,6 +122,7 @@ class LeadSerializer(serializers.ModelSerializer):
             "hvac_application",
             "capacity_required",
             "lead_source",
+            "lead_source_input",
             "status",
             "project_name",
             "project_adderess",
@@ -153,7 +154,7 @@ class LeadSerializer(serializers.ModelSerializer):
             # allow fixed sources
             if value in self.FIXED_SOURCES:
                 return value
-            
+           
     
 
 

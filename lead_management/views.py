@@ -10,6 +10,8 @@ from .serializers import CustomerSerializer , LeadSerializer ,   LeadFollowUpSer
 from django.db.models import Q ,Case, When, Value, IntegerField
 from django.utils import timezone
 from .filters import LeadFilter
+from rest_framework.decorators import action
+
 
 class CustomerViewsets(viewsets.ModelViewSet):
   queryset = Customer.objects.all().order_by('id')
@@ -100,6 +102,35 @@ class LeadViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(lead_source=lead_source)
 
         return queryset
+    
+    @action(detail=False, methods=['get'], url_path='latest-lead-by-mobile')
+    def latest_lead_by_mobile(self, request):
+        mobile = request.query_params.get("mobile")
+
+        if not mobile:
+            return Response(
+                {"error": "Mobile number is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        lead = (
+            lead_management.objects
+            .select_related("customer")
+            .filter(customer__contact_number=mobile)
+            .order_by("-date", "-id")
+            .first()
+        )
+
+        if not lead:
+            return Response(
+                {"message": "No lead found for this mobile number"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        return Response({
+            "project_name": lead.project_name,
+            "address": lead.project_adderess if hasattr(lead.customer, "address") else None
+        }, status=status.HTTP_200_OK)
 
 
 class LeadFAQViewSet(viewsets.ModelViewSet):

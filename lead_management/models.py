@@ -31,7 +31,14 @@ class LeadSource(models.TextChoices):
     GOOGLE_ADS = 'google_ads', 'Google Ads'
     INDIAMART = 'indiamart', 'IndiaMART'
     BNI = 'bni', 'BNI'
+    JUSTDIAL = 'justdial', 'Justdial'
+    REFERENCE = 'reference', 'Reference'
+    ARCHITECT_INTERIOR_DESIGNER = 'architect/interior_designer', 'Architect / Interior Designer'
+    BUILDER = 'builder', 'Builder'
+    EXISTING_CUSTOMER = 'existing_customer', 'Existing Customer'
+    KA_STAFF = 'ka_staff', 'KA Staff'
     OTHER = 'other', 'Other'
+
 
 
 class LeadStatus(models.TextChoices):
