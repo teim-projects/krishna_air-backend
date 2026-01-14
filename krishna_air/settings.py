@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     # My apps
     'api',
     'lead_management',
+    'product_management',
 ] 
 
 SITE_ID = 1
@@ -167,6 +168,18 @@ DATABASES = {
         'PASSWORD':'',
         'HOST':'localhost',
         'PORT':3306
+    }
+}
+
+
+# Redis cache settings
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/1",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
     }
 }
 
