@@ -5,8 +5,8 @@ from .views import acTypeViewSet , acSubTypesViewSet, brandViewSet
 
 router = DefaultRouter()
 router.register(r'actype', acTypeViewSet, basename='actype')
-router.register(r'ac-subtypes', acTypeViewSet, basename='ac-subtypes')
-router.register(r'ac-brand', acTypeViewSet, basename='brand')
+router.register(r'ac-subtypes', acSubTypesViewSet, basename='ac-subtypes')
+router.register(r'ac-brand', brandViewSet, basename='brand')
 
 urlpatterns = [
     
