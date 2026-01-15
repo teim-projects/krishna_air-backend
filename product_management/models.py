@@ -64,7 +64,7 @@ class ProductVariant(models.Model):
     return f"{brand_code}-{model_code}-{capacity_code}-{star_code}-{unique_code}"
 
   def __str__(self):
-        return f"{self.product_model.name} - {self.capacity} Ton - {self.star_rating}★"
+        return self.sku
   
 
 INVENTORY_STATUS = [
