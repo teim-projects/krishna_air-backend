@@ -55,7 +55,7 @@ class ProductVariant(models.Model):
         SAM-AR18-15-5-9F2A
     """
 
-    brand_code = self.product_model.brand.name[:3].upper()
+    brand_code = self.product_model.brand_id.name[:3].upper()
     model_code = self.product_model.model_no[:5].upper()
     capacity_code = str(self.capacity).replace('.', '')
     star_code = str(self.star_rating)
