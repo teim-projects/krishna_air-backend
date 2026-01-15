@@ -5,7 +5,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework import status , filters
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import *
-from .serializers import acTypeSerializer , acSubTypesSerializer, brandSerializer
+from .serializers import acTypeSerializer , acSubTypesSerializer, brandSerializer , productModelSerializer , productVariantSerializer
 
 
 class acTypeViewSet(ModelViewSet):
@@ -35,3 +35,26 @@ class brandViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter]
     search_fields  = ['name']
+
+
+class productModelViewSet(ModelViewSet):
+    queryset = ProductModel.objects.all()
+    serializer_class = productModelSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['brand_id','ac_sub_type_id','is_active','inverter','phase']
+    search_fields  = ['name','model_no']
+
+class productVariabtViewSet(ModelViewSet):
+    queryset = ProductVariant.objects.all()
+    serializer_class = productVariantSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['is_active','product_model__inverter','product_model__phase']
+    search_fields  = ['sku','capacity']
+
+
+
+
