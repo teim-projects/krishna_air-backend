@@ -64,7 +64,7 @@ class productInventoryViewSet(ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['status', 
                         'purchase_date',
-                        'product_variant__product_model__brand__name'
+                        'product_variant__product_model__brand_id__name'
                         ]
     
     search_fields  = ['serial_no',
