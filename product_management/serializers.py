@@ -43,7 +43,17 @@ class productModelSerializer(serializers.ModelSerializer):
     fields = '__all__'
 
 class productVariantSerializer(serializers.ModelSerializer):
-
+  model_name = serializers.CharField(
+    source = "product_model.name",
+    read_only = True
+  )
+   
   class Meta:
     model = ProductVariant
+    fields = '__all__'
+
+class productInventorySerializer(serializers.ModelSerializer):
+
+  class Meta:
+    model = ProductInventory
     fields = '__all__'

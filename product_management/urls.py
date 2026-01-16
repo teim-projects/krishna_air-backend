@@ -9,6 +9,7 @@ router.register(r'ac-subtypes', acSubTypesViewSet, basename='ac-subtypes')
 router.register(r'ac-brand', brandViewSet, basename='brand')
 router.register(r'product-model', productModelViewSet, basename='product-model')
 router.register(r'product-variant', productVariabtViewSet, basename='product-variant')
+# router.register(r'product-inventory',)
 
 urlpatterns = [
     
