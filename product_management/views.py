@@ -24,7 +24,7 @@ class acSubTypesViewSet(ModelViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter]
-    search_fields  = ['name']
+    search_fields  = ['name','id']
 
 
 
@@ -34,7 +34,7 @@ class brandViewSet(ModelViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter]
-    search_fields  = ['name']
+    search_fields  = ['name','id']
 
 
 class productModelViewSet(ModelViewSet):
@@ -44,7 +44,7 @@ class productModelViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['brand_id','ac_sub_type_id','is_active','inverter','phase']
-    search_fields  = ['name','model_no']
+    search_fields  = ['name','model_no','id']
 
 class productVariabtViewSet(ModelViewSet):
     queryset = ProductVariant.objects.all()
@@ -53,7 +53,7 @@ class productVariabtViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['is_active','product_model__inverter','product_model__phase']
-    search_fields  = ['sku','capacity']
+    search_fields  = ['sku','capacity','id']
 
 
 class productInventoryViewSet(ModelViewSet):
