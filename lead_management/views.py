@@ -168,7 +168,6 @@ class LeadViewSet(viewsets.ModelViewSet):
             "address": lead.project_adderess if hasattr(lead.customer, "address") else None
         }, status=status.HTTP_200_OK)
 
-
 class LeadFAQViewSet(viewsets.ModelViewSet):
     queryset = LeadFAQ.objects.all().order_by("sort_order", "id")
     serializer_class = LeadFAQSerializer

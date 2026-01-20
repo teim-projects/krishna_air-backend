@@ -1,9 +1,11 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from product_management.models import *
 # Create your models here.
 User = get_user_model()
 
+# Customer
 class Customer(models.Model):
   name = models.CharField(max_length=200)
   contact_number = models.CharField(max_length=20, blank=True, null=True)
@@ -26,7 +28,7 @@ class Customer(models.Model):
         return f"{self.name} ({self.email or self.contact_number or ''})"
 
 
-  
+#   Lead source
 class LeadSource(models.TextChoices):
     GOOGLE_ADS = 'google_ads', 'Google Ads'
     INDIAMART = 'indiamart', 'IndiaMART'
@@ -40,17 +42,18 @@ class LeadSource(models.TextChoices):
     OTHER = 'other', 'Other'
 
 
-
+# Lead status
 class LeadStatus(models.TextChoices):
     OPEN = 'open', 'Open'
     CLOSED = 'closed', 'Closed'
     IN_PROCESS = 'in_process', 'In Process'
 
+# Lead management 
 class lead_management(models.Model):
   customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='leads')
   requirements_details = models.TextField(blank=True)
-  hvac_application = models.CharField(max_length=200, blank=True)
-  capacity_required =  models.CharField(max_length=200, blank=True)
+#   hvac_application = models.CharField(max_length=200, blank=True, null=True)
+#   capacity_required =  models.CharField(max_length=200, blank=True, null=True)
   lead_source = models.CharField(max_length=200)
   lead_source_input = models.CharField(max_length=200, blank=True, null=True)
   status = models.CharField(max_length=200, choices=LeadStatus)
@@ -76,6 +79,30 @@ class lead_management(models.Model):
       self.full_clean()
       super().save(*args, **kwargs)
 
+# Lead Product
+class lead_product(models.Model):
+    lead = models.ForeignKey(
+                             lead_management, 
+                             on_delete=models.CASCADE,
+                             related_name="lead_products"
+                             )
+    ac_type = models.ForeignKey(acType, on_delete=models.PROTECT)
+    ac_sub_type = models.ForeignKey(acSubTypes, on_delete=models.PROTECT)
+    brand = models.ForeignKey(brand, on_delete=models.PROTECT)
+    product_model = models.ForeignKey(ProductModel, on_delete=models.PROTECT)
+    variant = models.ForeignKey(ProductVariant, on_delete=models.PROTECT)
+
+    quantity = models.PositiveIntegerField(blank=True, null=True)
+    expected_price = models.DecimalField(
+        max_digits=10, decimal_places=2, blank=True, null=True
+    )
+    remarks = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"Lead {self.lead.id} - {self.variant.sku}"
+
+
+# Lead Followup
 class LeadFollowUp(models.Model):
     lead = models.ForeignKey(
         lead_management,
@@ -120,7 +147,8 @@ class LeadFollowUp(models.Model):
             lead.remarks = self.remarks
 
         lead.save(update_fields=["status", "followup_date", "remarks"])
-   
+
+# Lead FAQ 
 class LeadFAQ(models.Model):
     """
     Master list of standard FAQ questions for leads.
@@ -136,7 +164,7 @@ class LeadFAQ(models.Model):
     def __str__(self):
         return self.question
 
-
+# Lead followupFAQAnswer
 class LeadFollowUpFAQAnswer(models.Model):
     """
     Stores answers to standard FAQs for a particular follow-up.

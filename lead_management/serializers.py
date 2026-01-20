@@ -1,8 +1,9 @@
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from .models import Customer, lead_management ,  LeadFollowUp, LeadFAQ, LeadFollowUpFAQAnswer
+from .models import Customer, lead_management ,  LeadFollowUp, LeadFAQ, LeadFollowUpFAQAnswer , lead_product
 from api.serializers import CustomUserDetailsSerializer
 from django.contrib.auth import get_user_model
+from django.db import transaction
 
 User = get_user_model()
 
@@ -94,33 +95,82 @@ class LeadFollowUpSerializer(serializers.ModelSerializer):
     
 
 
+class LeadProductSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = lead_product
+        fields = [
+            'id',
+            'ac_type',
+            'ac_sub_type',
+            'brand',
+            'product_model',
+            'variant',
+            'quantity',
+            'expected_price',
+            'remarks'
+        ]
+
+
+class LeadProductReadSerializer(serializers.ModelSerializer):
+    ac_type = serializers.StringRelatedField()
+    ac_sub_type = serializers.StringRelatedField()
+    brand = serializers.StringRelatedField()
+    product_model = serializers.StringRelatedField()
+    variant = serializers.StringRelatedField()
+
+    class Meta:
+        model = lead_product
+        fields = [
+            'id',
+            'ac_type',
+            'ac_sub_type',
+            'brand',
+            'product_model',
+            'variant',
+            'quantity',
+            'expected_price',
+            'remarks'
+        ]
+
+
 
 class LeadSerializer(serializers.ModelSerializer):
-
     
     FIXED_SOURCES = [
         'google_ads',
         'indiamart',
         'bni',
+        'justdial',
+        'reference',
+        'architect/interior_designe',
+        'builder',
+        'existing_customer',
+        'ka_staff',
         'other',
     ]
+    products = LeadProductSerializer(many=True, write_only=True)
+    product_details = LeadProductReadSerializer(
+        many=True,
+        source="lead_products",
+        read_only=True
+    )
     # Customer fields
     customer_name = serializers.CharField(source="customer.name", read_only=True)
     customer_contact = serializers.CharField(source="customer.contact_number", read_only=True)
     customer_email = serializers.EmailField(source="customer.email", read_only=True)
     customer_secondary_email = serializers.EmailField(source="customer.secondary_email", read_only=True)
-    customer_address = serializers.EmailField(source="customer.address", read_only=True)
+    customer_address = serializers.CharField(source="customer.address", read_only=True)
     assign_to_details = CustomUserDetailsSerializer(source="assign_to", read_only=True)
     creatd_by_details = CustomUserDetailsSerializer(source="creatd_by", read_only=True)
     referance_by_details = CustomUserDetailsSerializer(source="referance_by", read_only=True)
     followups = LeadFollowUpSerializer(many=True, read_only=True)
+
     class Meta:
         model = lead_management
         fields = [
             "id",
             "requirements_details",
-            "hvac_application",
-            "capacity_required",
             "lead_source",
             "lead_source_input",
             "status",
@@ -142,19 +192,61 @@ class LeadSerializer(serializers.ModelSerializer):
             "assign_to_details",
             "creatd_by_details",
             "referance_by_details",
-            "followups",    
+            "followups",
+            "products",
+            "product_details",   
+             
          
         ]
         read_only_fields = ("id","creatd_by","date") 
 
 
-        def validate_lead_source(self, value):
-            value = value.strip()
+       
 
-            # allow fixed sources
-            if value in self.FIXED_SOURCES:
-                return value
-           
+        # def validate_lead_source(self, value):
+        #     value = value.strip()
+
+        #     # allow fixed sources
+        #     if value in self.FIXED_SOURCES:
+        #         return value
+
+    @transaction.atomic
+    def create(self, validated_data):
+        products = validated_data.pop("products", [])
+        lead = lead_management.objects.create(**validated_data)
+        for product in products:
+            lead_product.objects.create(
+                lead=lead,
+                **product
+            )
+        return lead
     
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        products = validated_data.pop("products", None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        if products is not None:
+            instance.lead_products.all().delete()
+            for product in products:
+                lead_product.objects.create(
+                    lead=instance,
+                    **product
+                )
+        return instance
+
+    def validate_lead_source(self, value):
+        value = value.strip().lower()
+    
+        if value in self.FIXED_SOURCES:
+            return value
+    
+        # allow custom value only if "other"
+        if value and value not in self.FIXED_SOURCES:
+            return value
+    
+        raise serializers.ValidationError("Invalid lead source")
+
 
 

@@ -1,5 +1,7 @@
 from django.db import models
 import uuid
+
+
 class acType(models.Model):
   name = models.CharField(max_length=100)
   description = models.TextField(blank=True, null=True)
