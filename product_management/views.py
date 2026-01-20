@@ -24,7 +24,7 @@ class acSubTypesViewSet(ModelViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter]
-    search_fields  = ['name','ac_type_id']
+    search_fields  = ['name','ac_type_id__id']
 
 
 
