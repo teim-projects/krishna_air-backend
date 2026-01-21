@@ -26,27 +26,28 @@ class brandSerializer(serializers.ModelSerializer):
     model = brand
     fields = '__all__'
 
-
 class productModelSerializer(serializers.ModelSerializer):
-  ac_sub_type_name = serializers.CharField(
-    source = 'ac_sub_type_id.name',
-    read_only = True
-  )
+    ac_sub_type_name = serializers.CharField(
+        source='ac_sub_type_id.name',
+        read_only=True
+    )
 
-  brand_name = serializers.CharField(
-    source = "brand_id.name",
-    read_only = True
-  )
+    brand_name = serializers.CharField(
+        source='brand_id.name',
+        read_only=True
+    )
 
-  model = serializers.CharField()
+    model = serializers.SerializerMethodField()
 
-  class Meta:
-    model = ProductModel
-    fields = '__all__'
+    class Meta:
+        model = ProductModel
+        fields = '__all__'
 
-  def get_model(self, obj):
+    def get_model(self, obj):
         inverter_text = "Inverter" if obj.inverter else "Non-Inverter"
         return f"{obj.model_no} - {inverter_text} - {obj.phase} Phase"
+    
+    
 
 class productVariantSerializer(serializers.ModelSerializer):
   model_name = serializers.CharField(
