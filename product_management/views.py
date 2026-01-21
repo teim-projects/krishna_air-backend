@@ -52,7 +52,7 @@ class productVariabtViewSet(ModelViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    filterset_fields = ['is_active','product_model__inverter','product_model__phase']
+    filterset_fields = ['is_active','product_model__inverter','product_model__phase','product_model']
     search_fields  = ['sku','capacity']
 
 
