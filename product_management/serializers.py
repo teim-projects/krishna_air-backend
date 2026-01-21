@@ -38,9 +38,15 @@ class productModelSerializer(serializers.ModelSerializer):
     read_only = True
   )
 
+  model = serializers.CharField()
+
   class Meta:
     model = ProductModel
     fields = '__all__'
+
+  def get_model(self, obj):
+        inverter_text = "Inverter" if obj.inverter else "Non-Inverter"
+        return f"{obj.model_no} - {inverter_text} - {obj.phase} Phase"
 
 class productVariantSerializer(serializers.ModelSerializer):
   model_name = serializers.CharField(
