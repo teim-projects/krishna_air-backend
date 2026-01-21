@@ -45,9 +45,9 @@ class productModelSerializer(serializers.ModelSerializer):
 
     def get_model(self, obj):
         inverter_text = "Inverter" if obj.inverter else "Non-Inverter"
-        return f"{obj.model_no} - {inverter_text} - {obj.phase} Phase"
+        return f"{obj.model_no}-{inverter_text}-{obj.phase}"
     
-    
+
 
 class productVariantSerializer(serializers.ModelSerializer):
   model_name = serializers.CharField(
