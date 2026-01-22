@@ -223,18 +223,32 @@ class LeadSerializer(serializers.ModelSerializer):
     
     @transaction.atomic
     def update(self, instance, validated_data):
-        products = validated_data.pop("products", None)
+        products = validated_data.pop("products", [])
+        deleted_ids = self.context["request"].data.get("deleted_products", [])
+    
+        # ✅ 1. Update lead fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
-        if products is not None:
-            instance.lead_products.all().delete()
-            for product in products:
-                lead_product.objects.create(
-                    lead=instance,
-                    **product
-                )
+    
+        # ✅ 2. Delete removed products
+        if deleted_ids:
+            lead_product.objects.filter(
+                lead=instance,
+                id__in=deleted_ids
+            ).delete()
+    
+        # ✅ 3. Add new products
+        for product in products:
+            lead_product.objects.create(
+                lead=instance,
+                **product
+            )
+    
         return instance
+    
+
+
 
     def validate_lead_source(self, value):
         value = value.strip().lower()

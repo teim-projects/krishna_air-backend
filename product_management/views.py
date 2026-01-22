@@ -23,8 +23,10 @@ class acSubTypesViewSet(ModelViewSet):
     serializer_class = acSubTypesSerializer
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
-    filter_backends = [filters.SearchFilter]
-    search_fields  = ['name','ac_type_id__id']
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['ac_type_id']
+    search_fields  = ['name']
+
 
 
 
