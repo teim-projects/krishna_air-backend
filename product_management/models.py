@@ -34,8 +34,12 @@ class ProductModel(models.Model):
   is_active = models.BooleanField(default=True)
   description = models.TextField(blank=True, null=True)
 
+  
   def __str__(self):
-        return f"{self.name} - {self.brand_id.name}"
+        inverter_text = "Inverter" if self.inverter else "Non-Inverter"
+        return f"{self.model_no}-{inverter_text}-{self.phase}"
+  
+
 
 class ProductVariant(models.Model):
   product_model = models.ForeignKey(ProductModel, on_delete=models.CASCADE, related_name='variants')

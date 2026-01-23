@@ -168,6 +168,8 @@ class LeadViewSet(viewsets.ModelViewSet):
             "address": lead.project_adderess if hasattr(lead.customer, "address") else None
         }, status=status.HTTP_200_OK)
 
+
+
 class LeadFAQViewSet(viewsets.ModelViewSet):
     queryset = LeadFAQ.objects.all().order_by("sort_order", "id")
     serializer_class = LeadFAQSerializer
@@ -185,7 +187,8 @@ class LeadFollowUpViewSet(viewsets.ModelViewSet):
         qs = (
             LeadFollowUp.objects
             .select_related("lead", "created_by")
-            .prefetch_related("faq_answers__faq")
+            .prefetch_related("faq_answers__faq",
+                              "lead__lead_products", )
         )
         lead_id = self.request.query_params.get("lead")
         if lead_id:
@@ -195,3 +198,4 @@ class LeadFollowUpViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         # created_by is set inside serializer.create but this is also ok
         serializer.save(created_by=self.request.user)
+
