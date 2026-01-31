@@ -83,7 +83,7 @@ class ProductInventory(models.Model):
    product_variant = models.ForeignKey(ProductVariant, on_delete=models.CASCADE, related_name='inventory')
    serial_no = models.CharField(max_length=200)
    status = models.CharField(max_length=20, choices=INVENTORY_STATUS, default="IN_STOCK")
-   warehouse = models.CharField(max_length=200)
+   warehouse = models.CharField(max_length=200, blank=True, null=True)
    purchase_date = models.DateField(blank=True, null=True)
    warranty_start = models.DateField(blank=True, null=True)
    warranty_end = models.DateField(blank=True, null=True)

@@ -60,7 +60,10 @@ class productVariantSerializer(serializers.ModelSerializer):
     fields = '__all__'
 
 class productInventorySerializer(serializers.ModelSerializer):
-
+  sku = serializers.CharField(
+    source = 'product_variant.sku',
+    read_only = True
+  )
   class Meta:
     model = ProductInventory
     fields = '__all__'
