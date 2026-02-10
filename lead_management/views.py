@@ -42,21 +42,24 @@ class CustomerViewsets(viewsets.ModelViewSet):
         return response
 
     def retrieve(self, request, *args, **kwargs):
-        
         customer_id = kwargs.get("pk")
         user_id = request.user.id
-
+    
         cache_key = f"customers:detail:{customer_id}:user={user_id}"
-
+    
         cached_data = cache.get(cache_key)
-
         if cached_data:
             return Response(cached_data)
-        
-        response = super().retrieve(request, response.data, self.CACHE_TTL)
-        
-        
+    
+        # 1️⃣ First get the response from DRF
+        response = super().retrieve(request, *args, **kwargs)
+    
+        # 2️⃣ Cache the data
+        cache.set(cache_key, response.data, self.CACHE_TTL)
+    
+        # 3️⃣ Return the response
         return response
+
 
 
 
