@@ -1,0 +1,19 @@
+FROM python:3.13-slim
+
+WORKDIR /app
+
+# System deps for mysqlclient and other native packages
+RUN apt-get update && apt-get install -y \
+    gcc \
+    pkg-config \
+    default-libmysqlclient-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy only requirements first (better cache)
+COPY requirements.txt .
+
+# Install Python dependencies (this installs Django!)
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy rest of the project
+COPY . .
