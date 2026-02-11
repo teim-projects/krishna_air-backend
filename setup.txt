@@ -1,8 +1,8 @@
 # start container
-docker compose docker/docker-compose.dev.yml up -d --build 
+docker compose -f docker/docker-compose.dev.yml up -d --build 
 
 # stop container 
-docker compose docker/docker-compose.dev.yml down -v
+docker compose -f docker/docker-compose.dev.yml down -v
 
 # access container
 docker exec -it <container name> sh
