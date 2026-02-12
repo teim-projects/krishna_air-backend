@@ -332,6 +332,8 @@ class LeadSerializer(serializers.ModelSerializer):
             "lead_source",
             "lead_source_input",
             "status",
+            "lead_type",
+            "is_service_lead",
             "project_name",
             "project_adderess",
             "date",
