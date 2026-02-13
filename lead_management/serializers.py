@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from .models import Customer, lead_management ,  LeadFollowUp, LeadFAQ, LeadFollowUpFAQAnswer , lead_product
+from .models import Customer, LeadFollowUpProduct, lead_management ,  LeadFollowUp, LeadFAQ, LeadFollowUpFAQAnswer , lead_product
 from api.serializers import CustomUserDetailsSerializer
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -67,47 +67,68 @@ class LeadProductSerializer(serializers.ModelSerializer):
             'expected_price',
             'remarks'
         ]
-
-
 class LeadProductReadSerializer(serializers.ModelSerializer):
-    ac_type = serializers.StringRelatedField()
-    ac_sub_type = serializers.StringRelatedField()
-    brand = serializers.StringRelatedField()
-    product_model = serializers.StringRelatedField()
-    variant = serializers.StringRelatedField()
+    ac_type_id = serializers.IntegerField(source="ac_type.id", read_only=True)
+    ac_type_name = serializers.CharField(source="ac_type.name", read_only=True)
+
+    ac_sub_type_id = serializers.IntegerField(source="ac_sub_type.id", read_only=True)
+    ac_sub_type_name = serializers.CharField(source="ac_sub_type.name", read_only=True)
+
+    brand_id = serializers.IntegerField(source="brand.id", read_only=True)
+    brand_name = serializers.CharField(source="brand.name", read_only=True)
+
+    product_model_id = serializers.IntegerField(source="product_model.id", read_only=True)
+    product_model_name = serializers.CharField(source="product_model.name", read_only=True)
+
+    variant_id = serializers.IntegerField(source="variant.id", read_only=True)
+    variant_name = serializers.CharField(source="variant.sku", read_only=True)
 
     class Meta:
         model = lead_product
         fields = [
             'id',
-            'ac_type',
-            'ac_sub_type',
-            'brand',
-            'product_model',
-            'variant',
+
+            'ac_type_id', 'ac_type_name',
+            'ac_sub_type_id', 'ac_sub_type_name',
+            'brand_id', 'brand_name',
+            'product_model_id', 'product_model_name',
+            'variant_id', 'variant_name',
+
             'quantity',
             'expected_price',
             'remarks'
         ]
 
+
+class LeadFollowUpProductSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LeadFollowUpProduct
+        fields = [
+            "id",
+            "ac_type",
+            "ac_sub_type",
+            "brand",
+            "product_model",
+            "variant",
+            "quantity",
+            "expected_price",
+            "remarks",
+        ]
+
+
+
 class LeadFollowUpSerializer(serializers.ModelSerializer):
-    """
-    Main serializer for LeadFollowUp with nested FAQ answers.
-    """
+    faq_answers = LeadFollowUpFAQAnswerSerializer(many=True, required=False)
 
-    faq_answers = LeadFollowUpFAQAnswerSerializer(
-        many=True, required=False
-    )
-
-    products = LeadProductSerializer(
+    products = LeadFollowUpProductSerializer(
         many=True,
         required=False,
         write_only=True
     )
 
-    product_details = LeadProductReadSerializer(
+    product_details = LeadFollowUpProductSerializer(
         many=True,
-        source="lead.lead_products",
+        source="products",
         read_only=True
     )
 
@@ -129,8 +150,8 @@ class LeadFollowUpSerializer(serializers.ModelSerializer):
             "created_by",
             "created_at",
             "faq_answers",
-            "products",
-            "product_details",
+            "products",          # write
+            "product_details",   # read
         ]
         read_only_fields = ["id", "created_by", "created_at"]
 
@@ -140,30 +161,45 @@ class LeadFollowUpSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         request = self.context.get("request")
-        
+
         faq_data = validated_data.pop("faq_answers", [])
         products_data = validated_data.pop("products", [])
 
-        deleted_ids = request.data.get("deleted_products", [])
-        
         if request and request.user.is_authenticated:
             validated_data["created_by"] = request.user
 
         followup = LeadFollowUp.objects.create(**validated_data)
 
+        # 1️⃣ Save FAQ answers
         for item in faq_data:
-            LeadFollowUpFAQAnswer.objects.create(
+            LeadFollowUpFAQAnswer.objects.create(followup=followup, **item)
+
+        # 2️⃣ Snapshot into LeadFollowUpProduct
+        for product in products_data:
+            LeadFollowUpProduct.objects.create(
                 followup=followup,
-                **item
+                **product
             )
 
-        if deleted_ids:
-            lead_product.objects.filter(
-                lead=followup.lead,
-                id__in=deleted_ids
-            ).delete()
+        # 3️⃣ Sync latest followup products → lead_product (current state)
+        lead = followup.lead
 
-        self._sync_products(followup.lead, products_data)
+        # delete old current products
+        lead.lead_products.all().delete()
+
+        # recreate from followup products
+        for product in products_data:
+            lead_product.objects.create(
+                lead=lead,
+                ac_type=product["ac_type"],
+                ac_sub_type=product["ac_sub_type"],
+                brand=product["brand"],
+                product_model=product["product_model"],
+                variant=product["variant"],
+                quantity=product.get("quantity"),
+                expected_price=product.get("expected_price"),
+                remarks=product.get("remarks"),
+            )
 
         return followup
 
@@ -172,73 +208,32 @@ class LeadFollowUpSerializer(serializers.ModelSerializer):
     # =========================
     @transaction.atomic
     def update(self, instance, validated_data):
-        request = self.context.get("request")
-
         faq_data = validated_data.pop("faq_answers", None)
         products_data = validated_data.pop("products", None)
-        deleted_ids = request.data.get("deleted_products", [])
-
+    
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
-
+    
         if faq_data is not None:
             instance.faq_answers.all().delete()
             for item in faq_data:
-                LeadFollowUpFAQAnswer.objects.create(
-                    followup=instance,
-                    **item
-                )
-        
-        # 🔥 DELETE PRODUCTS
-        if deleted_ids:
-            lead_product.objects.filter(
-                lead=instance.lead,
-                id__in=deleted_ids
-            ).delete()
-
+                LeadFollowUpFAQAnswer.objects.create(followup=instance, **item)
+    
         if products_data is not None:
-            self._sync_products(instance.lead, products_data)
-
-        return instance
-
-    # =========================
-    # PRODUCT SYNC (CORE LOGIC)
-    # =========================
-    def _sync_products(self, lead, products_data):
-        """
-        Update existing lead products and create new ones if id is not provided.
-        """
-        for product in products_data:
-            print("product", product)
-            product_id = product.get("id")
-
-            # =====================
-            # UPDATE EXISTING
-            # =====================
-            if product_id:
-                lead_product.objects.filter(
-                    id=product_id,
-                    lead=lead
-                ).update(
-                    quantity=product.get("quantity"),
-                    expected_price=product.get("expected_price"),
-                    remarks=product.get("remarks", "")
+            # 1️⃣ Replace snapshot for this followup
+            instance.products.all().delete()
+            for product in products_data:
+                LeadFollowUpProduct.objects.create(
+                    followup=instance,
+                    **product
                 )
-                continue
-
-            # =====================
-            # CREATE NEW
-            # =====================
-            required_fields = [
-                "ac_type",
-                "ac_sub_type",
-                "brand",
-                "product_model",
-                "variant",
-            ]
-
-            if all(product.get(field) for field in required_fields):
+    
+            # 2️⃣ Sync to lead current products
+            lead = instance.lead
+            lead.lead_products.all().delete()
+    
+            for product in products_data:
                 lead_product.objects.create(
                     lead=lead,
                     ac_type=product["ac_type"],
@@ -248,49 +243,10 @@ class LeadFollowUpSerializer(serializers.ModelSerializer):
                     variant=product["variant"],
                     quantity=product.get("quantity"),
                     expected_price=product.get("expected_price"),
-                    remarks=product.get("remarks", "")
+                    remarks=product.get("remarks"),
                 )
-
-            # ❌ silently ignore incomplete rows
-
-# class LeadProductSerializer(serializers.ModelSerializer):
-#     id = serializers.IntegerField(required=False)
-#     class Meta:
-#         model = lead_product
-#         fields = [
-#             'id',
-#             'ac_type',
-#             'ac_sub_type',
-#             'brand',
-#             'product_model',
-#             'variant',
-#             'quantity',
-#             'expected_price',
-#             'remarks'
-#         ]
-
-
-# class LeadProductReadSerializer(serializers.ModelSerializer):
-#     ac_type = serializers.StringRelatedField()
-#     ac_sub_type = serializers.StringRelatedField()
-#     brand = serializers.StringRelatedField()
-#     product_model = serializers.StringRelatedField()
-#     variant = serializers.StringRelatedField()
-
-#     class Meta:
-#         model = lead_product
-#         fields = [
-#             'id',
-#             'ac_type',
-#             'ac_sub_type',
-#             'brand',
-#             'product_model',
-#             'variant',
-#             'quantity',
-#             'expected_price',
-#             'remarks'
-#         ]
-
+    
+        return instance
 
 
 class LeadSerializer(serializers.ModelSerializer):
@@ -445,6 +401,5 @@ class LeadSerializer(serializers.ModelSerializer):
             return value
     
         raise serializers.ValidationError("Invalid lead source")
-
 
 

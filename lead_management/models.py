@@ -188,3 +188,22 @@ class LeadFollowUpFAQAnswer(models.Model):
         return f"Q: {self.faq.question} | Lead #{self.followup.lead_id}"
     
 
+class LeadFollowUpProduct(models.Model):
+    followup = models.ForeignKey(
+        LeadFollowUp,
+        on_delete=models.CASCADE,
+        related_name="products"
+    )
+
+    ac_type = models.ForeignKey(acType, on_delete=models.PROTECT)
+    ac_sub_type = models.ForeignKey(acSubTypes, on_delete=models.PROTECT)
+    brand = models.ForeignKey(brand, on_delete=models.PROTECT)
+    product_model = models.ForeignKey(ProductModel, on_delete=models.PROTECT)
+    variant = models.ForeignKey(ProductVariant, on_delete=models.PROTECT)
+
+    quantity = models.PositiveIntegerField(blank=True, null=True)
+    expected_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    remarks = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"FollowUp #{self.followup_id} - {self.variant.sku}"
