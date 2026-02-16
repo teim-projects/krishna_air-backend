@@ -13,55 +13,17 @@ from .filters import LeadFilter
 from rest_framework.decorators import action
 from django.core.cache import cache
 
-
 class CustomerViewsets(viewsets.ModelViewSet):
     queryset = Customer.objects.all().order_by('id')
     serializer_class = CustomerSerializer
     authentication_classes = [JWTAuthentication]   
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter]
-    search_fields = ['name', '=email','secondary_email', 'contact_number','poc_name', 'poc_contact_number', 'land_line_no' ,'city','state' ,'site_city','site_state', 'pin_code']
-
-
-    # Add data caching 
-    CACHE_TTL = 60
-
-    def list(self, request, *args, **kwargs):
-        user_id = request.user.id
-        query_params = request.query_params.urlencode()
-        cache_key = f"customers:list:user={user_id}&{query_params}"
-
-        cached_data = cache.get(cache_key)
-        if cached_data:
-            print("called from cached data........")
-            return Response(cached_data)
-        
-        response =  super().list(request, *args, **kwargs)
-
-        cache.set(cache_key, response.data, self.CACHE_TTL)
-        return response
-
-    def retrieve(self, request, *args, **kwargs):
-        customer_id = kwargs.get("pk")
-        user_id = request.user.id
-    
-        cache_key = f"customers:detail:{customer_id}:user={user_id}"
-    
-        cached_data = cache.get(cache_key)
-        if cached_data:
-            return Response(cached_data)
-    
-        # 1️⃣ First get the response from DRF
-        response = super().retrieve(request, *args, **kwargs)
-    
-        # 2️⃣ Cache the data
-        cache.set(cache_key, response.data, self.CACHE_TTL)
-    
-        # 3️⃣ Return the response
-        return response
-
-
-
+    search_fields = [
+        'name', '=email', 'secondary_email', 'contact_number',
+        'poc_name', 'poc_contact_number', 'land_line_no',
+        'city', 'state', 'site_city', 'site_state', 'pin_code'
+    ]
 
 
 class LeadViewSet(viewsets.ModelViewSet):
