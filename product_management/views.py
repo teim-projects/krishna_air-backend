@@ -5,7 +5,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework import status , filters
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import *
-from .serializers import acTypeSerializer , acSubTypesSerializer, brandSerializer , productModelSerializer , productVariantSerializer, productInventorySerializer
+from .serializers import * 
 
 
 class acTypeViewSet(ModelViewSet):
@@ -74,3 +74,45 @@ class productInventoryViewSet(ModelViewSet):
                       'product_variant__capacity'
                       ]
 
+
+
+class material_typeViewSet(ModelViewSet):
+    queryset = material_type.objects.all()
+    serializer_class = MaterialTypeSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter]
+    search_fields  = ['name']
+
+class item_typeViewSet(ModelViewSet):
+    queryset = item_type.objects.all()
+    serializer_class = ItemTypeSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter]
+    search_fields  = ['name']
+
+class item_classViewSet(ModelViewSet):
+    queryset = item_class.objects.all()
+    serializer_class = ItemClassSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter]
+    search_fields  = ['name']
+
+class feature_typeViewSet(ModelViewSet):
+    queryset = feature_type.objects.all()
+    serializer_class = FeatureTypeSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter]
+    search_fields  = ['name']
+
+class itemViewSet(ModelViewSet):
+    queryset = item.objects.all()
+    serializer_class = ItemSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['item_type_id','item_class_id','material_type_id']
+    search_fields  = ['item_code']

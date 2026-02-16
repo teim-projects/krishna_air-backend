@@ -1,4 +1,4 @@
-from .models import acType , acSubTypes , brand , ProductModel , ProductVariant, ProductInventory
+from .models import acType , acSubTypes , brand , ProductModel , ProductVariant, ProductInventory, material_type, item_type, item_class, feature_type, item
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
@@ -67,3 +67,49 @@ class productInventorySerializer(serializers.ModelSerializer):
   class Meta:
     model = ProductInventory
     fields = '__all__'
+
+class MaterialTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = material_type
+        fields = '__all__'
+
+
+class ItemTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = item_type
+        fields = '__all__'
+
+
+class ItemClassSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = item_class
+        fields = '__all__'
+
+
+class FeatureTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = feature_type
+        fields = '__all__'
+
+
+class ItemSerializer(serializers.ModelSerializer):
+    item_type_name = serializers.CharField(
+        source='item_type_id.name',
+        read_only=True
+    )
+    item_class_name = serializers.CharField(
+        source='item_class_id.name',
+        read_only=True
+    )
+    material_type_name = serializers.CharField(
+        source='material_type_id.name',
+        read_only=True
+    )
+    feature_type_name = serializers.CharField(
+        source='feature_type_id.name',
+        read_only=True
+    )
+
+    class Meta:
+        model = item
+        fields = '__all__'
