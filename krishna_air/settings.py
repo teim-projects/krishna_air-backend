@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     'api',
     'lead_management',
     'product_management',
+    'quotation',
 ] 
 
 SITE_ID = 1
