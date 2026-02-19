@@ -50,7 +50,6 @@ class ProductVariant(models.Model):
   product_model = models.ForeignKey(ProductModel, on_delete=models.CASCADE, related_name='variants')
   capacity = models.CharField(max_length=50)
   star_rating = models.IntegerField()
- 
   sku = models.CharField(max_length=100 , unique=True, blank=True)
   mrp = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
   dp = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
@@ -156,9 +155,9 @@ class item(models.Model):
 
     def generate_item_code(self):
         parts = [
-            get_code_part(self.material_type.name),
-            get_code_part(self.item_type.name),
-            get_code_part(self.feature_type.name),
+            get_code_part(self.material_type_id.name),
+            get_code_part(self.item_type_id.name),
+            get_code_part(self.feature_type_id.name),
         ]
 
         if self.size:
@@ -169,7 +168,7 @@ class item(models.Model):
             thickness_part = f"{self.thickness}{self.thickness_unit or ''}".upper()
             parts.append(thickness_part)
 
-        parts.append(get_code_part(self.item_class.name))
+        parts.append(get_code_part(self.item_class_id.name))
 
         return "-".join(parts)
 

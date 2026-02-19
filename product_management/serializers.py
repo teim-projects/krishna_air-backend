@@ -31,7 +31,8 @@ class productModelSerializer(serializers.ModelSerializer):
         source='ac_sub_type_id.name',
         read_only=True
     )
-
+    ac_type_id = serializers.IntegerField(source='ac_sub_type_id.ac_type_id.id', read_only=True)
+    ac_type_name = serializers.CharField(source='ac_sub_type_id.ac_type_id.name', read_only=True)
     brand_name = serializers.CharField(
         source='brand_id.name',
         read_only=True

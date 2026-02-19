@@ -143,7 +143,7 @@ REST_AUTH = {
     'LOGIN_SERIALIZER': 'api.serializers.CustomLoginSerializer',
     'USER_DETAILS_SERIALIZER': 'api.serializers.CustomUserDetailsSerializer',
     'PASSWORD_RESET_USE_SITES_DOMAIN': True,
-
+    
     'USE_JWT' : True,
     'JWT_AUTH_COOKIE': 'access',
     'JWT_AUTH_REFRESH_COOKIE': 'refresh',
@@ -247,7 +247,7 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 # JWT settings 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=4),
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=6),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
