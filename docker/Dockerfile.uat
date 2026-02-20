@@ -1,0 +1,33 @@
+# Use python base image
+FROM python:3.13-slim
+
+# create work directory
+WORKDIR /app
+
+# System deps for mysqlclient and other native packages
+RUN apt-get update && apt-get install -y \
+    gcc \
+    pkg-config \
+    default-libmysqlclient-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements.txt  
+COPY requirements.txt .
+
+# Install Python dependencies (this installs Django!)
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy rest of the project
+COPY . .
+
+# Collect static
+RUN python manage.py collectstatic --noinput || true
+
+
+# Expose Django port
+EXPOSE 8000
+
+
+# Run Django using gunicorn (recommended for UAT/Prod)
+CMD ["gunicorn", "krishna_air.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
+
