@@ -162,15 +162,18 @@ AUTHENTICATION_BACKENDS = [
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        "NAME": os.getenv("DB_NAME"),
-        "USER": os.getenv("DB_USER"),
-        "PASSWORD": os.getenv("DB_PASSWORD"),
-        "HOST": os.getenv("DB_HOST"),
-        "PORT": os.getenv("DB_PORT"),
+    "default": {
+        "ENGINE": "django.db.backends.mysql",
+
+        # Prefer MYSQL_* (Docker/UAT), fallback to DB_* (local dev)
+        "NAME": os.getenv("MYSQL_DATABASE") or os.getenv("DB_NAME"),
+        "USER": os.getenv("MYSQL_USER") or os.getenv("DB_USER"),
+        "PASSWORD": os.getenv("MYSQL_PASSWORD") or os.getenv("DB_PASSWORD"),
+        "HOST": os.getenv("MYSQL_HOST") or os.getenv("DB_HOST") or "db",
+        "PORT": os.getenv("MYSQL_PORT") or os.getenv("DB_PORT") or "3306",
     }
 }
+
 
 
 # Redis cache settings
