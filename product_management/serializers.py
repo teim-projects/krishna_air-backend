@@ -110,6 +110,10 @@ class ItemSerializer(serializers.ModelSerializer):
         source='feature_type_id.name',
         read_only=True
     )
+    brand_name = serializers.CharField(
+        source='brand.name',
+        read_only=True
+    )
 
     class Meta:
         model = item
