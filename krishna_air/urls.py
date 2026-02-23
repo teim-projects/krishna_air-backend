@@ -37,20 +37,21 @@ urlpatterns = [
     path('swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
-    path('api/auth/', include('api.urls')),
+    path('auth/', include('api.urls')),
 
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('api/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
+    path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('token/verify/', TokenVerifyView.as_view(), name='token_verify'),
 
 
-    path('api/lead/', include('lead_management.urls')),
-    path('api/product/', include('product_management.urls')),
-    path('api/quotation/', include('quotation.urls')),
-    path('api/invoice/',include('invoice.urls')),
+   
+    path('invoice/',include('invoice.urls')),
+    path('lead/', include('lead_management.urls')),
+    path('product/', include('product_management.urls')),
+    path('quotation/', include('quotation.urls')),
     
 ]
 
 if settings.DEBUG:
         urlpatterns += static(settings.MEDIA_URL, document_root = settings.MEDIA_ROOT)
-        urlpatterns += static(settings.STATIC_URL, document_root = settings.STATIC_URL)
+        urlpatterns += static(settings.STATIC_URL, document_root = settings.STATIC_ROOT)

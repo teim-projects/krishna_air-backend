@@ -15,8 +15,8 @@ router.register(r'product-inventory',productInventoryViewSet , basename='product
 # Low side routes for parts and accessories can be added here in the future as needed.
 router.register(r'material-type', material_typeViewSet, basename='material-type')
 router.register(r'item-type', item_typeViewSet, basename='item-type')
-router.register(r'item-class', item_classViewSet, basename='item-class')
 router.register(r'feature-type', feature_typeViewSet, basename='feature-type')
+router.register(r'item-class', item_classViewSet, basename='item-class')
 router.register(r'item', itemViewSet, basename='item')
 
 urlpatterns = [
