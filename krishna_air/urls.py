@@ -47,6 +47,7 @@ urlpatterns = [
     path('api/lead/', include('lead_management.urls')),
     path('api/product/', include('product_management.urls')),
     path('api/quotation/', include('quotation.urls')),
+    path('api/invoice/',include('invoice.urls')),
     
 ]
 
