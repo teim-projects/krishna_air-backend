@@ -81,7 +81,8 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'krishna_air.urls'
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = os.getenv("CORS_ALLOW_ALL_ORIGINS")
+
 
 CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "")
 
@@ -90,6 +91,7 @@ if CORS_ALLOWED_ORIGINS:
 else:
     CORS_ALLOWED_ORIGINS = []
 
+CSRF_TRUSTED_ORIGINS = os.getenv("CSRF_TRUSTED_ORIGINS")
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
