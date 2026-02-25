@@ -51,14 +51,32 @@ class productModelSerializer(serializers.ModelSerializer):
 
 
 class productVariantSerializer(serializers.ModelSerializer):
-  model_name = serializers.CharField(
-    source = "product_model.name",
-    read_only = True
-  )
-   
-  class Meta:
-    model = ProductVariant
-    fields = '__all__'
+
+    variant_sku = serializers.CharField(source="sku", read_only=True)
+
+    ac_type_name = serializers.CharField(
+        source="product_model.ac_sub_type_id.ac_type_id.name",
+        read_only=True
+    )
+
+    ac_sub_type_name = serializers.CharField(
+        source="product_model.ac_sub_type_id.name",
+        read_only=True
+    )
+
+    brand_name = serializers.CharField(
+        source="product_model.brand_id.name",
+        read_only=True
+    )
+
+    model_no = serializers.CharField(
+        source="product_model.model_no",
+        read_only=True
+    )
+
+    class Meta:
+        model = ProductVariant
+        fields = "__all__"
 
 class productInventorySerializer(serializers.ModelSerializer):
   sku = serializers.CharField(

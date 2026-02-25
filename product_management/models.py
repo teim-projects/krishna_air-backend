@@ -167,16 +167,11 @@ class item(models.Model):
     
         if self.thickness:
             thickness_part = f"{self.thickness}{self.thickness_unit or ''}".upper()
+            
             parts.append(thickness_part)
-<<<<<<< HEAD
-    
-        parts.append(get_code_part(self.item_class_id.name))
-    
-=======
 
         parts.append(get_code_part(self.item_class_id.name))
 
->>>>>>> origin/main
         return "-".join(parts)
 
 

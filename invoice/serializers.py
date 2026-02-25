@@ -6,11 +6,41 @@ from .models import Invoice, InvoiceItem, InvoiceTaxBreakup, CompanyProfile
 
 
 class InvoiceItemSerializer(serializers.ModelSerializer):
+
+    variant_sku = serializers.CharField(
+        source="product_variant.sku",
+        read_only=True
+    )
+
+    ac_type_name = serializers.CharField(
+        source="product_variant.product_model.ac_sub_type_id.ac_type_id.name",
+        read_only=True
+    )
+
+    ac_sub_type_name = serializers.CharField(
+        source="product_variant.product_model.ac_sub_type_id.name",
+        read_only=True
+    )
+
+    brand_name = serializers.CharField(
+        source="product_variant.product_model.brand_id.name",
+        read_only=True
+    )
+
+    model_no = serializers.CharField(
+        source="product_variant.product_model.model_no",
+        read_only=True
+    )
+
+    item_code = serializers.CharField(
+        source="item.item_code",
+        read_only=True
+    )
+
     class Meta:
         model = InvoiceItem
         fields = "__all__"
         read_only_fields = ("invoice", "amount")
-
 
 class InvoiceTaxBreakupSerializer(serializers.ModelSerializer):
     class Meta:

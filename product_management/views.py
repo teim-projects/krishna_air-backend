@@ -45,7 +45,14 @@ class productModelViewSet(ModelViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    filterset_fields = ['brand_id','ac_sub_type_id__ac_type_id','is_active','inverter','phase']
+    filterset_fields = [
+    'brand_id',
+    'ac_sub_type_id',      # ✅ ADD THIS
+    'ac_sub_type_id__ac_type_id',
+    'is_active',
+    'inverter',
+    'phase'
+]
     search_fields  = ['name','model_no']
 
 class productVariabtViewSet(ModelViewSet):
