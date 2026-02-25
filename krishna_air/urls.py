@@ -49,6 +49,7 @@ urlpatterns = [
     path('lead/', include('lead_management.urls')),
     path('product/', include('product_management.urls')),
     path('quotation/', include('quotation.urls')),
+    path('inventory/', include("inventory.urls")),
     
 ]
 

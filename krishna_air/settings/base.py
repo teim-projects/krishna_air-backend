@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     'product_management',
     'quotation',
     'invoice',
+    'inventory',
 ] 
 
 SITE_ID = 1
@@ -82,7 +83,8 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'krishna_air.urls'
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = os.getenv("CORS_ALLOW_ALL_ORIGINS")
+
 
 CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "")
 
@@ -90,6 +92,8 @@ if CORS_ALLOWED_ORIGINS:
     CORS_ALLOWED_ORIGINS = [origin.strip() for origin in CORS_ALLOWED_ORIGINS.split(",")]
 else:
     CORS_ALLOWED_ORIGINS = []
+
+CSRF_TRUSTED_ORIGINS = os.getenv("CSRF_TRUSTED_ORIGINS")
 
 TEMPLATES = [
     {
