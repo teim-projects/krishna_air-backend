@@ -1,12 +1,13 @@
 
 from django.urls import path, include
 from django.contrib.auth import views as auth_views
-from .views import GoogleLogin ,PasswordResetRequestView, PasswordResetConfirmView, StaffViewSet,RoleViewSet,MeView
+from .views import GoogleLogin ,PasswordResetRequestView, PasswordResetConfirmView, StaffViewSet,RoleViewSet,MeView, BranchManagementViewSet
 from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
 router.register(r'staff', StaffViewSet, basename='staff')
 router.register(r'roles', RoleViewSet, basename='roles') 
+router.register(r'branch',BranchManagementViewSet, basename='branch')
 
 urlpatterns = [
     path('dj-rest-auth/', include('dj_rest_auth.urls')),

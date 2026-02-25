@@ -9,7 +9,7 @@ from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from rest_framework import serializers
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
-from .models import CustomUser, Role
+from .models import CustomUser, Role, BranchManagement , SiteManagement
 from rest_framework.exceptions import ValidationError
 from django.core.validators import RegexValidator
 import re
@@ -282,3 +282,32 @@ class AddStaffSerializer(serializers.ModelSerializer):
 
         instance.save()
         return instance
+
+
+
+
+# --------------------------------------------------------------------------------
+# Branch Management Serializer
+# --------------------------------------------------------------------------------
+
+
+class BranchSerializers(serializers.ModelSerializer):
+    full_address = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BranchManagement
+        fields = "__all__"
+        
+    def validate_name(self, value):
+        qs = BranchManagement.objects.filter(name__iexact=value.strip())
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        
+        if qs.exists():
+             raise serializers.ValidationError("Branch with this name already exists.")
+        return value
+    
+    
+    
+    def get_full_address(self, obj):
+        return f"{obj.address}, {obj.city}, {obj.state} - {obj.pincode}"
