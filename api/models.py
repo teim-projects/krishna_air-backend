@@ -111,3 +111,68 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         identity = self.email if self.email else (self.mobile_no or "Anonymous")
         role_name = self.role.name if self.role else "NoRole"
         return f"{identity} - {role_name}"
+
+
+
+# --------------------------------------------------------------------------------
+# Branch Management model
+# --------------------------------------------------------------------------------
+
+class BranchManagement(models.Model):
+    name = models.CharField(max_length=255)
+    email = models.EmailField(unique=True)
+    secondary_email = models.EmailField(blank=True, null=True)
+    primary_contact = models.CharField(max_length=20)
+    secondary_contact = models.CharField(max_length=20,null=True, blank=True)
+    address = models.TextField()
+    city = models.CharField(max_length=255)
+    state = models.CharField(max_length=255)
+    pincode = models.IntegerField()
+    state_code = models.CharField(max_length=20)
+    gst_no = models.CharField(max_length=255, null=True, blank=True)
+    is_head_office = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.name}-{self.city}"
+    
+
+# --------------------------------------------------------------------------------
+# Site Management model
+# --------------------------------------------------------------------------------
+
+class SiteManagement(models.Model):
+    name = models.CharField(max_length=255)
+    site_shortcut = models.CharField(max_length=50, blank=True, unique=True)
+    address = models.CharField(max_length=255)
+    city = models.CharField(max_length=255)
+    state = models.CharField(max_length=255)
+    pincode = models.IntegerField()
+    owner_name = models.CharField(max_length=255)
+    owner_contact = models.CharField(max_length=20)
+
+    def generate_unique_shortcut(self):
+        name_part = (self.name[:3] if self.name else "").upper()
+        city_part = (self.city[:3] if self.city else "").upper()
+
+        base = f"{name_part}-{city_part}"
+        shortcut = f"{base}-{self.pk}"
+
+        counter = 1
+        while SiteManagement.objects.filter(site_shortcut=shortcut).exclude(pk=self.pk).exists():
+            counter += 1
+            shortcut = f"{base}-{self.pk}-{counter}"
+
+        return shortcut
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+
+        # First save to get PK
+        super().save(*args, **kwargs)
+
+        if is_new and not self.site_shortcut:
+            self.site_shortcut = self.generate_unique_shortcut()
+            super().save(update_fields=["site_shortcut"])
+
+    def __str__(self):
+        return f"{self.name} ({self.site_shortcut})"

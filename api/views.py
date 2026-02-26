@@ -15,8 +15,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication 
 from rest_framework import filters
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import CustomUser, Role
-from .serializers import AddStaffSerializer, RoleSerializer
+from .models import CustomUser, Role, BranchManagement, SiteManagement
+from .serializers import AddStaffSerializer, RoleSerializer, BranchSerializers
 from .permissions import IsAdminOrSubAdmin ,StaffObjectPermission
 from .pagination import StaffPagination
 from rest_framework.decorators import action
@@ -146,3 +146,21 @@ class MeView(APIView):
     def get(self, request):
         serializer = AddStaffSerializer(request.user)
         return Response(serializer.data)
+
+
+
+# --------------------------------------------------------------------------------
+# Branch Management Viewsets
+# --------------------------------------------------------------------------------
+
+class BranchManagementViewSet(viewsets.ModelViewSet):
+    queryset = BranchManagement.objects.all()
+    serializer_class = BranchSerializers
+    authentication_classes = [JWTAuthentication]   
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    search_fields = [
+        'name', '=email', 'primary_contact',
+        'city', 'state',
+    ]
+    filterset_fields = ['city', 'state']
