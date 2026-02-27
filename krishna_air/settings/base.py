@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     'lead_management',
     'product_management',
     'quotation',
+    'invoice',
     'inventory',
 ] 
 

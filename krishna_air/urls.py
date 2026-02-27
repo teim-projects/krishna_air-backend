@@ -44,6 +44,8 @@ urlpatterns = [
     path('token/verify/', TokenVerifyView.as_view(), name='token_verify'),
 
 
+   
+    path('invoice/',include('invoice.urls')),
     path('lead/', include('lead_management.urls')),
     path('product/', include('product_management.urls')),
     path('quotation/', include('quotation.urls')),
