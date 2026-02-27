@@ -1,6 +1,7 @@
 from django.db import models
 from api.models import SiteManagement, BranchManagement
 from product_management.models import ProductVariant, item
+from django.utils import timezone
 
 class Vendor(models.Model):
     # Required fields
@@ -9,8 +10,8 @@ class Vendor(models.Model):
     mobile = models.CharField(max_length=15)
     office_address = models.TextField()
     gst_details = models.CharField(max_length=15)
-    office_poc_name = models.CharField(max_length=100)
-    office_poc_phone = models.CharField(max_length=15)
+    office_poc_name = models.CharField(max_length=100, blank=True, null=True)
+    office_poc_phone = models.CharField(max_length=15, blank=True, null=True)
     
     # Optional fields
     company_type = models.CharField(max_length=100, blank=True, null=True)
@@ -66,15 +67,43 @@ class PurchaseOrder(models.Model):
     vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="purchase_orders")
     site = models.ForeignKey(SiteManagement, on_delete=models.PROTECT, related_name="purchase_orders", null=True, blank=True)
     branch = models.ForeignKey(BranchManagement, on_delete=models.PROTECT, related_name="purchase_orders")
-    terms_conditions = models.ForeignKey(TermsConditions, on_delete=models.PROTECT, related_name="purchase_orders")
-    purchase_order_no = models.CharField(max_length=50 , unique=True)
+    terms_conditions = models.ManyToManyField(
+        TermsConditions,
+        related_name="purchase_orders",
+        blank=True
+    )
+    po_date = models.DateField(null=True,blank=True)
+    book_no = models.CharField(max_length=10)
+    purchase_order_no = models.CharField(max_length=50 )
+    version = models.PositiveIntegerField(default=1)
+    is_current = models.BooleanField(default=True)
     quotation_ref_no = models.CharField(max_length=50, blank=True, null=True)
     quotation_date = models.DateField(null=True, blank=True)
     contact_name = models.CharField(max_length=255, null=True, blank=True)
     contact_no = models.CharField(max_length=20, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    class Meta:
+        unique_together = ("purchase_order_no", "version")
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+
+        if is_new and not self.purchase_order_no:
+            now = timezone.now()
+            year = now.strftime("%Y")
+            month = now.strftime("%m")
+
+            padded_id = str(self.id).zfill(4)  
+
+            self.purchase_order_no = f"{self.book_no}/{year}/{month}{padded_id}"
+
+            # update only the PO number
+            super().save(update_fields=["purchase_order_no"])
 
     def __str__(self):
-        return self.purchase_order_no
+        return f"{self.purchase_order_no} (v{self.version})"
     
 
 

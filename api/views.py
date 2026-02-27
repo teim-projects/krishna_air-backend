@@ -16,7 +16,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework import filters
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import CustomUser, Role, BranchManagement, SiteManagement
-from .serializers import AddStaffSerializer, RoleSerializer, BranchSerializers
+from .serializers import AddStaffSerializer, RoleSerializer, BranchSerializers, SiteSerializers
 from .permissions import IsAdminOrSubAdmin ,StaffObjectPermission
 from .pagination import StaffPagination
 from rest_framework.decorators import action
@@ -164,3 +164,20 @@ class BranchManagementViewSet(viewsets.ModelViewSet):
         'city', 'state',
     ]
     filterset_fields = ['city', 'state']
+
+
+# --------------------------------------------------------------------------------
+# Site Management Viewsets
+# --------------------------------------------------------------------------------
+
+class SiteManagementViewSet(viewsets.ModelViewSet):
+    queryset = SiteManagement.objects.all()
+    serializer_class = SiteSerializers
+    authentication_classes = [JWTAuthentication]   
+    permission_classes = [IsAuthenticated]
+    filter_backends = [ filters.SearchFilter]
+    search_fields = [
+        'name',"pincode","owner_contact","owner_name",
+        'city', 'state',
+    ]
+    

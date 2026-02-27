@@ -311,3 +311,12 @@ class BranchSerializers(serializers.ModelSerializer):
     
     def get_full_address(self, obj):
         return f"{obj.address}, {obj.city}, {obj.state} - {obj.pincode}"
+    
+
+class SiteSerializers(serializers.ModelSerializer):
+    class Meta:
+        model = SiteManagement
+        fields = "__all__"
+        read_only_fields = ("site_shortcut",)
+
+    

@@ -17,8 +17,7 @@ services:
       mysql:
         condition: service_healthy
       
-      redis:
-        condition: service_started
+    
 
     command: python manage.py runserver 0.0.0.0:8000
 
@@ -54,12 +53,7 @@ services:
       mysql:
         condition: service_healthy
 
-  redis:
-    image: redis:7-alpine
-    container_name: redis-dev
-    ports:
-      - "6379:6379"  
-    restart: always
+
 
 volumes:
   mysql_data:
