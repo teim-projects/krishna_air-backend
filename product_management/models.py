@@ -160,18 +160,20 @@ class item(models.Model):
             get_code_part(self.item_type_id.name),
             get_code_part(self.feature_type_id.name),
         ]
-
+    
         if self.size:
             size_part = f"{self.size}{self.size_unit or ''}".upper()
             parts.append(size_part)
-
+    
         if self.thickness:
             thickness_part = f"{self.thickness}{self.thickness_unit or ''}".upper()
+            
             parts.append(thickness_part)
 
         parts.append(get_code_part(self.item_class_id.name))
 
         return "-".join(parts)
+
 
     def save(self, *args, **kwargs):
       if not self.item_code:
