@@ -53,6 +53,28 @@ class TermsConditionsSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+
+class TermsConditionsBulkSerializer(serializers.Serializer):
+    terms_condition_type = serializers.IntegerField()
+    terms = serializers.ListField(
+        child=serializers.CharField()
+    )
+
+    def create(self, validated_data):
+        terms_type = validated_data["terms_condition_type"]
+        terms_list = validated_data["terms"]
+
+        objects = []
+
+        for term in terms_list:
+            obj = TermsConditions.objects.create(
+                terms_condition_type_id=terms_type,
+                terms=term
+            )
+            objects.append(obj)
+
+        return objects
+
 class PurchaseOrderProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = PurchaseOrderProduct

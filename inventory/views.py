@@ -45,7 +45,21 @@ class TermsConditionViewsets(ModelViewSet):
     filterset_fields = ["terms_condition_type","terms"]
     search_fields = ['terms', 'terms_condition_type__name']
 
+    def create(self, request, *args, **kwargs):
 
+        # If terms is list → bulk create
+        if isinstance(request.data.get("terms"), list):
+            serializer = TermsConditionsBulkSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            objects = serializer.save()
+
+            return Response(
+                TermsConditionsSerializer(objects, many=True).data,
+                status=status.HTTP_201_CREATED
+            )
+
+        # Else normal single create
+        return super().create(request, *args, **kwargs)
 
 class PurchaseOrderViewSet(ModelViewSet):
     queryset = PurchaseOrder.objects.filter(is_current=True).prefetch_related("products")
