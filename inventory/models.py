@@ -10,8 +10,8 @@ class Vendor(models.Model):
     mobile = models.CharField(max_length=15)
     office_address = models.TextField()
     gst_details = models.CharField(max_length=15)
-    office_poc_name = models.CharField(max_length=100)
-    office_poc_phone = models.CharField(max_length=15)
+    office_poc_name = models.CharField(max_length=100, blank=True, null=True)
+    office_poc_phone = models.CharField(max_length=15, blank=True, null=True)
     
     # Optional fields
     company_type = models.CharField(max_length=100, blank=True, null=True)
