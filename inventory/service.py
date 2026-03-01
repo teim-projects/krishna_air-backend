@@ -41,4 +41,7 @@ def create_new_po_version(old_po, validated_data, products_data):
             **product
         )
 
+    # calulate the totals and save
+    new_po.calculate_totals()
+
     return new_po
