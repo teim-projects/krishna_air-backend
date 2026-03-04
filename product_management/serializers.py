@@ -116,16 +116,11 @@ class ItemSerializer(serializers.ModelSerializer):
         source='item_type_id.name',
         read_only=True
     )
-    item_class_name = serializers.CharField(
-        source='item_class_id.name',
-        read_only=True
-    )
+    item_class_name = serializers.SerializerMethodField()
+    feature_type_name = serializers.SerializerMethodField()
+    
     material_type_name = serializers.CharField(
         source='material_type_id.name',
-        read_only=True
-    )
-    feature_type_name = serializers.CharField(
-        source='feature_type_id.name',
         read_only=True
     )
     brand_name = serializers.CharField(
@@ -136,3 +131,9 @@ class ItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = item
         fields = '__all__'
+
+    def get_item_class_name(self, obj):
+        return obj.item_class_id.name if obj.item_class_id else None
+
+    def get_feature_type_name(self, obj):
+        return obj.feature_type_id.name if obj.feature_type_id else None
