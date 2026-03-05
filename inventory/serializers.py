@@ -98,6 +98,9 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         read_only=True
     )
 
+    vendor_name = serializers.CharField(source='vendor.name', read_only=True)
+    site_name = serializers.CharField(source='site.name', read_only=True)
+
     class Meta:
         model = PurchaseOrder
         fields = "__all__"
