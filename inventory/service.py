@@ -21,6 +21,12 @@ def create_new_po_version(old_po, validated_data, products_data):
         purchase_order_no=old_po.purchase_order_no,  # same PO no across versions
         version=old_po.version + 1,
         is_current=True,
+
+        po_date=validated_data.get("po_date", old_po.po_date),
+        gst_percentage=validated_data.get("gst_percentage", old_po.gst_percentage),
+        gst_type=validated_data.get("gst_type", old_po.gst_type),
+        transport_charges=validated_data.get("transport_charges", old_po.transport_charges),
+        round_off=validated_data.get("round_off", old_po.round_off),
         quotation_ref_no=validated_data.get("quotation_ref_no", old_po.quotation_ref_no),
         quotation_date=validated_data.get("quotation_date", old_po.quotation_date),
         contact_name=validated_data.get("contact_name", old_po.contact_name),
