@@ -92,11 +92,11 @@ class PurchaseOrderHistoryViewSet(ReadOnlyModelViewSet):
 
     def get_queryset(self):
         po_no = self.request.query_params.get("purchase_order_no")
-
+        
         qs = PurchaseOrder.objects.all().order_by("-version")
 
         if po_no:
-            qs = qs.filter(purchase_order_no=po_no)
+            qs = qs.filter(purchase_order_no=po_no , is_current =  False)
 
         return qs
     
