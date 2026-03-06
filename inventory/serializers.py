@@ -76,6 +76,17 @@ class TermsConditionsBulkSerializer(serializers.Serializer):
         return objects
 
 class PurchaseOrderProductSerializer(serializers.ModelSerializer):
+    variant_sku = serializers.CharField(
+        source="product_variant.sku",
+        read_only=True,
+        allow_null=True
+    )
+    item_code = serializers.CharField(
+        source="item.item_code",
+        read_only=True,
+        allow_null=True
+
+    )
     class Meta:
         model = PurchaseOrderProduct
         fields = "__all__"
