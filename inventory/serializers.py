@@ -117,6 +117,13 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         fields = "__all__"
         read_only_fields = ("purchase_order_no","version", "is_current")
 
+    def validate_contact_no(self, value):
+        """Validate contact number is 10 digits"""
+        if value:  # Only validate if provided (since it's optional)
+            if not value.isdigit() or len(value) != 10:
+                raise serializers.ValidationError("Contact number must be exactly 10 digits")
+        return value
+
     def create(self, validated_data):
         products_data = validated_data.pop("products", [])
         terms_conditions = validated_data.pop("terms_conditions", [])

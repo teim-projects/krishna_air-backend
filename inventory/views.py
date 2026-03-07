@@ -69,7 +69,7 @@ class PurchaseOrderViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend,  filters.SearchFilter]
     filterset_fields = ["branch",]
-    search_fields = ['vendor', 'site',"purchase_order_no","quotation_ref_no","contact_name","contact_no"]
+    search_fields = ['vendor__name', 'site__name',"purchase_order_no","quotation_ref_no","contact_name","contact_no"]
 
     @transaction.atomic
     def destroy(self, request, *args, **kwargs):
