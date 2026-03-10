@@ -16,6 +16,7 @@ def create_new_po_version(old_po, validated_data, products_data):
     new_po = PurchaseOrder.objects.create(
         vendor=validated_data.get("vendor", old_po.vendor),
         site=validated_data.get("site", old_po.site),
+        delivery_destination=validated_data.get("delivery_destination", old_po.delivery_destination),
         branch=validated_data.get("branch", old_po.branch),
         book_no=validated_data.get("book_no", old_po.book_no),
         purchase_order_no=old_po.purchase_order_no,  # same PO no across versions

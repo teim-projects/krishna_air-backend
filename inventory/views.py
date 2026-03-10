@@ -115,3 +115,42 @@ class PurchaseOrderHistoryViewSet(ReadOnlyModelViewSet):
             {"detail": f"PO version v{po.version} deleted successfully."},
             status=status.HTTP_204_NO_CONTENT
         )
+    
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+from django.contrib.staticfiles import finders
+from weasyprint import HTML
+from decimal import Decimal
+from .models import PurchaseOrder
+
+
+def purchase_order_pdf(request, pk):
+
+    po = PurchaseOrder.objects.get(pk=pk)
+    products = po.products.all()
+
+    gst_amount = (po.subtotal * po.gst_percentage) / Decimal("100")
+
+    # logo_path = finders.find("images/ka-logo.png")
+
+    html_string = render_to_string(
+        "pdf/purchase_order.html",
+        {
+            "po": po,
+            "products": products,
+            "gst_amount": gst_amount,
+            # "logo_path": logo_path,
+        }
+    )
+
+    # print("LOGO PATH:", logo_path)
+
+    pdf = HTML(
+        string=html_string,
+        base_url=request.build_absolute_uri("/")
+    ).write_pdf()
+
+    response = HttpResponse(pdf, content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="PO-{po.purchase_order_no}.pdf"'
+
+    return response
