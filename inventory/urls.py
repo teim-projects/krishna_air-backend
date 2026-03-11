@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import *
+from inventory import views
 
 router = DefaultRouter()
 router.register(r'vendors', VendorViewSet, basename='vendor')
@@ -10,4 +11,11 @@ router.register(r"purchase-orders", PurchaseOrderViewSet, basename="po")
 router.register(r"purchase-orders-history", PurchaseOrderHistoryViewSet, basename="po-history")
 
 
-urlpatterns = router.urls
+urlpatterns = [
+    path("", include(router.urls)),
+    path(
+        "purchase-order/<int:pk>/pdf/",
+        views.purchase_order_pdf,
+        name="purchase_order_pdf"
+)
+]

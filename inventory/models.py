@@ -42,6 +42,7 @@ class Vendor(models.Model):
 # --------------------------------------------------------------------------------
 class TermsConditionType(models.Model):
     name = models.CharField(max_length=255)
+    display_name = models.CharField(max_length=255, blank=True, null=True)
     description = models.CharField(max_length=255, null=True, blank=True)
 
     def __str__(self):
@@ -106,7 +107,7 @@ class PurchaseOrder(models.Model):
 
     contact_name = models.CharField(max_length=255, blank=True, null=True)
     contact_no = models.CharField(max_length=20, blank=True, null=True)
-
+    delivery_destination = models.TextField(blank=True, null=True)
     # Financial Fields
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     gst_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=18)
@@ -234,5 +235,8 @@ class PurchaseOrderProduct(models.Model):
             )
 
         super().save(*args, **kwargs)
+        # auto update PO totals
+        if self.purchase_order:
+            self.purchase_order.calculate_totals()
 
 
