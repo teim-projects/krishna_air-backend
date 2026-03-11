@@ -32,6 +32,7 @@ def create_new_po_version(old_po, validated_data, products_data):
         quotation_date=validated_data.get("quotation_date", old_po.quotation_date),
         contact_name=validated_data.get("contact_name", old_po.contact_name),
         contact_no=validated_data.get("contact_no", old_po.contact_no),
+        note =validated_data.get("note", old_po.note)
     )
 
     # ✅ Set terms_conditions AFTER save

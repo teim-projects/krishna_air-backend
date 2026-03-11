@@ -1,4 +1,5 @@
 {% load static %}
+{% load humanize %}
 <!doctype html>
 <html>
   <head>
@@ -81,9 +82,10 @@
       /* TOTAL SECTION */
 
       .total-table {
-        width: 40%;
+        width: 100%;
         margin-left: auto;
         border-collapse: collapse;
+        table-layout: fixed;
       }
 
       .total-table td {
@@ -99,14 +101,16 @@
 
       .terms {
         border: 1px solid #000;
-        margin-top: 5px;
+        margin-top: 10px;
         padding: 5px;
       }
 
       /* FOOTER */
 
       .footer {
+        border: 1px solid #8d8b8b;
         margin-top: 20px;
+        padding: 5px;
       }
 
       .signature {
@@ -182,44 +186,44 @@
     <table style="width:100%; border-collapse:collapse;">
 
       <tr>
-        <td style="border-bottom:1px solid #2c2c2c; padding:4px;">
+        <td style="border-bottom:1px solid #2c2c2c; padding:10px;">
           <b>PO Date :</b> {{ po.po_date }}
         </td>
       </tr>
 
       <tr>
-        <td style="border-bottom:1px solid #2c2c2c; padding:4px;">
+        <td style="border-bottom:1px solid #2c2c2c; padding:10px;">
           <b>PO No :</b> {{ po.purchase_order_no }}
         </td>
       </tr>
 
       <tr>
-        <td style="border-bottom:1px solid #2c2c2c; padding:4px; text-align:center;">
+        <td style="border-bottom:1px solid #2c2c2c; padding:10px; text-align:center;">
           <b>Quotation Details</b>
         </td>
       </tr>
 
       <tr>
-        <td style="border-bottom:1px solid #2c2c2c; padding:4px;">
+        <td style="border-bottom:1px solid #2c2c2c; padding:10px;">
           <b>Ref No :</b> {{ po.quotation_ref_no|default:"-" }}
         </td>
       </tr>
 
       <tr>
-        <td style="border-bottom:1px solid #2c2c2c; padding:4px;">
+        <td style="border-bottom:1px solid #2c2c2c; padding:10px;">
           <b>Date :</b> {{ po.quotation_date|default:"-" }}
         </td>
       </tr>
 
       <tr>
-        <td style="border-bottom:1px solid #525252; padding:4px; text-align:center;">
+        <td style="border-bottom:1px solid #525252; padding:10px; text-align:center;">
           <b>Contact Detail</b>
         </td>
       </tr>
 
       <tr>
-        <td style="padding:4px;">
-          <b>Name :</b> {{ po.contact_name|default:"-" }}<br>
+        <td style="padding:10px;">
+          <span style="padding-bottom:10px;"><b>Name :</b> {{ po.contact_name|default:"-" }}</span><br>
           <b>No :</b> {{ po.contact_no|default:"-" }}
         </td>
       </tr>
@@ -278,58 +282,75 @@
 
       <!-- TOTAL -->
 
-      <table class="total-table">
+    <table class="total-table">
         <tr>
-          <td class="right">Sub Total :</td>
-          <td class="right">{{ po.subtotal }}</td>
+          <td class="right" style="width:81%;"><b>Sub Total :</b></td>
+          <td class="right" style="width:11%;">{{ po.subtotal|floatformat:2|intcomma  }}</td>
         </tr>
+      
+        {% if po.gst_type == "inclusive" %}
 
         <tr>
-          <td class="right">GST ({{ po.gst_percentage }}%) :</td>
-          <td class="right">{{ gst_amount }}</td>
+          <td class="right"><b>GST @ {{ po.gst_percentage|floatformat:0 }}% :</b></td>
+          <td class="right">Inclusive</td>
         </tr>
+
+        {% else %}
 
         <tr>
-          <td class="right">Transport :</td>
-          <td class="right">{{ po.transport_charges }}</td>
+          <td class="right"><b>GST @ {{ po.gst_percentage|floatformat:0 }}% :</b></td>
+          <td class="right">{{ gst_amount|floatformat:2|intcomma }}</td>
         </tr>
 
+        {% endif %}
+      
+        <tr>
+          <td class="right"><b>Transport :</b></td>
+          <td class="right">{{ po.transport_charges|floatformat:2|intcomma  }}</td>
+        </tr>
+      
+        <tr>
+          <td class="right"><b>Round off :</b></td>
+          <td class="right">{{ po.round_off|floatformat:2|intcomma  }}</td>
+        </tr>
+      
         <tr>
           <td class="right"><b>Total :</b></td>
-          <td class="right"><b>{{ po.grand_total }}</b></td>
+          <td class="right"><b>{{ po.grand_total|floatformat:2|intcomma }}</b></td>
         </tr>
       </table>
-
       <!-- TERMS -->
-<div class="terms">
-  <b>Other Terms and Conditions :</b>
-  <hr>
-
-  {% regroup po.terms_conditions.all by terms_condition_type as term_groups %}
-
-  {% for group in term_groups %}
-
-    <b>{{ group.grouper.display_name|default:group.grouper.name }}</b><br>
-
-    {% for term in group.list %}
-      • {{ term.terms }}<br>
-    {% endfor %}
-
-    <br>
-
-  {% endfor %}
-</div>
+      <div class="terms">
+        <b>Other Terms and Conditions :</b>
+        <hr>
+      
+        {% regroup po.terms_conditions.all by terms_condition_type as term_groups %}
+      
+        {% for group in term_groups %}
+      
+          <b>{{ group.grouper.display_name|default:group.grouper.name }}</b><br>
+      
+          {% for term in group.list %}
+            • {{ term.terms }}<br>
+          {% endfor %}
+      
+          <br>
+      
+        {% endfor %}
+      </div>
 
       <!-- FOOTER -->
 
       <div class="footer">
-        <b>GSTIN No :</b> 27AITPP8825B2ZS
 
-        <br /><br />
-
+        <p><b>Note :</b> {{ po.note|default:"-" }}</p> 
+        <br><hr> <br>
+        Your Faith fully,
+        <br> <br>
         For Krisna Airconditioning,
-
-        <div class="signature">Authorized Signatory</div>
+        <br><br>
+        <div class="signature right">Authorized Signatory</div>
+        <br><br>
       </div>
     </div>
   </body>
