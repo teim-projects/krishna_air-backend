@@ -1,52 +1,30 @@
 from rest_framework import serializers
 from django.db import transaction
 from decimal import Decimal
+from inventory.models import TermsConditions,TermsConditionType
+from .models import (
+    Invoice,
+    
+    CompanyProfile,
+    HighSideInvoiceItem,
+    LowSideInvoiceItem
+)
 
-from .models import Invoice, InvoiceItem, InvoiceTaxBreakup, CompanyProfile
 
 
-class InvoiceItemSerializer(serializers.ModelSerializer):
 
-    variant_sku = serializers.CharField(
-        source="product_variant.sku",
-        read_only=True
-    )
-
-    ac_type_name = serializers.CharField(
-        source="product_variant.product_model.ac_sub_type_id.ac_type_id.name",
-        read_only=True
-    )
-
-    ac_sub_type_name = serializers.CharField(
-        source="product_variant.product_model.ac_sub_type_id.name",
-        read_only=True
-    )
-
-    brand_name = serializers.CharField(
-        source="product_variant.product_model.brand_id.name",
-        read_only=True
-    )
-
-    model_no = serializers.CharField(
-        source="product_variant.product_model.model_no",
-        read_only=True
-    )
-
-    item_code = serializers.CharField(
-        source="item.item_code",
-        read_only=True
-    )
-
+class HighSideInvoiceItemSerializer(serializers.ModelSerializer):
     class Meta:
-        model = InvoiceItem
+        model = HighSideInvoiceItem
         fields = "__all__"
         read_only_fields = ("invoice", "amount")
 
-class InvoiceTaxBreakupSerializer(serializers.ModelSerializer):
+
+class LowSideInvoiceItemSerializer(serializers.ModelSerializer):
     class Meta:
-        model = InvoiceTaxBreakup
+        model = LowSideInvoiceItem
         fields = "__all__"
-        read_only_fields = ("invoice",)
+        read_only_fields = ("invoice", "amount")
 
 
 # =====================================================
@@ -54,9 +32,18 @@ class InvoiceTaxBreakupSerializer(serializers.ModelSerializer):
 # =====================================================
 
 class InvoiceSerializer(serializers.ModelSerializer):
+    branch_name = serializers.CharField(source="branch.name", read_only=True)
 
-    items = InvoiceItemSerializer(many=True)
-    tax_breakups = InvoiceTaxBreakupSerializer(many=True, required=False)
+    high_side_items = HighSideInvoiceItemSerializer(many=True, required=False)
+    low_side_items = LowSideInvoiceItemSerializer(many=True, required=False)
+
+    terms_conditions = serializers.PrimaryKeyRelatedField(
+        queryset=TermsConditions.objects.all(),
+        many=True,
+        required=False
+    )
+    
+   
 
     class Meta:
         model = Invoice
@@ -74,121 +61,142 @@ class InvoiceSerializer(serializers.ModelSerializer):
     # =====================================================
     # 🔥 CALCULATION ENGINE
     # =====================================================
-    def calculate_totals(self, invoice, items_data):
-
+    def calculate_totals(self, invoice, high_items, low_items):
+    
         taxable_value = Decimal("0")
         gst_total = Decimal("0")
-
-        invoice.items.all().delete()
-        invoice.tax_breakups.all().delete()
-
-        items_bulk = []
-        tax_map = {}
-
-        for item in items_data:
-
+        
+    
+        invoice.high_side_items.all().delete()
+        invoice.low_side_items.all().delete()
+        
+    
+        # ================= HIGH SIDE =================
+        for item in high_items:
+    
             qty = Decimal(str(item.get("quantity", 0)))
             rate = Decimal(str(item.get("rate", 0)))
             gst_percent = Decimal(str(item.get("gst_percent", 0)))
-
-            base_amount = qty * rate
-            gst_amount = (base_amount * gst_percent) / Decimal("100")
-
-            taxable_value += base_amount
+    
+            base = qty * rate
+            gst_amount = (base * gst_percent) / Decimal("100")
+    
+            taxable_value += base
             gst_total += gst_amount
-
-            items_bulk.append(
-                InvoiceItem(
-                    invoice=invoice,
-                    product_variant=item.get("product_variant"),
-                    item=item.get("item"),
-                    description=item.get("description", ""),
-                    hsn_sac=item.get("hsn_sac"),
-                    gst_percent=gst_percent,
-                    quantity=qty,
-                    unit=item.get("unit", "NOS"),
-                    rate=rate,
-                    amount=base_amount
-                )
+    
+            HighSideInvoiceItem.objects.create(
+                invoice=invoice,
+                product_variant=item.get("product_variant"),
+                description=item.get("description"),
+                hsn_sac=item.get("hsn_sac"),
+                gst_percent=gst_percent,
+                quantity=qty,
+                unit=item.get("unit"),
+                rate=rate
             )
-
-            tax_map.setdefault(gst_percent, Decimal("0"))
-            tax_map[gst_percent] += base_amount
-
-        InvoiceItem.objects.bulk_create(items_bulk)
-
-        tax_bulk = []
-
-        for gst_percent, value in tax_map.items():
-
-            if invoice.gst_type == "CGST_SGST":
-
-                half = gst_percent / Decimal("2")
-
-                tax_bulk.append(
-                    InvoiceTaxBreakup(
-                        invoice=invoice,
-                        taxable_value=value,
-                        cgst_rate=half,
-                        cgst_amount=(value * half) / Decimal("100"),
-                        sgst_rate=half,
-                        sgst_amount=(value * half) / Decimal("100"),
-                    )
-                )
-            else:
-                tax_bulk.append(
-                    InvoiceTaxBreakup(
-                        invoice=invoice,
-                        taxable_value=value,
-                        igst_rate=gst_percent,
-                        igst_amount=(value * gst_percent) / Decimal("100"),
-                    )
-                )
-
-        InvoiceTaxBreakup.objects.bulk_create(tax_bulk)
-
+    
+            
+    
+        # ================= LOW SIDE =================
+        for item in low_items:
+    
+            qty = Decimal(str(item.get("quantity", 0)))
+            rate = Decimal(str(item.get("rate", 0)))
+            gst_percent = Decimal(str(item.get("gst_percent", 0)))
+    
+            base = qty * rate
+            gst_amount = (base * gst_percent) / Decimal("100")
+    
+            taxable_value += base
+            gst_total += gst_amount
+    
+            LowSideInvoiceItem.objects.create(
+                invoice=invoice,
+                item=item.get("item"),
+                description=item.get("description"),
+                gst_percent=gst_percent,
+                quantity=qty,
+                unit=item.get("unit"),
+                rate=rate
+            )
+    
+            
+         
+    
+            # ================= FINAL TOTAL =================
         invoice.taxable_value = taxable_value
-        invoice.total_tax = gst_total
-
-        if invoice.gst_type == "CGST_SGST":
+        
+        # ================= NO GST =================
+        if invoice.gst_type == "NO_GST":
+        
+            invoice.cgst_amount = Decimal("0")
+            invoice.sgst_amount = Decimal("0")
+            invoice.igst_amount = Decimal("0")
+            invoice.total_tax = Decimal("0")
+        
+            invoice.grand_total = taxable_value
+        
+        
+        # ================= CGST + SGST =================
+        elif invoice.gst_type == "CGST_SGST":
+        
             invoice.cgst_amount = gst_total / Decimal("2")
             invoice.sgst_amount = gst_total / Decimal("2")
             invoice.igst_amount = Decimal("0")
-        else:
+        
+            invoice.total_tax = gst_total
+            invoice.grand_total = taxable_value + gst_total
+        
+        
+        # ================= IGST =================
+        elif invoice.gst_type == "IGST":
+        
             invoice.igst_amount = gst_total
             invoice.cgst_amount = Decimal("0")
             invoice.sgst_amount = Decimal("0")
-
-        invoice.grand_total = taxable_value + gst_total
-        invoice.save()
-
+        
+            invoice.total_tax = gst_total
+            invoice.grand_total = taxable_value + gst_total        
+        invoice.save()    
     # =====================================================
     # CREATE
     # =====================================================
     @transaction.atomic
     def create(self, validated_data):
-
-        items_data = validated_data.pop("items", [])
-
+    
+        high_items = validated_data.pop("high_side_items", [])
+        low_items = validated_data.pop("low_side_items", [])
+        terms = validated_data.pop("terms_conditions", [])
+    
         invoice = Invoice.objects.create(**validated_data)
-
-        self.calculate_totals(invoice, items_data)
-
-        return invoice
+    
+        if terms:
+            invoice.terms_conditions.set(terms)
+    
+        self.calculate_totals(invoice, high_items, low_items)
+    
+        return invoice    
 
     # =====================================================
     # UPDATE
     # =====================================================
     @transaction.atomic
     def update(self, instance, validated_data):
-
-        items_data = validated_data.pop("items", [])
-
+    
+        high_items = validated_data.pop("high_side_items", [])
+        low_items = validated_data.pop("low_side_items", [])
+        terms = validated_data.pop("terms_conditions", [])
+    
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-
+    
         instance.save()
-
-        self.calculate_totals(instance, items_data)
-
+    
+        if terms is not None:
+            instance.terms_conditions.set(terms)
+    
+        self.calculate_totals(instance, high_items, low_items)
+    
         return instance
+
+
