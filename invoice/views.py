@@ -39,9 +39,13 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             Invoice.objects
             .select_related("customer","branch")
             .prefetch_related(
-                "high_side_items",
-                "low_side_items",
                 "terms_conditions",
+                "high_side_items__product_variant__product_model__brand_id",
+                "high_side_items__product_variant__product_model__ac_sub_type_id__ac_type_id",
+                "low_side_items__item__material_type_id",
+                "low_side_items__item__item_type_id",
+                "low_side_items__item__feature_type_id",
+                "low_side_items__item__item_class_id",
                 
             )
             .order_by("-id")

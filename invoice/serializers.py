@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.db import transaction
+from num2words import num2words
 from decimal import Decimal
 from inventory.models import TermsConditions,TermsConditionType
 from .models import (
@@ -14,19 +15,68 @@ from .models import (
 
 
 class HighSideInvoiceItemSerializer(serializers.ModelSerializer):
+
+    ac_type_name = serializers.CharField(
+        source="product_variant.product_model.ac_sub_type_id.ac_type_id.name",
+        read_only=True
+    )
+
+    ac_sub_type_name = serializers.CharField(
+        source="product_variant.product_model.ac_sub_type_id.name",
+        read_only=True
+    )
+
+    brand_name = serializers.CharField(
+        source="product_variant.product_model.brand_id.name",
+        read_only=True
+    )
+
+    model_no = serializers.CharField(
+        source="product_variant.product_model.model_no",
+        read_only=True
+    )
+
+    variant_sku = serializers.CharField(
+        source="product_variant.sku",
+        read_only=True
+    )
+
     class Meta:
         model = HighSideInvoiceItem
         fields = "__all__"
         read_only_fields = ("invoice", "amount")
 
-
 class LowSideInvoiceItemSerializer(serializers.ModelSerializer):
+
+    item_code = serializers.CharField(
+        source="item.item_code",
+        read_only=True
+    )
+
+    material_type_name = serializers.CharField(
+        source="item.material_type_id.name",
+        read_only=True
+    )
+
+    item_type_name = serializers.CharField(
+        source="item.item_type_id.name",
+        read_only=True
+    )
+
+    feature_type_name = serializers.CharField(
+        source="item.feature_type_id.name",
+        read_only=True
+    )
+
+    item_class_name = serializers.CharField(
+        source="item.item_class_id.name",
+        read_only=True
+    )
+
     class Meta:
         model = LowSideInvoiceItem
         fields = "__all__"
         read_only_fields = ("invoice", "amount")
-
-
 # =====================================================
 # 🔥 PRO INVOICE SERIALIZER
 # =====================================================
@@ -34,6 +84,8 @@ class LowSideInvoiceItemSerializer(serializers.ModelSerializer):
 class InvoiceSerializer(serializers.ModelSerializer):
     branch_name = serializers.CharField(source="branch.name", read_only=True)
 
+    terms_conditions_details = serializers.SerializerMethodField()
+    
     high_side_items = HighSideInvoiceItemSerializer(many=True, required=False)
     low_side_items = LowSideInvoiceItemSerializer(many=True, required=False)
 
@@ -42,6 +94,13 @@ class InvoiceSerializer(serializers.ModelSerializer):
         many=True,
         required=False
     )
+    customer_phone = serializers.CharField(
+    source="customer.contact_number",
+    read_only=True
+)
+
+    
+    
     
    
 
@@ -57,6 +116,20 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "grand_total",
             "created_at",
         )
+
+    def get_terms_conditions_details(self, obj):
+    
+        data = []
+    
+        for term in obj.terms_conditions.all():
+    
+            data.append({
+                "id": term.id,
+                "terms": term.terms,
+                "terms_condition_type_name": term.terms_condition_type.name
+            })
+    
+        return data        
 
     # =====================================================
     # 🔥 CALCULATION ENGINE
@@ -156,7 +229,20 @@ class InvoiceSerializer(serializers.ModelSerializer):
             invoice.sgst_amount = Decimal("0")
         
             invoice.total_tax = gst_total
-            invoice.grand_total = taxable_value + gst_total        
+            invoice.grand_total = taxable_value + gst_total   
+
+        
+        # ================= AMOUNT IN WORDS =================
+        rupees = int(invoice.grand_total)
+        paise = int((invoice.grand_total - rupees) * 100)
+        
+        words = num2words(rupees, lang="en_IN").title()
+        
+        if paise > 0:
+            paise_words = num2words(paise, lang="en_IN").title()
+            invoice.amount_in_words = f"{words} Rupees and {paise_words} Paise Only"
+        else:
+            invoice.amount_in_words = f"{words} Rupees Only"                 
         invoice.save()    
     # =====================================================
     # CREATE

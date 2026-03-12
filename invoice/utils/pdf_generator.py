@@ -339,7 +339,15 @@ class InvoicePDFGenerator:
         # HIGH SIDE ITEMS
         for item in self.invoice.high_side_items.all():
     
-            description = item.description or ""
+            product_name = ""
+            
+            if item.product_variant:
+                product_name = item.product_variant.sku
+            
+            description = product_name
+            
+            if item.description:
+                description += f"<br/>{item.description}"
     
             data.append([
                 str(sr),
@@ -357,7 +365,15 @@ class InvoicePDFGenerator:
         # LOW SIDE ITEMS
         for item in self.invoice.low_side_items.all():
     
-            description = item.description or ""
+            item_name = ""
+            
+            if item.item:
+                item_name = item.item.item_code
+            
+            description = item_name
+            
+            if item.description:
+                description += f"<br/>{item.description}"
     
             data.append([
                 str(sr),
