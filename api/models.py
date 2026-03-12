@@ -127,7 +127,7 @@ class BranchManagement(models.Model):
     address = models.TextField()
     city = models.CharField(max_length=255)
     state = models.CharField(max_length=255)
-    pincode = models.IntegerField()
+    pincode = models.CharField(max_length=10, blank=True, null=True)
     state_code = models.CharField(max_length=20)
     gst_no = models.CharField(max_length=255, null=True, blank=True)
     company_pan = models.CharField(max_length=20, null=True, blank=True)

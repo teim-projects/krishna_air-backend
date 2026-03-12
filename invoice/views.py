@@ -4,6 +4,8 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from django.db.models import Prefetch
 
+import invoice
+
 from .models import Invoice  
 from .serializers import InvoiceSerializer
 from django.http import HttpResponse
@@ -118,3 +120,46 @@ class PublicInvoicePDFView(APIView):
         response['Content-Disposition'] = f'inline; filename="invoice_{invoice.invoice_no}.pdf"'
         
         return response
+
+
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+from weasyprint import HTML
+from decimal import Decimal
+from .models import Invoice
+
+
+def invoice_pdf(request, pk):
+
+    invoice = Invoice.objects.get(pk=pk)
+
+    high_items = invoice.high_side_items.all()
+    low_items = invoice.low_side_items.all()
+    invoice_payment_terms = invoice.terms_conditions.filter(
+    terms_condition_type__name="Invoice Payment"
+        )
+
+
+    html_string = render_to_string(
+        "pdf/invoice.html",
+        {
+            "invoice": invoice,
+            "high_items": high_items,
+            "low_items": low_items,
+            "invoice_payment_terms": invoice_payment_terms,
+        }
+    )
+
+    pdf = HTML(
+        string=html_string,
+        base_url=request.build_absolute_uri("/")
+    ).write_pdf()
+
+    response = HttpResponse(pdf, content_type="application/pdf")
+
+    if request.GET.get("download"):
+        response["Content-Disposition"] = f'attachment; filename="INV-{invoice.invoice_no}.pdf"'
+    else:
+        response["Content-Disposition"] = f'inline; filename="INV-{invoice.invoice_no}.pdf"'
+
+    return response

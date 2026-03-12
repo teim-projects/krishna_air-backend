@@ -1,5 +1,6 @@
 from django.db import models
-from api.models import  BranchManagement
+from api.models import  BranchManagement, SiteManagement
+from inventory.models import TermsConditions
 # Create your models here.
 
 
@@ -64,6 +65,8 @@ class Invoice(models.Model):
         blank=True
     )
 
+
+
     bank_name = models.CharField(max_length=255)
     account_no = models.CharField(max_length=50)
     ifsc_code = models.CharField(max_length=50)
@@ -75,16 +78,22 @@ class Invoice(models.Model):
     # ===== HEADER FIELDS FROM INVOICE =====
 
     delivery_note = models.CharField(max_length=100, blank=True, null=True)
-    delivery_note_date = models.DateField(blank=True, null=True)
+    delivery_note_date = models.DateField(blank=True, null=True, verbose_name="Delivery Note Date")
     supplier_ref = models.CharField(max_length=100, blank=True, null=True)
     other_references = models.CharField(max_length=255, blank=True, null=True)
     buyer_order_no = models.CharField(max_length=100, blank=True, null=True)
     dispatch_doc_no = models.CharField(max_length=100, blank=True, null=True)
     dispatched_through = models.CharField(max_length=255, blank=True, null=True)
     destination = models.CharField(max_length=255, blank=True, null=True)
-    terms_of_payment = models.CharField(max_length=255, blank=True, null=True)
-    terms_of_delivery = models.TextField(blank=True, null=True)
-    site_name = models.CharField(max_length=255, blank=True, null=True)
+    # terms_of_payment = models.CharField(max_length=255, blank=True, null=True)
+    # terms_of_delivery = models.TextField(blank=True, null=True)
+    site = models.ForeignKey(
+        SiteManagement,
+        on_delete=models.PROTECT,
+        related_name="invoices",
+        null=True,
+        blank=True
+    )
     # ===== WORK DESCRIPTION =====
     work_description = models.TextField(blank=True, null=True)
 
