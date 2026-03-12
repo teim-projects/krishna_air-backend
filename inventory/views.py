@@ -151,6 +151,9 @@ def purchase_order_pdf(request, pk):
     ).write_pdf()
 
     response = HttpResponse(pdf, content_type="application/pdf")
-    response["Content-Disposition"] = f'inline; filename="PO-{po.purchase_order_no}.pdf"'
+    if request.GET.get("download"):
+        response["Content-Disposition"] = f'attachment; filename="PO-{po.purchase_order_no}.pdf"'
+    else:
+        response["Content-Disposition"] = f'inline; filename="PO-{po.purchase_order_no}.pdf"'
 
     return response
