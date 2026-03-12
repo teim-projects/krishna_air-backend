@@ -130,6 +130,8 @@ class BranchManagement(models.Model):
     pincode = models.IntegerField()
     state_code = models.CharField(max_length=20)
     gst_no = models.CharField(max_length=255, null=True, blank=True)
+    company_pan = models.CharField(max_length=20, null=True, blank=True)
+    msme_number = models.CharField(max_length=50, null=True, blank=True)
     is_head_office = models.BooleanField(default=False)
 
     def __str__(self):

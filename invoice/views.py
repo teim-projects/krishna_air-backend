@@ -4,7 +4,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from django.db.models import Prefetch
 
-from .models import Invoice, InvoiceItem, InvoiceTaxBreakup
+from .models import Invoice  
 from .serializers import InvoiceSerializer
 from django.http import HttpResponse
 from rest_framework.decorators import action
@@ -37,10 +37,16 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
         return (
             Invoice.objects
-            .select_related("customer")
+            .select_related("customer","branch")
             .prefetch_related(
-                "items",
-                "tax_breakups"
+                "terms_conditions",
+                "high_side_items__product_variant__product_model__brand_id",
+                "high_side_items__product_variant__product_model__ac_sub_type_id__ac_type_id",
+                "low_side_items__item__material_type_id",
+                "low_side_items__item__item_type_id",
+                "low_side_items__item__feature_type_id",
+                "low_side_items__item__item_class_id",
+                
             )
             .order_by("-id")
         )
