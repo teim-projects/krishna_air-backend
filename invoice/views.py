@@ -127,26 +127,53 @@ from django.template.loader import render_to_string
 from weasyprint import HTML
 from decimal import Decimal
 from .models import Invoice
-
+from num2words import num2words
 
 def invoice_pdf(request, pk):
 
     invoice = Invoice.objects.get(pk=pk)
 
-    high_items = invoice.high_side_items.all()
-    low_items = invoice.low_side_items.all()
+    high_items = list(invoice.high_side_items.all())
+    low_items = list(invoice.low_side_items.all())
+
+    products = high_items + low_items
+
+    total_qty = sum(p.quantity for p in products)
     invoice_payment_terms = invoice.terms_conditions.filter(
     terms_condition_type__name="Invoice Payment"
         )
+    
+    invoice_delivery_terms = invoice.terms_conditions.filter(
+    terms_condition_type__name="Invoice Delivery"
+        )
+    
+    # Initialize
+    cgst = None
+    sgst = None
+    igst = None
+
+    if invoice.gst_type == "CGST_SGST":
+        cgst = invoice.gst_percentage / Decimal(2)
+        sgst = invoice.gst_percentage / Decimal(2)
+
+    else:
+        igst = invoice.gst_percentage
 
 
+    total_tax_in_words = num2words(invoice.total_tax, lang='en').capitalize() + " Rupees Only"
     html_string = render_to_string(
         "pdf/invoice.html",
         {
             "invoice": invoice,
-            "high_items": high_items,
-            "low_items": low_items,
+            "products": products,
+            "total_qty": total_qty,
+            "total_tax_in_words": total_tax_in_words,
+            "cgst": cgst,
+            "sgst": sgst,
+            "igst": igst,   
             "invoice_payment_terms": invoice_payment_terms,
+            "invoice_delivery_terms": invoice_delivery_terms,
+
         }
     )
 

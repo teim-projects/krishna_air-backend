@@ -172,53 +172,80 @@
           <td width="70%" style="padding: 0" valign="top">
             <table style="width: 100%; border-collapse: collapse">
               <tr>
-                <td style="border-bottom: 1px solid #2c2c2c; padding: 10px">
+                <td style="border-bottom: 1px solid #2c2c2c; padding: 5px">
                   <b>Invoice No </b> <br> {{ invoice.invoice_no }}
                 </td>
-                <td style="border-bottom: 1px solid #2c2c2c; padding: 10px">
+                <td style="border-bottom: 1px solid #2c2c2c; padding: 5px">
                   <b>Invoice Date </b> <br> {{ invoice.invoice_date }}
                 </td>
               </tr>
 
              
               <tr>
-                <td style="border-bottom: 1px solid #2c2c2c; padding: 10px">
+                <td style="border-bottom: 1px solid #2c2c2c; padding: 5px">
                   <b>Delivery Note</b> <br> {{ invoice.delivery_note|default:"-" }}
                 </td>
-                <td style="border-bottom: 1px solid #2c2c2c; padding: 10px">
-                    <b>Mode/Terms of Payment :</b> <br>
+                <td style="border-bottom: 1px solid #2c2c2c; padding: 5px;">
+                    <b >Mode/Terms of Payment</b><br>
 
                     {% for term in invoice_payment_terms %}
-                        {{ term.terms }}{% if not forloop.last %}, <br> {% endif %}
+                        <span style="font-size:10.5px; line-height:1.2;">
+                            {{ term.terms }}
+                        </span>
+                        {% if not forloop.last %}, <br> {% endif %}
                     {% empty %}
-                        -
+                        <span style="font-size:10px;">-</span>
                     {% endfor %}
-
                 </td>
               </tr>
 
               <tr>
-                
+                <td style="padding: 5px">
+                  <b>Supplier's Ref.</b> <br>{{ invoice.supplier_ref|default:"-" }}
+                </td>
+                <td style="padding: 5px">
+                  <b>Other Reference(s)</b> <br>{{ invoice.other_references|default:"-" }}
+                </td>
               </tr>
 
-              <tr>
-                <td
-                  style="
-                    border-bottom: 1px solid #525252;
-                    padding: 10px;
-                    text-align: center;
-                  "
-                >
-                  <b>Contact Detail</b>
+               <tr>
+                <td style="padding: 5px">
+                  <b>Buyer's Order No.</b> <br>{{ invoice.buyer_order_no|default:"-" }}
+                </td>
+                <td style="padding: 5px">
+                  <b>Dated</b> <br>{{ invoice.buyer_dated|default:"-" }}
                 </td>
               </tr>
 
               <tr>
-                <td style="padding: 10px">
-                  <span style="padding-bottom: 10px"
-                    ><b>Name :</b> {{ po.contact_name|default:"-" }}</span
-                  ><br />
-                  <b>No :</b> {{ po.contact_no|default:"-" }}
+                <td style="padding: 5px">
+                  <b>Despatch Document No.</b> <br>{{ invoice.dispatch_doc_no|default:"-" }}
+                </td>
+                <td style="padding: 5px">
+                  <b>Delivery Note Date</b> <br>{{ invoice.delivery_note_date|default:"-" }}
+                </td>
+              </tr>
+
+              <tr>
+                <td style="padding: 5px">
+                  <b>Despatched through</b> <br>{{ invoice.dispatched_through|default:"-" }}
+                </td>
+                <td style="padding: 5px">
+                  <b>Destination</b> <br>{{ invoice.destination|default:"-" }}
+                </td>
+              </tr>
+
+              <tr>
+                <td colspan="2" style="padding: 5px">
+                  <b>Terms of Delivery</b> <br>
+                    {% for term in invoice_delivery_terms %}
+                        <span style="font-size:10.5px; line-height:1.2;">
+                            {{ term.terms }}
+                        </span>
+                        {% if not forloop.last %}, <br> {% endif %}
+                    {% empty %}
+                        <span style="font-size:10px;">-</span>
+                    {% endfor %}
                 </td>
               </tr>
             </table>
@@ -227,122 +254,161 @@
       </table>
 
       <!-- ITEMS -->
-
       <table class="items-table">
         <thead>
           <tr>
             <th>S.N.</th>
-            <th>Description</th>
+            <th>Description of <br> Goods and Services</th>
+            <th>HSN/SAC</th>
+            <th>GST Rate</th>
             <th>Qty</th>
-            <th>UOM</th>
             <th>Rate</th>
+            <th>Per</th>
             <th>Amount</th>
           </tr>
         </thead>
-
+      
         <tbody>
-          {% for p in products %} {% if p.is_section %}
-
+          {% for p in products %}
           <tr>
-            <td>{{ p.serial_no }}</td>
-            <td colspan="5"><b>{{ p.section_title }}</b></td>
-          </tr>
-
-          {% else %}
-
-          <tr>
-            <td>{{ p.serial_no }}</td>
+            <td>{{ forloop.counter }}</td>
+          
             <td>
-              {% if p.item %} {{ p.item.item_code }} {% elif p.product_variant
-              %} {{ p.product_variant.sku }} {% endif %}
-              <br />
+              {% if p.item %}
+                {{ p.item.item_code }}
+              {% elif p.product_variant %}
+                {{ p.product_variant.sku }}
+              {% endif %}
+              <br>
               {{ p.description }}
             </td>
-            <td>{{ p.quantity }}</td>
-            <td>{{ p.uom }}</td>
-            <td class="right">{{ p.rate }}</td>
-            <td class="right">{{ p.amount }}</td>
+          
+            <td>{{ p.hsn_sac|default:"-" }}</td>
+            <td>{{ p.gst_percent|floatformat:0 }}%</td>
+            <td>{{ p.quantity|floatformat:2 }}</td>
+            <td class="right">{{ p.rate|floatformat:2 }}</td>
+            <td>{{ p.unit }}</td>
+            <td class="right">{{ p.amount|floatformat:2|intcomma }}</td>
+          </tr>
+          
+          {% empty %}
+
+          <tr>
+            <td colspan="8" style="text-align:center;">No Products</td>
+          </tr>
+          {% endfor %}
+          <tr>
+            <td colspan="4" class="right"><b>Total</b></td>
+            <td class="right"><b>{{ total_qty|floatformat:2 }}</b></td>
+            <td></td>
+            <td></td>
+            <td class="right"><b>{{ invoice.taxable_value|floatformat:2|intcomma }}</b></td>
+          </tr>
+          {% if invoice.gst_type == "CGST_SGST" %}
+
+          <tr>
+            <td colspan="7" class="right">
+              <b>Output CGST @ {{ cgst|floatformat:0 }}% :</b>
+            </td>
+            <td class="right">{{ invoice.cgst_amount|floatformat:2|intcomma }}</td>
           </tr>
 
-          {% endif %} {% endfor %}
+          <tr>
+            <td colspan="7" class="right">
+              <b>Output SGST @ {{ sgst|floatformat:0 }}% :</b>
+            </td>
+            <td class="right">{{ invoice.sgst_amount|floatformat:2|intcomma }}</td>
+          </tr>
+
+          {% elif invoice.gst_type == "IGST" %}
+
+          <tr>
+            <td colspan="7" class="right">
+              <b>GST @ {{ igst|floatformat:0 }}% :</b>
+            </td>
+            <td class="right">{{ invoice.igst_amount|floatformat:2|intcomma }}</td>
+          </tr>
+
+          {% endif %}
+
+          <tr>
+            <td colspan="7" class="right"><b>Grand Total</b></td>
+            <td class="right"><b>RS {{ invoice.grand_total|floatformat:2|intcomma }}</b></td>
+          </tr>
+          <tr>
+            <td colspan="7" style="border-right: none;">Amount Chargeable (in words) : <b>{{ invoice.amount_in_words}} </b></td>
+            <td style="border-left: none;" class="right">
+             E. &amp; O.E
+            </td>
+          </tr>
+          <tr>
+            <th rowspan="2" colspan="2">Taxable Value</th>
+            <th colspan="2">Central Tax</th>
+            <th colspan="2">State Tax</th>
+            <th rowspan="2" colspan="2">Total <br> Tax Amount</th>
+          </tr>
+
+          <tr>
+            <th>Rate</th>
+            <th>Amount</th>
+            <th>Rate</th>
+            <th>Amount</th>
+          </tr>
+          <tr>
+            <td style="border-right: none;"></td>
+            <td  style="text-align:left; border-left: none;">
+              {{ invoice.taxable_value|floatformat:2|intcomma }}
+            </td>
+            <td style="text-align:center;">
+              {{ cgst|floatformat:0 }}%
+            </td>
+          
+            <td style="text-align:right;">
+              {{ invoice.cgst_amount|floatformat:2|intcomma }}
+            </td>
+          
+            <td style="text-align:center;">
+              {{ sgst|floatformat:0 }}%
+            </td>
+          
+            <td style="text-align:right;">
+              {{ invoice.sgst_amount|floatformat:2|intcomma }}
+            </td>
+          
+            <td colspan="2" style="text-align:right;">
+              {{ invoice.total_tax|floatformat:2|intcomma }}
+            </td>
+          </tr>
+          <tr>
+            <td  class="left"><b>Total</b></td>
+            <td class="center"> {{ invoice.taxable_value|floatformat:2|intcomma }} </td>
+            <td></td>
+            <td class="right">
+              <b>{{ invoice.cgst_amount|floatformat:2|intcomma }}</b>
+            </td>
+          
+            <td></td>
+            <td class="right">
+              <b>{{ invoice.sgst_amount|floatformat:2|intcomma }}</b>
+            </td>
+          
+            <td colspan="2" class="right">
+              <b>{{ invoice.total_tax|floatformat:2|intcomma }}</b>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="8">
+              Tax Amount (in words) : <b>{{ total_tax_in_words }} </b>
+            </td>
+          </tr>
         </tbody>
       </table>
 
-      <!-- TOTAL -->
-
-      <table class="total-table">
-        <tr>
-          <td class="right" style="width: 81%"><b>Sub Total :</b></td>
-          <td class="right" style="width: 11%">
-            {{ po.subtotal|floatformat:2|intcomma }}
-          </td>
-        </tr>
-
-        {% if po.gst_type == "inclusive" %}
-
-        <tr>
-          <td class="right">
-            <b>GST @ {{ po.gst_percentage|floatformat:0 }}% :</b>
-          </td>
-          <td class="right">Inclusive</td>
-        </tr>
-
-        {% else %}
-
-        <tr>
-          <td class="right">
-            <b>GST @ {{ po.gst_percentage|floatformat:0 }}% :</b>
-          </td>
-          <td class="right">{{ gst_amount|floatformat:2|intcomma }}</td>
-        </tr>
-
-        {% endif %}
-
-        <tr>
-          <td class="right"><b>Transport :</b></td>
-          <td class="right">
-            {{ po.transport_charges|floatformat:2|intcomma }}
-          </td>
-        </tr>
-
-        <tr>
-          <td class="right"><b>Round off :</b></td>
-          <td class="right">{{ po.round_off|floatformat:2|intcomma }}</td>
-        </tr>
-
-        <tr>
-          <td class="right"><b>Total :</b></td>
-          <td class="right">
-            <b>{{ po.grand_total|floatformat:2|intcomma }}</b>
-          </td>
-        </tr>
-      </table>
-      <!-- TERMS -->
-      <div class="terms">
-        <b>Other Terms and Conditions :</b>
-        <hr />
-
-        {% regroup po.terms_conditions.all by terms_condition_type as
-        term_groups %} {% for group in term_groups %}
-
-        <b>{{ group.grouper.display_name|default:group.grouper.name }}</b><br />
-
-        {% for term in group.list %} • {{ term.terms }}<br />
-        {% endfor %}
-
-        <br />
-
-        {% endfor %}
-      </div>
-
+    
+      
       <!-- FOOTER -->
 
       <div class="footer">
-        <p><b>Note :</b> {{ po.note|default:"-" }}</p>
-        <br />
-        <hr />
-        <br />
-        Your Faith fully,
         <br />
         <br />
         For Krisna Airconditioning,
