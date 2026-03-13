@@ -533,53 +533,88 @@ class QuotationPDFGenerator:
         pass
 
     def add_terms_and_conditions(self):
-        """Add terms and conditions"""
+        """Add terms and conditions from quotation data"""
         # Always start Terms & Conditions on a new page
         self.elements.append(PageBreak())
         
         self.elements.append(Paragraph("Terms & Conditions", self.styles['SectionHeader']))
-        self.elements.append(Spacer(1, 5))
+        self.elements.append(Spacer(1, 10))
         
-        terms = [
-            "<b>TAXES:</b> GST will be extra as applicable.",
-            "",
-            "<b>PAYMENT TERMS:</b>",
-            "<b>Part A)</b> For HVAC Equipment: <b>100%</b> advance along with PO against Performa Invoice.",
-            "Purchase Order and Cheque shall be made in the name of <b>KRISNA AIRCONDITIONING</b>, Pune.",
-            "Bank of India, Account Number: 051520100000616, IFSC Code: BKID0000515, GSTIN: 27AITPP8825B2ZS.",
-            "",
-            "<b>Part B)</b> For Low Side Installation charges of HVAC Equipment: <b>50%</b> advance along with order, <b>50%</b> against delivery of material at site on prorata basis, 10% against installation of material at site on month basis, and balance 10% against completion of work.",
-            "Purchase Order and Cheque shall be made in the name of <b>Crona Heat Technology Pvt. Ltd.</b>, Pune.",
-            "Bank of India, Account Number: 051520100000612, IFSC Code: BKID0000515, GSTIN: 27AAFCC6613, GSTIN: 27AAFCC6613ZC.",
-            "",
-            "<b>VALIDITY of rates:</b> Rates for AC units are valid up to 7 days and Low Side Installation rates are valid up to 7 days from the date of this offer.",
-            "",
-            "<b>WARRANTY:</b> 1.) All AC units will have Efficent ( 1:3 months warranty from the date of delivery at site or Twelve (12) months from date of commissioning of AC units ever is earlier.",
-            "2.) 1 Nos. free in warranty servicing will be provided in Twelve (1:3 months from date of installation (*Applicable if supply & installation done by Krishna Airconditioning only).",
-            "",
-            "<b>Important Note:</b>",
-            "1) Electrical Power Cables & Pin top/Socket arrangement up to all HVAC equipment will be in the scope of customer.",
-            "2) Exact Mathadi Charges will be extra at actual and will be pass by customer.",
-            "3) Above costing are estimated and will be finalized detailed material layout.",
-            "4) Above costing are estimated and will be finalized detailed material layout.",
-            "5) Above Warranty & Servicing is not applicable on Old Split AC.",
-            "6) Lifting/Shifting/ Transportation of Old AC, MS Fabrication Work for Hogging/Mounting of AC IDU & ODU &",
-            "Electrical Work for AC will be in the scope of customer (if applicable).",
-            "7) Any HVAC equipment installation above 1 meter single angle inside Scaffolding arrangement & this type of arrangement to be provided by the client on-site or it will be on extra chargeable basis as extra.",
-            "8) The storage with Locker room for all HVAC material shall be arranged by client.",
-            "9) Any kind of hole made for AC pipings & ducting and waterproofing is in the client's scope.",
-            "10) Electrical work for AC will be in the scope of customer (if applicable).",
-            "11) Excess is not a integral part of HVAC system and Client has to check its physically & location with structural consultant. (Optional)",
-            "",
+        # Get terms and conditions from the quotation
+        terms_conditions = self.quotation.terms_conditions.all()
+        
+        if terms_conditions:
+            # Group terms by type
+            payment_terms = []
+            delivery_terms = []
+            other_terms = []
+            
+            for term in terms_conditions:
+                term_type_name = term.terms_condition_type.name.lower()
+                if 'payment' in term_type_name:
+                    payment_terms.append(term.terms)
+                elif 'delivery' in term_type_name:
+                    delivery_terms.append(term.terms)
+                else:
+                    other_terms.append(term.terms)
+            
+            # Add Payment Terms section
+            if payment_terms:
+                self.elements.append(Paragraph("<b>PAYMENT TERMS:</b>", self.styles['SubHeader']))
+                for idx, term in enumerate(payment_terms, 1):
+                    self.elements.append(Paragraph(f"{idx}. {term}", self.styles['Value']))
+                self.elements.append(Spacer(1, 8))
+            
+            # Add Delivery Terms section
+            if delivery_terms:
+                self.elements.append(Paragraph("<b>DELIVERY TERMS:</b>", self.styles['SubHeader']))
+                for idx, term in enumerate(delivery_terms, 1):
+                    self.elements.append(Paragraph(f"{idx}. {term}", self.styles['Value']))
+                self.elements.append(Spacer(1, 8))
+            
+            # Add Other Terms section
+            if other_terms:
+                self.elements.append(Paragraph("<b>GENERAL TERMS:</b>", self.styles['SubHeader']))
+                for idx, term in enumerate(other_terms, 1):
+                    self.elements.append(Paragraph(f"{idx}. {term}", self.styles['Value']))
+                self.elements.append(Spacer(1, 8))
+        
+        else:
+            # Fallback to default terms if no terms are set
+            self.elements.append(Paragraph("<b>TAXES:</b> GST will be extra as applicable.", self.styles['Value']))
+            self.elements.append(Spacer(1, 5))
+            
+            self.elements.append(Paragraph("<b>PAYMENT TERMS:</b>", self.styles['SubHeader']))
+            default_payment_terms = [
+                "For HVAC Equipment: 100% advance along with PO against Performa Invoice.",
+                "Purchase Order and Cheque shall be made in the name of KRISNA AIRCONDITIONING, Pune.",
+                "Bank of India, Account Number: 051520100000616, IFSC Code: BKID0000515, GSTIN: 27AITPP8825B2ZS."
+            ]
+            for idx, term in enumerate(default_payment_terms, 1):
+                self.elements.append(Paragraph(f"{idx}. {term}", self.styles['Value']))
+            self.elements.append(Spacer(1, 8))
+            
+            self.elements.append(Paragraph("<b>DELIVERY TERMS:</b>", self.styles['SubHeader']))
+            default_delivery_terms = [
+                "Delivery will be made within 15-20 working days from the date of receipt of order.",
+                "Material will be delivered at site during working hours only."
+            ]
+            for idx, term in enumerate(default_delivery_terms, 1):
+                self.elements.append(Paragraph(f"{idx}. {term}", self.styles['Value']))
+            self.elements.append(Spacer(1, 8))
+        
+        # Add standard closing text
+        closing_text = [
             "We hope we are in line with your requirement and look forward to hear from you with interest.",
             "",
             "Thanking you and assuring you our best of services always."
         ]
         
-        for term in terms:
-            self.elements.append(Paragraph(term, self.styles['Value']))
-            if term == "":
-                self.elements.append(Spacer(1, 3))
+        for text in closing_text:
+            if text == "":
+                self.elements.append(Spacer(1, 5))
+            else:
+                self.elements.append(Paragraph(text, self.styles['Value']))
         
         self.elements.append(Spacer(1, 10))
 
