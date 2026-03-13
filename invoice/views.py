@@ -39,7 +39,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
         return (
             Invoice.objects
-            .select_related("customer","branch")
+            .select_related("customer","branch","site")
             .prefetch_related(
                 "terms_conditions",
                 "high_side_items__product_variant__product_model__brand_id",
