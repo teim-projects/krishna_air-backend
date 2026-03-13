@@ -55,71 +55,72 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     
 
     # In views.py - update the download_pdf method
-    @action(detail=True, methods=['get'], url_path='pdf')
-    def download_pdf(self, request, pk=None):
-        """Generate and download PDF for invoice"""
-        # Check for token in query params if needed
-        token = request.query_params.get('token')
-        if token:
-            # Validate token here if needed
-            pass
+    # @action(detail=True, methods=['get'], url_path='pdf')
+    # def download_pdf(self, request, pk=None):
+    #     """Generate and download PDF for invoice"""
+    #     # Check for token in query params if needed
+    #     token = request.query_params.get('token')
+    #     if token:
+    #         # Validate token here if needed
+    #         pass
         
-        invoice = self.get_object()
-        pdf_content = generate_invoice_pdf(invoice)
+    #     invoice = self.get_object()
+    #     pdf_content = generate_invoice_pdf(invoice)
         
-        response = HttpResponse(pdf_content, content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="invoice_{invoice.invoice_no}.pdf"'
+    #     response = HttpResponse(pdf_content, content_type='application/pdf')
+    #     response['Content-Disposition'] = f'attachment; filename="invoice_{invoice.invoice_no}.pdf"'
         
-        return response
+    #     return response
 
 
-     # views.py - Add this new view
+    #  # views.py - Add this new view
+
 
 # Keep your existing InvoiceViewSet as is (remove the token query param code)
 
-class PublicInvoicePDFView(APIView):
-    """
-    Public endpoint to view invoice PDFs with token validation
-    """
-    authentication_classes = []  # No authentication
-    permission_classes = []  # No permission classes
+# class PublicInvoicePDFView(APIView):
+#     """
+#     Public endpoint to view invoice PDFs with token validation
+#     """
+#     authentication_classes = []  # No authentication
+#     permission_classes = []  # No permission classes
     
-    def get(self, request, pk):
-        # Get token from query params
-        token = request.query_params.get('token')
+#     def get(self, request, pk):
+#         # Get token from query params
+#         token = request.query_params.get('token')
         
-        if not token:
-            return HttpResponse(
-                "Authentication token required", 
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+#         if not token:
+#             return HttpResponse(
+#                 "Authentication token required", 
+#                 status=status.HTTP_401_UNAUTHORIZED
+#             )
         
-        # Validate the token
-        try:
-            # Decode and validate the token
-            jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
-        except jwt.ExpiredTokenError:
-            return HttpResponse(
-                "Token has expired", 
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-        except jwt.InvalidTokenError:
-            return HttpResponse(
-                "Invalid token", 
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+#         # Validate the token
+#         try:
+#             # Decode and validate the token
+#             jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+#         except jwt.ExpiredTokenError:
+#             return HttpResponse(
+#                 "Token has expired", 
+#                 status=status.HTTP_401_UNAUTHORIZED
+#             )
+#         except jwt.InvalidTokenError:
+#             return HttpResponse(
+#                 "Invalid token", 
+#                 status=status.HTTP_401_UNAUTHORIZED
+#             )
         
-        # Get the invoice
-        invoice = get_object_or_404(Invoice, pk=pk)
+#         # Get the invoice
+#         invoice = get_object_or_404(Invoice, pk=pk)
         
-        # Generate PDF
-        pdf_content = generate_invoice_pdf(invoice)
+#         # Generate PDF
+#         pdf_content = generate_invoice_pdf(invoice)
         
-        # Create response
-        response = HttpResponse(pdf_content, content_type='application/pdf')
-        response['Content-Disposition'] = f'inline; filename="invoice_{invoice.invoice_no}.pdf"'
+#         # Create response
+#         response = HttpResponse(pdf_content, content_type='application/pdf')
+#         response['Content-Disposition'] = f'inline; filename="invoice_{invoice.invoice_no}.pdf"'
         
-        return response
+#         return response
 
 
 from django.http import HttpResponse

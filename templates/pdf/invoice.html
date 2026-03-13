@@ -407,15 +407,51 @@
     
       
       <!-- FOOTER -->
+      <div style="display:flex; justify-content:space-between; margin-top: 10px; border: #000 solid 1px; padding: 5px;">
 
-      <div class="footer">
-        <br />
-        <br />
-        For Krisna Airconditioning,
-        <br /><br />
-        <div class="signature right">Authorized Signatory</div>
-        <br /><br />
+        <!-- Left Part -->
+        <div style="width:50%;">
+          <b>Declaration</b><br>
+          <p>We declare that this invoice shows the actual price of the goods.</p>
+        </div>
+        
+        <!-- Right Part -->
+        <div style="width:40%;">
+          <b>Company's Bank Details</b><br>
+          <p>
+            Bank Name : {{ invoice.bank_name }}<br>
+            A/C No : {{ invoice.account_no }}<br>
+            IFSC : {{ invoice.ifsc_code }} <br>
+            Branch : {{ invoice.branch_name }}
+          </p>
+        </div>
+      
       </div>
+      <br>
+      <div style="margin-top:10px; border:1px solid #000; border-bottom:none; padding:5px;">
+  <table style="width:100%; border-collapse:collapse;">
+    <tr>
+      
+      <!-- Left Part -->
+      <td style="width:50%; vertical-align:top;">
+        <p>Customer's Seal and Signature</p>
+      </td>
+
+      <!-- Right Part -->
+      <td style="width:50%; text-align:right; vertical-align:top;">
+        <b>For Krisna Airconditioning.</b><br><br><br>
+        <p>Authorised Signatory</p>
+        <br><br><br>
+        
+      </td>
+      
+    </tr>
+  
+  </table>
+    <p style="text-align:center;">
+          This is a Computer Generated Invoice
+        </p>
+</div>
     </div>
   </body>
 </html>
