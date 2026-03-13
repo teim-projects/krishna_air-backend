@@ -88,6 +88,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
     
     high_side_items = HighSideInvoiceItemSerializer(many=True, required=False)
     low_side_items = LowSideInvoiceItemSerializer(many=True, required=False)
+    site_name = serializers.CharField(source="site.site_name", read_only=True)
 
     terms_conditions = serializers.PrimaryKeyRelatedField(
         queryset=TermsConditions.objects.all(),
