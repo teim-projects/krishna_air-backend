@@ -206,7 +206,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             invoice.sgst_amount = Decimal("0")
             invoice.igst_amount = Decimal("0")
             invoice.total_tax = Decimal("0")
-        
+            invoice.gst_percentage = Decimal("0")
             invoice.grand_total = taxable_value
         
         
@@ -216,7 +216,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             invoice.cgst_amount = gst_total / Decimal("2")
             invoice.sgst_amount = gst_total / Decimal("2")
             invoice.igst_amount = Decimal("0")
-        
+            invoice.gst_percentage = gst_total / taxable_value * Decimal("100") if taxable_value > 0 else Decimal("0")
             invoice.total_tax = gst_total
             invoice.grand_total = taxable_value + gst_total
         
@@ -227,7 +227,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             invoice.igst_amount = gst_total
             invoice.cgst_amount = Decimal("0")
             invoice.sgst_amount = Decimal("0")
-        
+            invoice.gst_percentage = gst_total / taxable_value * Decimal("100") if taxable_value > 0 else Decimal("0")
             invoice.total_tax = gst_total
             invoice.grand_total = taxable_value + gst_total   
 

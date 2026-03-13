@@ -33,7 +33,7 @@ class Quotation(models.Model):
     
     terms_conditions = models.ManyToManyField(
         "inventory.TermsConditions",
-        related_name="invoices",
+        related_name="quotations",
         blank=True
     )
 
