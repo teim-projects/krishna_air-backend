@@ -3,6 +3,8 @@ from django.db import transaction
 import random
 from datetime import datetime
 from product_management.models import ProductVariant
+from inventory.models import TermsConditions
+from inventory.serializers import TermsConditionsSerializer
 
 from .models import (
     Quotation,
@@ -99,8 +101,44 @@ class QuotationSerializer(serializers.ModelSerializer):
     customer_contact = serializers.CharField(
         source="customer.contact_number", read_only=True
     )
+    
+    # Add branch information
+    branch_name = serializers.CharField(
+        source="branch.name", read_only=True
+    )
+    branch_address = serializers.CharField(
+        source="branch.address", read_only=True
+    )
+    branch_email = serializers.CharField(
+        source="branch.email", read_only=True
+    )
+    
+    # Add site information
+    site_name_detail = serializers.CharField(
+        source="site.name", read_only=True
+    )
+    site_address = serializers.CharField(
+        source="site.address", read_only=True
+    )
+    site_city = serializers.CharField(
+        source="site.city", read_only=True
+    )
 
     versions = QuotationVersionSerializer(many=True)
+    
+    terms_conditions = serializers.PrimaryKeyRelatedField(
+        queryset=TermsConditions.objects.all(),
+        many=True,
+        required=False,
+        write_only=True
+
+    )
+
+    terms_conditions_details = TermsConditionsSerializer(
+        source="terms_conditions",
+        many=True,
+        read_only=True
+    )
 
     class Meta:
         model = Quotation

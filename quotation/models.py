@@ -15,6 +15,28 @@ class Quotation(models.Model):
         related_name="quotations"
     )
 
+    branch = models.ForeignKey(
+        "api.BranchManagement",
+        on_delete=models.PROTECT,
+        related_name="quotations",
+        null=True,
+        blank=True
+    )
+    
+    site = models.ForeignKey(
+        "api.SiteManagement",
+        on_delete=models.PROTECT,
+        related_name="quotations",
+        null=True,
+        blank=True
+    )
+    
+    terms_conditions = models.ManyToManyField(
+        "inventory.TermsConditions",
+        related_name="invoices",
+        blank=True
+    )
+
     subject = models.CharField(max_length=255)
     site_name = models.CharField(max_length=255, blank=True, null=True)
     thank_you_note = models.TextField(blank=True, null=True)
@@ -103,6 +125,8 @@ class QuotationHighSideItem(models.Model):
 
     mathadi_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     transportation_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    description = models.TextField(blank=True, null=True)
+    
 
     # 🔥 NEW FIELDS
     base_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -127,6 +151,7 @@ class QuotationLowSideItem(models.Model):
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
 
     mathadi_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    description = models.TextField(blank=True, null=True)
 
     # 🔥 NEW FIELDS
     base_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)

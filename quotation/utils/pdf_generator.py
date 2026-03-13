@@ -1,5 +1,8 @@
 # quotation/utils/pdf_generator.py
+# Updated: 2026-03-10 - Match exact format from screenshots
 import io
+import logging
+import os
 from datetime import datetime
 from decimal import Decimal
 from reportlab.lib import colors
@@ -7,8 +10,11 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
 from django.http import HttpResponse
+from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 
 class QuotationPDFGenerator:
@@ -22,7 +28,8 @@ class QuotationPDFGenerator:
             rightMargin=15*mm,
             leftMargin=15*mm,
             topMargin=15*mm,
-            bottomMargin=15*mm
+            bottomMargin=15*mm,
+            showBoundary=1
         )
         self.styles = getSampleStyleSheet()
         self.elements = []
@@ -30,14 +37,25 @@ class QuotationPDFGenerator:
 
     def setup_styles(self):
         """Setup custom styles for the PDF"""
+        # Company name in blue
         self.styles.add(ParagraphStyle(
             name='CompanyName',
             parent=self.styles['Normal'],
-            fontSize=14,
-            textColor=colors.black,
+            fontSize=16,
+            textColor=colors.HexColor('#0066CC'),
             alignment=TA_LEFT,
             spaceAfter=2,
             fontName='Helvetica-Bold'
+        ))
+        
+        # Contact details in blue
+        self.styles.add(ParagraphStyle(
+            name='ContactInfo',
+            parent=self.styles['Normal'],
+            fontSize=9,
+            textColor=colors.HexColor('#0066CC'),
+            alignment=TA_LEFT,
+            leading=11
         ))
         
         self.styles.add(ParagraphStyle(
@@ -62,9 +80,10 @@ class QuotationPDFGenerator:
         self.styles.add(ParagraphStyle(
             name='SectionHeader',
             parent=self.styles['Normal'],
-            fontSize=12,
+            fontSize=11,
             textColor=colors.black,
             fontName='Helvetica-Bold',
+            alignment=TA_CENTER,
             spaceBefore=10,
             spaceAfter=5
         ))
@@ -94,95 +113,143 @@ class QuotationPDFGenerator:
             textColor=colors.black,
             leading=12
         ))
+        
+        # Underlined label style
+        self.styles.add(ParagraphStyle(
+            name='UnderlinedLabel',
+            parent=self.styles['Normal'],
+            fontSize=9,
+            textColor=colors.black,
+            fontName='Helvetica-Bold',
+            leading=14
+        ))
 
     def add_company_header(self):
-        """Add company header"""
-        data = [
-            [Paragraph("KRISHNA AIRCONDITIONING", self.styles['CompanyName'])],
-            [Paragraph("309B, Patil Plaza, Mitra Mandal Chowk,", self.styles['Address'])],
-            [Paragraph("Saras Baug, Pune-411 009.", self.styles['Address'])],
-            [Paragraph("GSTIN: 27AITPP8825B2ZS | PAN: AITPP8825B", self.styles['Address'])],
+        """Add company header with logo space and contact info"""
+        # Get branch information
+        if self.quotation.branch:
+            branch = self.quotation.branch
+            company_name = branch.name
+            address = branch.address
+            city_state = f"{branch.city}, {branch.state} - {branch.pincode}"
+            email = branch.email
+            
+            # Build address string
+            full_address = f"{address}<br/>{city_state}<br/>E-mail: {email}"
+        else:
+            # Fallback to default
+            company_name = "KRISNA AIR CONDITIONING"
+            full_address = "309/B, Patil Plaza, Saras Baug, Pune - 411 009.<br/>E-mail: sales@krisnatech.com ; krisnatech@vsnl.in"
+        
+        # Main header with logo space (left) and company details (right)
+        # Try to load logo, fallback to placeholder if not found
+        logo_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'logo.png')
+        
+        if os.path.exists(logo_path):
+            try:
+                logo = Image(logo_path, width=80, height=60)  # Adjust size as needed
+            except:
+                logo = Paragraph('[LOGO]<br/><font size="8">Logo file found but could not load</font>', 
+                               ParagraphStyle(name='LogoError', fontSize=10, textColor=colors.red, alignment=TA_CENTER))
+        else:
+            logo = Paragraph('[LOGO SPACE]<br/><font size="8">Put logo.png in static/images/</font>', 
+                           ParagraphStyle(name='LogoPlaceholder', fontSize=10, textColor=colors.grey, alignment=TA_CENTER))
+        
+        header_data = [
+            [
+                # Left side - Logo or placeholder
+                logo,
+                
+                # Right side - Dynamic company name and address
+                Paragraph(f'<b>{company_name}</b><br/>'
+                         f'<font size="9">{full_address}</font>', 
+                         ParagraphStyle(name='CompanyHeader', fontSize=12, fontName='Helvetica-Bold', alignment=TA_RIGHT))
+            ]
         ]
         
-        table = Table(data, colWidths=[self.doc.width])
-        table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        header_table = Table(header_data, colWidths=[self.doc.width*0.3, self.doc.width*0.7])
+        header_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (0, 0), 'CENTER'),  # Logo space centered
+            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),   # Company details right-aligned
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('TOPPADDING', (0, 0), (-1, -1), 1),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
-            ('LINEBELOW', (0, -1), (-1, -1), 1, colors.black),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
         ]))
         
-        self.elements.append(table)
+        self.elements.append(header_table)
+        self.elements.append(Spacer(1, 10))
+        
+        # Quotation reference and date
+        ref_data = [
+            [
+                '',  # Empty left column
+                Paragraph(f'Ref. No: {self.quotation.quotation_no}<br/>{self.quotation.created_at.strftime("%d-%m-%Y")}', 
+                         ParagraphStyle(name='RefStyle', fontSize=9, alignment=TA_RIGHT))
+            ]
+        ]
+        
+        ref_table = Table(ref_data, colWidths=[self.doc.width*0.7, self.doc.width*0.3])
+        ref_table.setStyle(TableStyle([
+            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+        
+        self.elements.append(ref_table)
         self.elements.append(Spacer(1, 10))
 
     def add_quotation_title(self):
-        """Add quotation title and basic info"""
-        self.elements.append(Paragraph("QUOTATION", self.styles['QuotationTitle']))
+        """Add To, From, Subject section with dynamic branch and site info"""
         
-        # Quotation details
+        # Get branch information for "From" section
+        if self.quotation.branch:
+            branch_info = f"{self.quotation.branch.name}, {self.quotation.branch.city}"
+        else:
+            branch_info = "Pune"  # Default fallback
+        
+        # Get site information
+        site_info = ""
+        if self.quotation.site:
+            site_info = f"{self.quotation.site.name} - {self.quotation.site.address}, {self.quotation.site.city}"
+        elif self.quotation.site_name:
+            site_info = self.quotation.site_name
+        
+        # To, From, Subject section
         data = [
-            [
-                Paragraph(f"<b>Quotation No:</b> {self.quotation.quotation_no}", self.styles['Value']),
-                Paragraph(f"<b>Date:</b> {self.quotation.created_at.strftime('%d-%m-%Y')}", self.styles['Value'])
-            ],
-            [
-                Paragraph(f"<b>Version:</b> {self.version.version_no}", self.styles['Value']),
-                Paragraph(f"<b>Subject:</b> {self.quotation.subject}", self.styles['Value'])
-            ],
-            [
-                Paragraph(f"<b>Site Name:</b> {self.quotation.site_name or 'N/A'}", self.styles['Value']),
-                ''
-            ]
+            [Paragraph('<u><b>To,</b></u>', self.styles['UnderlinedLabel']), ''],
+            [Paragraph(f'<b>From,</b>', self.styles['Label']), ''],
+            [Paragraph(f'<b>{branch_info}:</b>', self.styles['Label']), ''],
+            [Paragraph(f'<u><b>Subject:</b></u> {self.quotation.subject}', self.styles['UnderlinedLabel']), ''],
         ]
         
-        table = Table(data, colWidths=[self.doc.width/2.0 - 10, self.doc.width/2.0 - 10])
+        table = Table(data, colWidths=[self.doc.width, 0])
         table.setStyle(TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, -1), 3),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
         ]))
         
         self.elements.append(table)
         self.elements.append(Spacer(1, 10))
+        
+        # Site Name section (if site information exists)
+        if site_info:
+            self.elements.append(Paragraph(f'<u><b>Site Name:</b></u> {site_info}', self.styles['UnderlinedLabel']))
+            self.elements.append(Spacer(1, 10))
+        
+        # Greeting
+        self.elements.append(Paragraph('Dear Sir,', self.styles['Value']))
+        self.elements.append(Spacer(1, 5))
+        
+        # Introduction text - only use thank_you_note if available
+        if self.quotation.thank_you_note:
+            intro_text = self.quotation.thank_you_note
+            self.elements.append(Paragraph(intro_text, self.styles['Value']))
+            self.elements.append(Spacer(1, 10))
 
     def add_customer_details(self):
-        """Add customer details"""
-        self.elements.append(Paragraph("Customer Details", self.styles['SectionHeader']))
-        
-        data = [
-            [
-                Paragraph("<b>Customer Name:</b>", self.styles['Label']),
-                Paragraph(self.quotation.customer.name, self.styles['Value'])
-            ],
-            [
-                Paragraph("<b>Contact:</b>", self.styles['Label']),
-                Paragraph(self.quotation.customer.contact_number or 'N/A', self.styles['Value'])
-            ],
-            [
-                Paragraph("<b>Address:</b>", self.styles['Label']),
-                Paragraph(self.quotation.customer.address or 'N/A', self.styles['Value'])
-            ]
-        ]
-        
-        table = Table(data, colWidths=[80, self.doc.width - 100])
-        table.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('TOPPADDING', (0, 0), (-1, -1), 3),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8F9F9')),
-            ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#BDC3C7')),
-        ]))
-        
-        self.elements.append(table)
-        self.elements.append(Spacer(1, 10))
-
-    # quotation/utils/pdf_generator.py
-
-# In the add_high_side_items method, replace the product_name section with:
-
-    # quotation/utils/pdf_generator.py
+        """Add customer details - removed"""
+        pass
 
     def add_high_side_items(self):
         """Add high side items table"""
@@ -191,11 +258,11 @@ class QuotationPDFGenerator:
             if not high_items:
                 return
                 
-            self.elements.append(Paragraph("High Side Items", self.styles['SubHeader']))
+            self.elements.append(Paragraph("High side Installation work", self.styles['SubHeader']))
             
             # Table headers
             headers = [
-                ['Sr.', 'Product', 'Model', 'Capacity', 'Qty', 'Unit Price', 'Mathadi', 'Transport', 'GST%', 'Amount']
+                ['S.N', 'Description', 'Unit', 'Qty', 'Rate', 'Amount']
             ]
             
             # Table data
@@ -214,41 +281,102 @@ class QuotationPDFGenerator:
                 # Capacity
                 capacity = variant.capacity if hasattr(variant, 'capacity') else 'N/A'
                 
+                # Build description with product info and additional description
+                product_info = f"{product_name} {model_no} {capacity}"
+                
+                # Add item description if it exists
+                if item.description and item.description.strip():
+                    full_description = f"{product_info}<br/><i><font color='grey' size='8'>{item.description}</font></i>"
+                else:
+                    full_description = product_info
+                
+                # Main product row with description included in same cell
                 data.append([
                     str(idx),
-                    Paragraph(product_name, self.styles['Value']),
-                    Paragraph(model_no, self.styles['Value']),
-                    capacity,
+                    Paragraph(full_description, self.styles['Value']),
+                    'Nos.',
                     str(item.quantity),
                     f"{float(item.unit_price):,.2f}",
-                    f"{float(item.mathadi_charges):,.2f}",
-                    f"{float(item.transportation_charges):,.2f}",
-                    f"{float(item.gst_percent)}%",
                     f"{float(item.total_with_gst):,.2f}"
                 ])
             
-            # Subtotal row
+            # Add empty row between content and totals
+            data.append(['', '', '', '', '', ''])
+            
+            # Calculate subtotal
             high_subtotal = sum(float(item.total_with_gst) for item in high_items)
+            
+            # Summary section - High side specific rows
             data.append([
-                '', '', '', '', '', '', '', '', 
-                Paragraph("<b>Subtotal:</b>", self.styles['Value']),
-                Paragraph(f"<b>{high_subtotal:,.2f}</b>", self.styles['Value'])
+                "Subtotal :", '', '', '', '', 
+                f"{high_subtotal:,.2f}"
             ])
             
-            col_widths = [25, 100, 80, 50, 35, 55, 45, 45, 40, 55]
+            # Calculate GST (18%)
+            gst_amount = high_subtotal * 0.18
+            data.append([
+                "GST @ 18% :", '', '', '', '', 
+                f"{gst_amount:,.2f}"
+            ])
+            
+            data.append([
+                "Mathadi Charges :", '', '', '', '', 
+                "Extra"
+            ])
+            
+            data.append([
+                "Transportation :", '', '', '', '', 
+                "Extra"
+            ])
+            
+            # Calculate total with GST
+            total_with_gst = high_subtotal + gst_amount
+            data.append([
+                "Total :", '', '', '', '', 
+                f"{total_with_gst:,.2f}"
+            ])
+
+            col_widths = [25, 200, 40, 30, 70, 70]
             table = Table(data, colWidths=col_widths)
             
+            # Count data rows (excluding header)
+            data_rows = len(data) - 1
+            
+            empty_row_index = data_rows - 5  # Empty row is 6th from last
+            summary_start = data_rows - 4    # Summary rows start (Subtotal, GST, Mathadi, Transportation, Total)
+            
             style = [
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#34495E')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('ALIGN', (1, 1), (2, -1), 'LEFT'),
-                ('ALIGN', (3, 1), (-1, -1), 'RIGHT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, -1), 8),
-                ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#BDC3C7')),
-                ('LINEABOVE', (0, -1), (-1, -1), 1, colors.HexColor('#2C3E50')),
-                ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#ECF0F1')),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),  # Header bold
+                ('ALIGN', (0, 0), (0, -1), 'CENTER'),   # S.N column center
+                ('ALIGN', (1, 0), (1, -1), 'LEFT'),     # Description column left
+                ('ALIGN', (2, 0), (-1, -1), 'RIGHT'),   # Unit, Qty, Rate, Amount right
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('TOPPADDING', (0, 0), (-1, -1), 3),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+                
+                # Summary section spans - individual spans for each row to preserve horizontal lines
+                ('SPAN', (0, summary_start), (4, summary_start)),      # Subtotal row
+                ('SPAN', (0, summary_start+1), (4, summary_start+1)),  # GST row
+                ('SPAN', (0, summary_start+2), (4, summary_start+2)),  # Mathadi row
+                ('SPAN', (0, summary_start+3), (4, summary_start+3)),  # Transportation row
+                ('SPAN', (0, summary_start+4), (4, summary_start+4)),  # Total row
+                
+                ('ALIGN', (0, summary_start), (4, summary_start+4), 'RIGHT'),  # Labels right-aligned
+                ('ALIGN', (5, summary_start), (5, summary_start+4), 'RIGHT'),  # Amounts right-aligned
+                ('FONTNAME', (0, summary_start), (-1, summary_start+4), 'Helvetica-Bold'),
+                
+                # Light gray background for summary rows
+                ('BACKGROUND', (0, summary_start), (-1, summary_start+4), colors.HexColor('#F0F0F0')),
+                # No background for empty row
+                ('BACKGROUND', (0, empty_row_index), (-1, empty_row_index), colors.white),
+                
+                # Ensure horizontal lines between summary rows are visible
+                ('LINEBELOW', (0, summary_start), (-1, summary_start), 0.5, colors.black),
+                ('LINEBELOW', (0, summary_start+1), (-1, summary_start+1), 0.5, colors.black),
+                ('LINEBELOW', (0, summary_start+2), (-1, summary_start+2), 0.5, colors.black),
+                ('LINEBELOW', (0, summary_start+3), (-1, summary_start+3), 0.5, colors.black),
             ]
             
             table.setStyle(TableStyle(style))
@@ -258,9 +386,6 @@ class QuotationPDFGenerator:
         except Exception as e:
             logger.error(f"Error in add_high_side_items: {str(e)}")
             self.elements.append(Paragraph(f"Error loading high side items: {str(e)}", self.styles['Value']))
-    # quotation/utils/pdf_generator.py
-    
-    # Update the add_low_side_items method:
 
     def add_low_side_items(self):
         """Add low side items table"""
@@ -268,23 +393,23 @@ class QuotationPDFGenerator:
             low_items = self.version.low_side_items.all()
             if not low_items:
                 return
-                
-            self.elements.append(Paragraph("Low Side Items", self.styles['SubHeader']))
-            
+
+            self.elements.append(Paragraph("Low side Installation work", self.styles['SubHeader']))
+
             # Table headers
             headers = [
-                ['Sr.', 'Item Code', 'Description', 'Qty', 'Unit Price', 'Mathadi', 'GST%', 'Amount']
+                ['S.N', 'Description', 'Unit', 'Qty', 'Rate', 'Amount']
             ]
-            
+
             # Table data
             data = headers.copy()
             for idx, item in enumerate(low_items, 1):
                 # Get item details from the related item model
                 item_obj = item.item
-                
+
                 # Use item_code as the primary identifier
                 item_code = item_obj.item_code if hasattr(item_obj, 'item_code') else 'N/A'
-                
+
                 # Build description from available fields
                 description_parts = []
                 if hasattr(item_obj, 'material_type_id') and item_obj.material_type_id:
@@ -298,137 +423,171 @@ class QuotationPDFGenerator:
                     description_parts.append(size_str)
                 if hasattr(item_obj, 'brand') and item_obj.brand:
                     description_parts.append(str(item_obj.brand))
-                    
-                description = ' - '.join(description_parts) if description_parts else 'N/A'
+
+                product_info = ' - '.join(description_parts) if description_parts else 'N/A'
                 
+                # Add item description if it exists
+                if item.description and item.description.strip():
+                    full_description = f"{product_info}<br/><i><font color='grey' size='8'>{item.description}</font></i>"
+                else:
+                    full_description = product_info
+
+                # Main product row with description included in same cell
                 data.append([
                     str(idx),
-                    Paragraph(item_code, self.styles['Value']),
-                    Paragraph(description, self.styles['Value']),
+                    Paragraph(full_description, self.styles['Value']),
+                    'Nos.',
                     str(item.quantity),
                     f"{float(item.unit_price):,.2f}",
-                    f"{float(item.mathadi_charges):,.2f}",
-                    f"{float(item.gst_percent)}%",
                     f"{float(item.total_with_gst):,.2f}"
                 ])
+
+            # Add empty row between content and totals
+            data.append(['', '', '', '', '', ''])
             
-            # Subtotal row
+            # Calculate subtotal
             low_subtotal = sum(float(item.total_with_gst) for item in low_items)
+            
+            # Summary section - Low side specific rows
             data.append([
-                '', '', '', '', '', '', 
-                Paragraph("<b>Subtotal:</b>", self.styles['Value']),
-                Paragraph(f"<b>{low_subtotal:,.2f}</b>", self.styles['Value'])
+                "Subtotal :", '', '', '', '', 
+                f"{low_subtotal:,.2f}"
             ])
             
-            col_widths = [25, 100, 150, 35, 55, 45, 40, 65]
+            # Calculate GST (18%)
+            gst_amount = low_subtotal * 0.18
+            data.append([
+                "GST @ 18% :", '', '', '', '', 
+                f"{gst_amount:,.2f}"
+            ])
+            
+            data.append([
+                "Mathadi Charges :", '', '', '', '', 
+                "Extra"
+            ])
+            
+            # Calculate total with GST
+            total_with_gst = low_subtotal + gst_amount
+            data.append([
+                "Total :", '', '', '', '', 
+                f"{total_with_gst:,.2f}"
+            ])
+
+            col_widths = [25, 200, 40, 30, 70, 70]
             table = Table(data, colWidths=col_widths)
             
+            # Count data rows (excluding header)
+            data_rows = len(data) - 1
+            
+            empty_row_index = data_rows - 4  # Empty row is 5th from last
+            summary_start = data_rows - 3    # Summary rows start (Subtotal, GST, Mathadi, Total) - 4 rows total
+
             style = [
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#34495E')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('ALIGN', (1, 1), (2, -1), 'LEFT'),  # Item Code and Description left-aligned
-                ('ALIGN', (3, 1), (-1, -1), 'RIGHT'),  # Numbers right-aligned
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, -1), 8),
-                ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#BDC3C7')),
-                ('LINEABOVE', (0, -1), (-1, -1), 1, colors.HexColor('#2C3E50')),
-                ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#ECF0F1')),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),  # Header bold
+                ('ALIGN', (0, 0), (0, -1), 'CENTER'),   # S.N column center
+                ('ALIGN', (1, 0), (1, -1), 'LEFT'),     # Description column left
+                ('ALIGN', (2, 0), (-1, -1), 'RIGHT'),   # Unit, Qty, Rate, Amount right
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('TOPPADDING', (0, 0), (-1, -1), 3),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+                
+                # Summary section spans - individual spans for each row to preserve horizontal lines
+                ('SPAN', (0, summary_start), (4, summary_start)),      # Subtotal row
+                ('SPAN', (0, summary_start+1), (4, summary_start+1)),  # GST row
+                ('SPAN', (0, summary_start+2), (4, summary_start+2)),  # Mathadi row
+                ('SPAN', (0, summary_start+3), (4, summary_start+3)),  # Total row
+                
+                ('ALIGN', (0, summary_start), (4, summary_start+3), 'RIGHT'),  # Labels right-aligned
+                ('ALIGN', (5, summary_start), (5, summary_start+3), 'RIGHT'),  # Amounts right-aligned
+                ('FONTNAME', (0, summary_start), (-1, summary_start+3), 'Helvetica-Bold'),
+                
+                # Light gray background for summary rows
+                ('BACKGROUND', (0, summary_start), (-1, summary_start+3), colors.HexColor('#F0F0F0')),
+                # No background for empty row
+                ('BACKGROUND', (0, empty_row_index), (-1, empty_row_index), colors.white),
+                
+                # Ensure horizontal lines between summary rows are visible
+                ('LINEBELOW', (0, summary_start), (-1, summary_start), 0.5, colors.black),
+                ('LINEBELOW', (0, summary_start+1), (-1, summary_start+1), 0.5, colors.black),
+                ('LINEBELOW', (0, summary_start+2), (-1, summary_start+2), 0.5, colors.black),
             ]
-            
+
             table.setStyle(TableStyle(style))
-            
+
             self.elements.append(table)
-            self.elements.append(Spacer(1, 10))
+
+            # Add page break if more than 4 items
+            if len(low_items) >= 4:
+                self.elements.append(PageBreak())
+            else:
+                self.elements.append(Spacer(1, 10))
         except Exception as e:
             logger.error(f"Error in add_low_side_items: {str(e)}")
-            # Add a simple error message
             self.elements.append(Paragraph(f"Error loading low side items: {str(e)}", self.styles['Value']))
 
 
     def add_tax_summary(self):
-        """Add tax summary section"""
-        self.elements.append(Paragraph("Tax Summary", self.styles['SectionHeader']))
-        
-        if self.version.gst_type == "CGST_SGST":
-            data = [
-                ['Description', 'Subtotal', 'CGST (9%)', 'SGST (9%)', 'Total Tax', 'Grand Total'],
-                [
-                    'Total',
-                    f"{self.version.subtotal:,.2f}",
-                    f"{self.version.cgst_amount:,.2f}",
-                    f"{self.version.sgst_amount:,.2f}",
-                    f"{self.version.gst_amount:,.2f}",
-                    f"{self.version.grand_total:,.2f}"
-                ]
-            ]
-            col_widths = [80, 70, 70, 70, 70, 80]
-        else:
-            data = [
-                ['Description', 'Subtotal', 'IGST (18%)', 'Total Tax', 'Grand Total'],
-                [
-                    'Total',
-                    f"{self.version.subtotal:,.2f}",
-                    f"{self.version.igst_amount:,.2f}",
-                    f"{self.version.gst_amount:,.2f}",
-                    f"{self.version.grand_total:,.2f}"
-                ]
-            ]
-            col_widths = [80, 100, 100, 100, 100]
-        
-        table = Table(data, colWidths=col_widths)
-        
-        style = [
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3498DB')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#BDC3C7')),
-            ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#EBF5FB')),
-        ]
-        
-        table.setStyle(TableStyle(style))
-        
-        self.elements.append(table)
-        self.elements.append(Spacer(1, 10))
+        """Add tax summary section - removed as per screenshot"""
+        pass
 
     def add_terms_and_conditions(self):
         """Add terms and conditions"""
-        self.elements.append(Paragraph("Terms and Conditions", self.styles['SectionHeader']))
+        # Always start Terms & Conditions on a new page
+        self.elements.append(PageBreak())
+        
+        self.elements.append(Paragraph("Terms & Conditions", self.styles['SectionHeader']))
+        self.elements.append(Spacer(1, 5))
         
         terms = [
-            "1. This quotation is valid for 30 days from the date of issue.",
-            "2. Payment terms: 50% advance and 50% before delivery.",
-            "3. GST extra as applicable.",
-            "4. Transportation and installation charges extra.",
-            "5. Warranty as per manufacturer's terms and conditions.",
+            "<b>TAXES:</b> GST will be extra as applicable.",
+            "",
+            "<b>PAYMENT TERMS:</b>",
+            "<b>Part A)</b> For HVAC Equipment: <b>100%</b> advance along with PO against Performa Invoice.",
+            "Purchase Order and Cheque shall be made in the name of <b>KRISNA AIRCONDITIONING</b>, Pune.",
+            "Bank of India, Account Number: 051520100000616, IFSC Code: BKID0000515, GSTIN: 27AITPP8825B2ZS.",
+            "",
+            "<b>Part B)</b> For Low Side Installation charges of HVAC Equipment: <b>50%</b> advance along with order, <b>50%</b> against delivery of material at site on prorata basis, 10% against installation of material at site on month basis, and balance 10% against completion of work.",
+            "Purchase Order and Cheque shall be made in the name of <b>Crona Heat Technology Pvt. Ltd.</b>, Pune.",
+            "Bank of India, Account Number: 051520100000612, IFSC Code: BKID0000515, GSTIN: 27AAFCC6613, GSTIN: 27AAFCC6613ZC.",
+            "",
+            "<b>VALIDITY of rates:</b> Rates for AC units are valid up to 7 days and Low Side Installation rates are valid up to 7 days from the date of this offer.",
+            "",
+            "<b>WARRANTY:</b> 1.) All AC units will have Efficent ( 1:3 months warranty from the date of delivery at site or Twelve (12) months from date of commissioning of AC units ever is earlier.",
+            "2.) 1 Nos. free in warranty servicing will be provided in Twelve (1:3 months from date of installation (*Applicable if supply & installation done by Krishna Airconditioning only).",
+            "",
+            "<b>Important Note:</b>",
+            "1) Electrical Power Cables & Pin top/Socket arrangement up to all HVAC equipment will be in the scope of customer.",
+            "2) Exact Mathadi Charges will be extra at actual and will be pass by customer.",
+            "3) Above costing are estimated and will be finalized detailed material layout.",
+            "4) Above costing are estimated and will be finalized detailed material layout.",
+            "5) Above Warranty & Servicing is not applicable on Old Split AC.",
+            "6) Lifting/Shifting/ Transportation of Old AC, MS Fabrication Work for Hogging/Mounting of AC IDU & ODU &",
+            "Electrical Work for AC will be in the scope of customer (if applicable).",
+            "7) Any HVAC equipment installation above 1 meter single angle inside Scaffolding arrangement & this type of arrangement to be provided by the client on-site or it will be on extra chargeable basis as extra.",
+            "8) The storage with Locker room for all HVAC material shall be arranged by client.",
+            "9) Any kind of hole made for AC pipings & ducting and waterproofing is in the client's scope.",
+            "10) Electrical work for AC will be in the scope of customer (if applicable).",
+            "11) Excess is not a integral part of HVAC system and Client has to check its physically & location with structural consultant. (Optional)",
+            "",
+            "We hope we are in line with your requirement and look forward to hear from you with interest.",
+            "",
+            "Thanking you and assuring you our best of services always."
         ]
         
         for term in terms:
             self.elements.append(Paragraph(term, self.styles['Value']))
+            if term == "":
+                self.elements.append(Spacer(1, 3))
         
         self.elements.append(Spacer(1, 10))
-        
-        # Thank you note
-        if self.quotation.thank_you_note:
-            self.elements.append(Paragraph(
-                self.quotation.thank_you_note,
-                ParagraphStyle(
-                    name='ThankYou',
-                    parent=self.styles['Value'],
-                    alignment=TA_CENTER,
-                    textColor=colors.HexColor('#27AE60'),
-                    fontName='Helvetica-Bold'
-                )
-            ))
-            self.elements.append(Spacer(1, 10))
 
     def add_footer(self):
         """Add footer with signature"""
         data = [
             [
-                Paragraph("<b>For Krishna Airconditioning</b>", self.styles['Value']),
+                Paragraph("<b>For Krisna Airconditioning</b>", self.styles['Value']),
                 ''
             ],
             [
@@ -442,7 +601,7 @@ class QuotationPDFGenerator:
             ('ALIGN', (0, 0), (0, -1), 'LEFT'),
             ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
             ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
-            ('LINEABOVE', (0, 1), (-1, 1), 1, colors.HexColor('#2C3E50')),
+            ('LINEABOVE', (0, 1), (-1, 1), 1, colors.black),
         ]))
         
         self.elements.append(table)
@@ -476,5 +635,7 @@ class QuotationPDFGenerator:
 
 def generate_quotation_pdf(quotation, version):
     """Generate PDF for quotation"""
+    generator = QuotationPDFGenerator(quotation, version)
+    return generator.generate()
     generator = QuotationPDFGenerator(quotation, version)
     return generator.generate()
