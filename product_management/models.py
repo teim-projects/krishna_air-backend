@@ -118,23 +118,27 @@ def get_code_part(name: str):
 
 class material_type(models.Model):
    name = models.CharField(max_length=100)
+   shortcut = models.CharField(max_length=10, blank=True, null=True)
    
    def __str__(self):
     return self.name
    
 class item_type(models.Model):
     name = models.CharField(max_length=100)
+    shortcut = models.CharField(max_length=10, blank=True, null=True)
     def __str__(self):
       return self.name
 
 
 class feature_type(models.Model):
     name = models.CharField(max_length=100)
+    shortcut = models.CharField(max_length=10, blank=True, null=True)
     def __str__(self):
       return self.name
     
 class item_class(models.Model):
     name = models.CharField(max_length=100)
+    shortcut = models.CharField(max_length=10, blank=True, null=True)
     def __str__(self):
       return self.name
     
@@ -150,7 +154,7 @@ class item(models.Model):
     thickness_unit = models.CharField(max_length=20, blank=True, null=True)
     density = models.CharField(max_length=50, blank=True, null=True)
     density_unit = models.CharField(max_length=20, blank=True, null=True)
-    brand = models.ForeignKey(brand, on_delete=models.CASCADE, related_name='items')
+    brand = models.ForeignKey(brand, on_delete=models.CASCADE, related_name='items', blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     
 
