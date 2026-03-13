@@ -238,11 +238,18 @@ class QuotationSerializer(serializers.ModelSerializer):
     
         request = self.context.get("request")
         versions_data = validated_data.pop("versions")
+        
+        # Extract terms_conditions before creating quotation
+        terms_conditions = validated_data.pop("terms_conditions", [])
     
         version_data = versions_data[0]
     
         high_items = version_data.pop("high_side_items")
         low_items = version_data.pop("low_side_items")
+        
+        # Validate that we have at least one high side item
+        if not high_items:
+            raise serializers.ValidationError("At least one high side item is required")
     
         # ======================================
         # STEP 1️⃣ CREATE QUOTATION FIRST
@@ -256,6 +263,8 @@ class QuotationSerializer(serializers.ModelSerializer):
             **validated_data
         )
 
+        
+        # Set many-to-many field after creation
         if terms_conditions:
             quotation.terms_conditions.set(terms_conditions)
     
@@ -312,6 +321,19 @@ class QuotationSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
 
         versions_data = validated_data.pop("versions")
+        
+        # Extract terms_conditions before updating
+        terms_conditions = validated_data.pop("terms_conditions", None)
+        
+        # Update other fields on the quotation instance
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        # Update many-to-many field if provided
+        if terms_conditions is not None:
+            instance.terms_conditions.set(terms_conditions)
+        
         old_version = instance.versions.filter(is_active=True).first()
         
         old_version.is_active = False
