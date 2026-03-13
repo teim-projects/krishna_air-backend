@@ -51,14 +51,32 @@ class productModelSerializer(serializers.ModelSerializer):
 
 
 class productVariantSerializer(serializers.ModelSerializer):
-  model_name = serializers.CharField(
-    source = "product_model.name",
-    read_only = True
-  )
-   
-  class Meta:
-    model = ProductVariant
-    fields = '__all__'
+
+    variant_sku = serializers.CharField(source="sku", read_only=True)
+
+    ac_type_name = serializers.CharField(
+        source="product_model.ac_sub_type_id.ac_type_id.name",
+        read_only=True
+    )
+
+    ac_sub_type_name = serializers.CharField(
+        source="product_model.ac_sub_type_id.name",
+        read_only=True
+    )
+
+    brand_name = serializers.CharField(
+        source="product_model.brand_id.name",
+        read_only=True
+    )
+
+    model_no = serializers.CharField(
+        source="product_model.model_no",
+        read_only=True
+    )
+
+    class Meta:
+        model = ProductVariant
+        fields = "__all__"
 
 class productInventorySerializer(serializers.ModelSerializer):
   sku = serializers.CharField(
@@ -98,16 +116,11 @@ class ItemSerializer(serializers.ModelSerializer):
         source='item_type_id.name',
         read_only=True
     )
-    item_class_name = serializers.CharField(
-        source='item_class_id.name',
-        read_only=True
-    )
+    item_class_name = serializers.SerializerMethodField()
+    feature_type_name = serializers.SerializerMethodField()
+    
     material_type_name = serializers.CharField(
         source='material_type_id.name',
-        read_only=True
-    )
-    feature_type_name = serializers.CharField(
-        source='feature_type_id.name',
         read_only=True
     )
     brand_name = serializers.CharField(
@@ -118,3 +131,9 @@ class ItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = item
         fields = '__all__'
+
+    def get_item_class_name(self, obj):
+        return obj.item_class_id.name if obj.item_class_id else None
+
+    def get_feature_type_name(self, obj):
+        return obj.feature_type_id.name if obj.feature_type_id else None

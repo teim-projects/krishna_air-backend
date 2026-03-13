@@ -1,0 +1,357 @@
+{% load static %}
+{% load humanize %}
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        font-size: 12px;
+        margin: 0;
+        padding: 0;
+      }
+
+      .page-border {
+        border: 1px solid #000;
+        padding: 10px;
+        min-height: 1050px;
+      }
+
+      /* HEADER */
+      .company-header {
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
+
+      .company-header img {
+        width: 110px;
+        height: auto;
+        display: block;
+        margin: 0;
+        padding: 0;
+      }
+
+      /* PO TITLE */
+      .po-title {
+        position: absolute;
+        margin-top: 35px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-weight: bold;
+        font-size: 16px;
+        text-align: center;
+      }
+
+      /* INFO TABLE */
+      .info-table {
+        width: 100%;
+        margin-top: 20px;
+        border-collapse: collapse;
+      }
+
+      .info-table td {
+        border: 1px solid #000;
+        padding: 4px;
+        vertical-align: top;
+      }
+
+      /* ITEM TABLE */
+
+      .items-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 5px;
+      }
+
+      .items-table th,
+      .items-table td {
+        border: 1px solid #000;
+        padding: 4px;
+      }
+
+      .items-table th {
+        text-align: center;
+      }
+
+      /* TOTAL SECTION */
+
+      .total-table {
+        width: 100%;
+        margin-left: auto;
+        border-collapse: collapse;
+        table-layout: fixed;
+      }
+
+      .total-table td {
+        border: 1px solid #000;
+        padding: 4px;
+      }
+
+      .right {
+        text-align: right;
+      }
+
+      /* TERMS */
+
+      .terms {
+        border: 1px solid #000;
+        margin-top: 10px;
+        padding: 5px;
+      }
+
+      /* FOOTER */
+
+      .footer {
+        border: 1px solid #8d8b8b;
+        margin-top: 20px;
+        padding: 5px;
+      }
+
+      .signature {
+        margin-top: 40px;
+      }
+
+      @page {
+        size: A4;
+        margin: 20px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="page-border">
+      <!-- COMPANY HEADER -->
+
+      <div class="company-header">
+        <img src="file:///app/static/images/ka-logo.png" />
+        <div class="po-title">PURCHASE ORDER</div>
+      </div>
+
+      <!-- PO INFORMATION -->
+
+      <table class="info-table">
+<tr>
+
+  <!-- LEFT SIDE -->
+  <td width="60%" valign="top" >
+    <b>To,</b><br>
+    <b>{{ po.vendor.name }}</b><br>
+    {{ po.vendor.email|default:"-" }} ,
+    {{ po.vendor.mobile|default:"-" }} <br>
+    {{ po.vendor.office_address|default:"-" }}<br>
+    {{ po.vendor.state|default:"-" }} - {{ po.vendor.state_code|default:"-" }}<br>
+    GST NO : {{ po.vendor.gst_details|default:"-" }} |
+    PAN NO : {{ po.vendor.pan_details|default:"-" }}
+    <br>
+    <br>
+    <!-- <hr> -->
+    
+    Kind Attention : {{ po.vendor.office_poc_name|default:"-" }}<br>
+    Contact No : {{ po.vendor.office_poc_phone|default:"-" }}
+    <hr>
+
+    <b>From,</b> <br>
+    <b>{{ po.branch.name }}</b> <br>
+    {{ po.branch.email|default:"-" }} ,
+    {{ po.branch.primary_contact|default:"-" }} | {{ po.branch.secondary_contact|default:"-" }} <br>
+    {{ po.branch.address }},{{po.branch.city}},
+    {{ po.branch.state|default:"-" }} - {{ po.branch.state_code|default:"-" }} ,{{ po.branch.pincode}}<br>
+    GST NO : {{ po.branch.gst_no|default:"-" }} |
+    PAN NO : {{ po.branch.pan_details|default:"-" }}
+    <hr>
+    <b>Site :</b> {{ po.site.site_shortcut|default:"-" }} <br>
+    <b>Delivery Address :</b>
+    
+    {% if po.delivery_destination == "branch" %}
+      {{ po.branch.address }}, {{ po.branch.city }}, {{ po.branch.state }} - {{ po.branch.pincode }}
+    
+    {% elif po.delivery_destination == "site" %}
+      {{ po.site.name }}, {{ po.site.address }}, {{ po.site.city }}, {{ po.site.state }} - {{ po.site.pincode }}
+    
+    {% endif %}
+            
+          
+ <br>
+  </td>
+
+  <!-- RIGHT SIDE -->
+  <td width="40%" style="padding:0;" valign="top">
+
+    <table style="width:100%; border-collapse:collapse;">
+
+      <tr>
+        <td style="border-bottom:1px solid #2c2c2c; padding:10px;">
+          <b>PO Date :</b> {{ po.po_date }}
+        </td>
+      </tr>
+
+      <tr>
+        <td style="border-bottom:1px solid #2c2c2c; padding:10px;">
+          <b>PO No :</b> {{ po.purchase_order_no }}
+        </td>
+      </tr>
+
+      <tr>
+        <td style="border-bottom:1px solid #2c2c2c; padding:10px; text-align:center;">
+          <b>Quotation Details</b>
+        </td>
+      </tr>
+
+      <tr>
+        <td style="border-bottom:1px solid #2c2c2c; padding:10px;">
+          <b>Ref No :</b> {{ po.quotation_ref_no|default:"-" }}
+        </td>
+      </tr>
+
+      <tr>
+        <td style="border-bottom:1px solid #2c2c2c; padding:10px;">
+          <b>Date :</b> {{ po.quotation_date|default:"-" }}
+        </td>
+      </tr>
+
+      <tr>
+        <td style="border-bottom:1px solid #525252; padding:10px; text-align:center;">
+          <b>Contact Detail</b>
+        </td>
+      </tr>
+
+      <tr>
+        <td style="padding:10px;">
+          <span style="padding-bottom:10px;"><b>Name :</b> {{ po.contact_name|default:"-" }}</span><br>
+          <b>No :</b> {{ po.contact_no|default:"-" }}
+        </td>
+      </tr>
+
+    </table>
+
+  </td>
+
+</tr>
+</table>
+
+      <!-- ITEMS -->
+
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>S.N.</th>
+            <th>Description</th>
+            <th>Qty</th>
+            <th>UOM</th>
+            <th>Rate</th>
+            <th>Amount</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for p in products %} {% if p.is_section %}
+
+          <tr>
+            <td>{{ p.serial_no }}</td>
+            <td colspan="5"><b>{{ p.section_title }}</b></td>
+          </tr>
+
+          {% else %}
+
+          <tr>
+            <td>{{ p.serial_no }}</td>
+          <td>
+            {% if p.item %}
+                  {{ p.item.item_code }}
+            {% elif p.product_variant %}
+                  {{ p.product_variant.sku }}
+            {% endif %}
+            <br>
+                {{ p.description }}
+            </td>
+            <td>{{ p.quantity }}</td>
+            <td>{{ p.uom }}</td>
+            <td class="right">{{ p.rate }}</td>
+            <td class="right">{{ p.amount }}</td>
+          </tr>
+
+          {% endif %} {% endfor %}
+        </tbody>
+      </table>
+
+      <!-- TOTAL -->
+
+    <table class="total-table">
+        <tr>
+          <td class="right" style="width:81%;"><b>Sub Total :</b></td>
+          <td class="right" style="width:11%;">{{ po.subtotal|floatformat:2|intcomma  }}</td>
+        </tr>
+      
+        {% if po.gst_type == "inclusive" %}
+
+        <tr>
+          <td class="right"><b>GST @ {{ po.gst_percentage|floatformat:0 }}% :</b></td>
+          <td class="right">Inclusive</td>
+        </tr>
+
+        {% else %}
+
+        <tr>
+          <td class="right"><b>GST @ {{ po.gst_percentage|floatformat:0 }}% :</b></td>
+          <td class="right">{{ gst_amount|floatformat:2|intcomma }}</td>
+        </tr>
+
+        {% endif %}
+      
+        <tr>
+          <td class="right"><b>Transport :</b></td>
+          <td class="right">{{ po.transport_charges|floatformat:2|intcomma  }}</td>
+        </tr>
+      
+        <tr>
+          <td class="right"><b>Round off :</b></td>
+          <td class="right">{{ po.round_off|floatformat:2|intcomma  }}</td>
+        </tr>
+      
+        <tr>
+          <td class="right"><b>Total :</b></td>
+          <td class="right"><b>{{ po.grand_total|floatformat:2|intcomma }}</b></td>
+        </tr>
+      </table>
+      <!-- TERMS -->
+      <div class="terms">
+        <b>Other Terms and Conditions :</b>
+        <hr>
+      
+        {% regroup po.terms_conditions.all by terms_condition_type as term_groups %}
+      
+        {% for group in term_groups %}
+      
+          <b>{{ group.grouper.display_name|default:group.grouper.name }}</b><br>
+      
+          {% for term in group.list %}
+            • {{ term.terms }}<br>
+          {% endfor %}
+      
+          <br>
+      
+        {% endfor %}
+      </div>
+
+      <!-- FOOTER -->
+
+      <div class="footer">
+
+        <p><b>Note :</b> {{ po.note|default:"-" }}</p> 
+        <br><hr> <br>
+        Your Faith fully,
+        <br> <br>
+        For Krisna Airconditioning,
+        <br><br>
+        <div class="signature right">Authorized Signatory</div>
+        <br><br>
+      </div>
+    </div>
+  </body>
+</html>

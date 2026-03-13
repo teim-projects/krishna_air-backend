@@ -118,23 +118,27 @@ def get_code_part(name: str):
 
 class material_type(models.Model):
    name = models.CharField(max_length=100)
+   shortcut = models.CharField(max_length=10, blank=True, null=True)
    
    def __str__(self):
     return self.name
    
 class item_type(models.Model):
     name = models.CharField(max_length=100)
+    shortcut = models.CharField(max_length=10, blank=True, null=True)
     def __str__(self):
       return self.name
 
 
 class feature_type(models.Model):
     name = models.CharField(max_length=100)
+    shortcut = models.CharField(max_length=10, blank=True, null=True)
     def __str__(self):
       return self.name
     
 class item_class(models.Model):
     name = models.CharField(max_length=100)
+    shortcut = models.CharField(max_length=10, blank=True, null=True)
     def __str__(self):
       return self.name
     
@@ -142,15 +146,15 @@ class item(models.Model):
     item_code = models.CharField(max_length=100,unique=True, blank=True)
     material_type_id = models.ForeignKey(material_type, on_delete=models.CASCADE, related_name='items')
     item_type_id = models.ForeignKey(item_type, on_delete=models.CASCADE, related_name='items')
-    feature_type_id = models.ForeignKey(feature_type, on_delete=models.CASCADE, related_name='items')
-    item_class_id = models.ForeignKey(item_class, on_delete=models.CASCADE, related_name='items')
+    feature_type_id = models.ForeignKey(feature_type, on_delete=models.CASCADE, related_name='items', blank=True, null=True)
+    item_class_id = models.ForeignKey(item_class, on_delete=models.CASCADE, related_name='items', blank=True, null=True)
     size = models.CharField(max_length=50, blank=True, null=True)
     size_unit = models.CharField(max_length=20, blank=True, null=True)
     thickness = models.CharField(max_length=50, blank=True, null=True)
     thickness_unit = models.CharField(max_length=20, blank=True, null=True)
     density = models.CharField(max_length=50, blank=True, null=True)
     density_unit = models.CharField(max_length=20, blank=True, null=True)
-    brand = models.ForeignKey(brand, on_delete=models.CASCADE, related_name='items')
+    brand = models.ForeignKey(brand, on_delete=models.CASCADE, related_name='items', blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     
 
@@ -158,8 +162,11 @@ class item(models.Model):
         parts = [
             get_code_part(self.material_type_id.name),
             get_code_part(self.item_type_id.name),
-            get_code_part(self.feature_type_id.name),
         ]
+    
+    # Add feature_type only if it exists
+        if self.feature_type_id:
+            parts.append(get_code_part(self.feature_type_id.name))
 
         if self.size:
             size_part = f"{self.size}{self.size_unit or ''}".upper()
@@ -169,9 +176,12 @@ class item(models.Model):
             thickness_part = f"{self.thickness}{self.thickness_unit or ''}".upper()
             parts.append(thickness_part)
 
-        parts.append(get_code_part(self.item_class_id.name))
+    # Add item_class only if it exists
+        if self.item_class_id:
+            parts.append(get_code_part(self.item_class_id.name))
 
         return "-".join(parts)
+
 
     def save(self, *args, **kwargs):
       if not self.item_code:

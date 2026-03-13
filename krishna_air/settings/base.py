@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 
 # Quick-start development settings - unsuitable for production
@@ -57,6 +57,8 @@ INSTALLED_APPS = [
     'dj_rest_auth.registration',
     'allauth.socialaccount.providers.google',
     'django_filters',
+    'reportlab',
+    'django.contrib.humanize',
 
 
     # My apps
@@ -64,6 +66,8 @@ INSTALLED_APPS = [
     'lead_management',
     'product_management',
     'quotation',
+    'invoice',
+    'inventory',
 ] 
 
 SITE_ID = 1
@@ -81,7 +85,8 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'krishna_air.urls'
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = os.getenv("CORS_ALLOW_ALL_ORIGINS")
+
 
 CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "")
 
@@ -89,6 +94,8 @@ if CORS_ALLOWED_ORIGINS:
     CORS_ALLOWED_ORIGINS = [origin.strip() for origin in CORS_ALLOWED_ORIGINS.split(",")]
 else:
     CORS_ALLOWED_ORIGINS = []
+
+CSRF_TRUSTED_ORIGINS = os.getenv("CSRF_TRUSTED_ORIGINS")
 
 TEMPLATES = [
     {
@@ -256,3 +263,9 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
+
+
+USE_L10N = True
+USE_THOUSAND_SEPARATOR = True
+THOUSAND_SEPARATOR = ","
+NUMBER_GROUPING = 2

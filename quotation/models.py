@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth import get_user_model
-from product_management.models import ProductVariant
+from product_management.models import ProductVariant ,item
 
 User = get_user_model()
 
@@ -13,6 +13,28 @@ class Quotation(models.Model):
         "lead_management.Customer",
         on_delete=models.PROTECT,
         related_name="quotations"
+    )
+
+    branch = models.ForeignKey(
+        "api.BranchManagement",
+        on_delete=models.PROTECT,
+        related_name="quotations",
+        null=True,
+        blank=True
+    )
+    
+    site = models.ForeignKey(
+        "api.SiteManagement",
+        on_delete=models.PROTECT,
+        related_name="quotations",
+        null=True,
+        blank=True
+    )
+    
+    terms_conditions = models.ManyToManyField(
+        "inventory.TermsConditions",
+        related_name="invoices",
+        blank=True
     )
 
     subject = models.CharField(max_length=255)
@@ -39,7 +61,7 @@ class QuotationVersion(models.Model):
         on_delete=models.CASCADE
     )
 
-    version_no = models.PositiveIntegerField()
+    version_no = models.CharField(max_length=100)
     is_active = models.BooleanField(default=True)
 
     gst_type = models.CharField(
@@ -57,8 +79,12 @@ class QuotationVersion(models.Model):
     gst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
-    mathadi_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    transportation_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+   
+
+    
+    # GRAND TOTAL
+    grand_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
 
     created_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True
@@ -94,8 +120,41 @@ class QuotationHighSideItem(models.Model):
     quantity = models.PositiveIntegerField()
 
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+
     gst_percent = models.DecimalField(max_digits=5, decimal_places=2, default=18)
-    total_price = models.DecimalField(max_digits=12, decimal_places=2)
+
+    mathadi_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    transportation_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    description = models.TextField(blank=True, null=True)
+    
+
+    # 🔥 NEW FIELDS
+    base_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    gst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_with_gst = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
 
+class QuotationLowSideItem(models.Model):
 
+    quotation_version = models.ForeignKey(
+        QuotationVersion,
+        related_name="low_side_items",
+        on_delete=models.CASCADE
+    )
+
+    item = models.ForeignKey(
+        item,
+        on_delete=models.PROTECT
+    )
+
+    quantity = models.PositiveIntegerField()
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    mathadi_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    description = models.TextField(blank=True, null=True)
+
+    # 🔥 NEW FIELDS
+    base_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    gst_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    gst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_with_gst = models.DecimalField(max_digits=12, decimal_places=2, default=0)

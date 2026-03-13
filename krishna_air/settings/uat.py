@@ -15,4 +15,9 @@ CSRF_TRUSTED_ORIGINS = [
     "http://dsaqua.online",
 ]
 
+CORS_ALLOWED_ORIGINS = [
+    "https://dsaqua.online",
+    "https://www.dsaqua.online",
+]
+
 CORS_ALLOW_ALL_ORIGINS = False
