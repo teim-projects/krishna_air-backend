@@ -247,11 +247,17 @@ class QuotationSerializer(serializers.ModelSerializer):
         # ======================================
         # STEP 1️⃣ CREATE QUOTATION FIRST
         # ======================================
-    
+        
+
+        terms_conditions = validated_data.pop("terms_conditions", [])
+
         quotation = Quotation.objects.create(
             quotation_no="TEMP",   # temporary value
             **validated_data
         )
+
+        if terms_conditions:
+            quotation.terms_conditions.set(terms_conditions)
     
         # ======================================
         # STEP 2️⃣ BUILD NUMBER USING DB ID
@@ -322,6 +328,11 @@ class QuotationSerializer(serializers.ModelSerializer):
 
         high_items = version_data.pop("high_side_items")
         low_items = version_data.pop("low_side_items")
+
+        terms_conditions = validated_data.pop("terms_conditions", None)
+
+        if terms_conditions is not None:
+            instance.terms_conditions.set(terms_conditions)
 
         new_version = QuotationVersion.objects.create(
         quotation=instance,
