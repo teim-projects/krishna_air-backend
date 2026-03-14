@@ -24,5 +24,5 @@ jobs:
 
       - name: Build and push backend image (UAT)
         run: |
-          docker build -f docker/Dockerfile.uat -t teim123/krisna_air:backend-uat-1.0.0 .
-          docker push teim123/krisna_air:backend-uat-1.0.0
+          docker build -f docker/Dockerfile.uat -t teim123/krisna_air:backend-uat-1.0.1 .
+          docker push teim123/krisna_air:backend-uat-1.0.1

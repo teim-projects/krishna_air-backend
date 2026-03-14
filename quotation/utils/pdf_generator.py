@@ -13,6 +13,9 @@ from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
 from django.http import HttpResponse
 from django.conf import settings
+from collections import defaultdict
+
+from rich.pretty import data
 
 logger = logging.getLogger(__name__)
 
@@ -252,141 +255,82 @@ class QuotationPDFGenerator:
         pass
 
     def add_high_side_items(self):
-        """Add high side items table"""
+        """Add high side items grouped by product"""
         try:
             high_items = self.version.high_side_items.all()
             if not high_items:
                 return
-                
-            self.elements.append(Paragraph("High side Installation work", self.styles['SubHeader']))
-            
-            # Table headers
-            headers = [
-                ['S.N', 'Description', 'Unit', 'Qty', 'Rate', 'Amount']
-            ]
-            
-            # Table data
-            data = headers.copy()
-            for idx, item in enumerate(high_items, 1):
-                # Get product variant and related product model
+    
+            # Group items by product model name
+            grouped_items = defaultdict(list)
+    
+            for item in high_items:
                 variant = item.product_variant
-                product_model = variant.product_model if hasattr(variant, 'product_model') else None
+                model = variant.product_model if hasattr(variant, "product_model") else None
+                product_name = model.name if model else "Product"
+    
+                grouped_items[product_name].append(item)
+    
+            # Create separate table per product group
+            for product_name, items in grouped_items.items():
+            
+                self.elements.append(
+                    Paragraph(f"Supply of {product_name} Airconditioners", self.styles["SubHeader"])
+                )
+    
+                data = [['S.N', 'Description', 'Unit', 'Qty', 'Rate', 'Amount']]
+    
+                subtotal = 0
+    
+                for idx, item in enumerate(items, 1):
                 
-                # Product name
-                product_name = product_model.name if product_model else 'N/A'
-                
-                # Model number
-                model_no = product_model.model_no if product_model else 'N/A'
-                
-                # Capacity
-                capacity = variant.capacity if hasattr(variant, 'capacity') else 'N/A'
-                
-                # Build description with product info and additional description
-                product_info = f"{product_name} {model_no} {capacity}"
-                
-                # Add item description if it exists
-                if item.description and item.description.strip():
-                    full_description = f"{product_info}<br/><i><font color='grey' size='8'>{item.description}</font></i>"
-                else:
-                    full_description = product_info
-                
-                # Main product row with description included in same cell
-                data.append([
-                    str(idx),
-                    Paragraph(full_description, self.styles['Value']),
-                    'Nos.',
-                    str(item.quantity),
-                    f"{float(item.unit_price):,.2f}",
-                    f"{float(item.total_with_gst):,.2f}"
-                ])
-            
-            # Add empty row between content and totals
-            data.append(['', '', '', '', '', ''])
-            
-            # Calculate subtotal
-            high_subtotal = sum(float(item.total_with_gst) for item in high_items)
-            
-            # Summary section - High side specific rows
-            data.append([
-                "Subtotal :", '', '', '', '', 
-                f"{high_subtotal:,.2f}"
-            ])
-            
-            # Calculate GST (18%)
-            gst_amount = high_subtotal * 0.18
-            data.append([
-                "GST @ 18% :", '', '', '', '', 
-                f"{gst_amount:,.2f}"
-            ])
-            
-            data.append([
-                "Mathadi Charges :", '', '', '', '', 
-                "Extra"
-            ])
-            
-            data.append([
-                "Transportation :", '', '', '', '', 
-                "Extra"
-            ])
-            
-            # Calculate total with GST
-            total_with_gst = high_subtotal + gst_amount
-            data.append([
-                "Total :", '', '', '', '', 
-                f"{total_with_gst:,.2f}"
-            ])
+                    variant = item.product_variant
+                    model = variant.product_model
+    
+                    description = f"{model.name} {model.model_no} {variant.capacity}"
+    
+                    amount = float(item.quantity) * float(item.unit_price)
+                    subtotal += amount
+    
+                    data.append([
+                        str(idx),
+                        Paragraph(description, self.styles['Value']),
+                        "Nos.",
+                        str(item.quantity),
+                        f"{float(item.unit_price):,.2f}",
+                        f"{amount:,.2f}",
+                    ])
+    
+                gst = subtotal * 0.18
+                total = subtotal + gst
 
-            col_widths = [25, 200, 40, 30, 70, 70]
-            table = Table(data, colWidths=col_widths)
-            
-            # Count data rows (excluding header)
-            data_rows = len(data) - 1
-            
-            empty_row_index = data_rows - 5  # Empty row is 6th from last
-            summary_start = data_rows - 4    # Summary rows start (Subtotal, GST, Mathadi, Transportation, Total)
-            
-            style = [
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),  # Header bold
-                ('ALIGN', (0, 0), (0, -1), 'CENTER'),   # S.N column center
-                ('ALIGN', (1, 0), (1, -1), 'LEFT'),     # Description column left
-                ('ALIGN', (2, 0), (-1, -1), 'RIGHT'),   # Unit, Qty, Rate, Amount right
-                ('FONTSIZE', (0, 0), (-1, -1), 9),
-                ('TOPPADDING', (0, 0), (-1, -1), 3),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-                
-                # Summary section spans - individual spans for each row to preserve horizontal lines
-                ('SPAN', (0, summary_start), (4, summary_start)),      # Subtotal row
-                ('SPAN', (0, summary_start+1), (4, summary_start+1)),  # GST row
-                ('SPAN', (0, summary_start+2), (4, summary_start+2)),  # Mathadi row
-                ('SPAN', (0, summary_start+3), (4, summary_start+3)),  # Transportation row
-                ('SPAN', (0, summary_start+4), (4, summary_start+4)),  # Total row
-                
-                ('ALIGN', (0, summary_start), (4, summary_start+4), 'RIGHT'),  # Labels right-aligned
-                ('ALIGN', (5, summary_start), (5, summary_start+4), 'RIGHT'),  # Amounts right-aligned
-                ('FONTNAME', (0, summary_start), (-1, summary_start+4), 'Helvetica-Bold'),
-                
-                # Light gray background for summary rows
-                ('BACKGROUND', (0, summary_start), (-1, summary_start+4), colors.HexColor('#F0F0F0')),
-                # No background for empty row
-                ('BACKGROUND', (0, empty_row_index), (-1, empty_row_index), colors.white),
-                
-                # Ensure horizontal lines between summary rows are visible
-                ('LINEBELOW', (0, summary_start), (-1, summary_start), 0.5, colors.black),
-                ('LINEBELOW', (0, summary_start+1), (-1, summary_start+1), 0.5, colors.black),
-                ('LINEBELOW', (0, summary_start+2), (-1, summary_start+2), 0.5, colors.black),
-                ('LINEBELOW', (0, summary_start+3), (-1, summary_start+3), 0.5, colors.black),
-            ]
-            
-            table.setStyle(TableStyle(style))
-            
-            self.elements.append(table)
-            self.elements.append(Spacer(1, 10))
+                data.append(['', '', '', '', 'Sub Total :', f"{subtotal:,.2f}"])
+                data.append(['', '', '', '', 'GST @ 18% :', f"{gst:,.2f}"])
+                data.append(['', '', '', '', 'Mathadi Charges :', 'Extra'])
+                data.append(['', '', '', '', 'Transportation :', 'Extra'])
+                data.append(['', '', '', '', 'Total :', f"{total:,.2f}"])
+    
+                col_widths = [25, 200, 40, 30, 70, 70]
+    
+                table = Table(data, colWidths=col_widths)
+    
+                table.setStyle(TableStyle([
+                    ('GRID', (0,0), (-1,-1), 0.5, colors.black),
+
+                    ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+
+                    ('ALIGN', (0,0), (0,-1), 'CENTER'),
+                    ('ALIGN', (2,1), (-1,-1), 'RIGHT'),
+
+                    # Green total row
+                    ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor("#8bc34a")),
+                    ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+                ]))
+                self.elements.append(table)
+                self.elements.append(Spacer(1,10))
+    
         except Exception as e:
             logger.error(f"Error in add_high_side_items: {str(e)}")
-            self.elements.append(Paragraph(f"Error loading high side items: {str(e)}", self.styles['Value']))
-
     def add_low_side_items(self):
         """Add low side items table"""
         try:
@@ -533,53 +477,88 @@ class QuotationPDFGenerator:
         pass
 
     def add_terms_and_conditions(self):
-        """Add terms and conditions"""
+        """Add terms and conditions from quotation data"""
         # Always start Terms & Conditions on a new page
         self.elements.append(PageBreak())
         
         self.elements.append(Paragraph("Terms & Conditions", self.styles['SectionHeader']))
-        self.elements.append(Spacer(1, 5))
+        self.elements.append(Spacer(1, 10))
         
-        terms = [
-            "<b>TAXES:</b> GST will be extra as applicable.",
-            "",
-            "<b>PAYMENT TERMS:</b>",
-            "<b>Part A)</b> For HVAC Equipment: <b>100%</b> advance along with PO against Performa Invoice.",
-            "Purchase Order and Cheque shall be made in the name of <b>KRISNA AIRCONDITIONING</b>, Pune.",
-            "Bank of India, Account Number: 051520100000616, IFSC Code: BKID0000515, GSTIN: 27AITPP8825B2ZS.",
-            "",
-            "<b>Part B)</b> For Low Side Installation charges of HVAC Equipment: <b>50%</b> advance along with order, <b>50%</b> against delivery of material at site on prorata basis, 10% against installation of material at site on month basis, and balance 10% against completion of work.",
-            "Purchase Order and Cheque shall be made in the name of <b>Crona Heat Technology Pvt. Ltd.</b>, Pune.",
-            "Bank of India, Account Number: 051520100000612, IFSC Code: BKID0000515, GSTIN: 27AAFCC6613, GSTIN: 27AAFCC6613ZC.",
-            "",
-            "<b>VALIDITY of rates:</b> Rates for AC units are valid up to 7 days and Low Side Installation rates are valid up to 7 days from the date of this offer.",
-            "",
-            "<b>WARRANTY:</b> 1.) All AC units will have Efficent ( 1:3 months warranty from the date of delivery at site or Twelve (12) months from date of commissioning of AC units ever is earlier.",
-            "2.) 1 Nos. free in warranty servicing will be provided in Twelve (1:3 months from date of installation (*Applicable if supply & installation done by Krishna Airconditioning only).",
-            "",
-            "<b>Important Note:</b>",
-            "1) Electrical Power Cables & Pin top/Socket arrangement up to all HVAC equipment will be in the scope of customer.",
-            "2) Exact Mathadi Charges will be extra at actual and will be pass by customer.",
-            "3) Above costing are estimated and will be finalized detailed material layout.",
-            "4) Above costing are estimated and will be finalized detailed material layout.",
-            "5) Above Warranty & Servicing is not applicable on Old Split AC.",
-            "6) Lifting/Shifting/ Transportation of Old AC, MS Fabrication Work for Hogging/Mounting of AC IDU & ODU &",
-            "Electrical Work for AC will be in the scope of customer (if applicable).",
-            "7) Any HVAC equipment installation above 1 meter single angle inside Scaffolding arrangement & this type of arrangement to be provided by the client on-site or it will be on extra chargeable basis as extra.",
-            "8) The storage with Locker room for all HVAC material shall be arranged by client.",
-            "9) Any kind of hole made for AC pipings & ducting and waterproofing is in the client's scope.",
-            "10) Electrical work for AC will be in the scope of customer (if applicable).",
-            "11) Excess is not a integral part of HVAC system and Client has to check its physically & location with structural consultant. (Optional)",
-            "",
+        # Get terms and conditions from the quotation
+        terms_conditions = self.quotation.terms_conditions.all()
+        
+        if terms_conditions:
+            # Group terms by type
+            payment_terms = []
+            delivery_terms = []
+            other_terms = []
+            
+            for term in terms_conditions:
+                term_type_name = term.terms_condition_type.name.lower()
+                if 'payment' in term_type_name:
+                    payment_terms.append(term.terms)
+                elif 'delivery' in term_type_name:
+                    delivery_terms.append(term.terms)
+                else:
+                    other_terms.append(term.terms)
+            
+            # Add Payment Terms section
+            if payment_terms:
+                self.elements.append(Paragraph("<b>PAYMENT TERMS:</b>", self.styles['SubHeader']))
+                for idx, term in enumerate(payment_terms, 1):
+                    self.elements.append(Paragraph(f"{idx}. {term}", self.styles['Value']))
+                self.elements.append(Spacer(1, 8))
+            
+            # Add Delivery Terms section
+            if delivery_terms:
+                self.elements.append(Paragraph("<b>DELIVERY TERMS:</b>", self.styles['SubHeader']))
+                for idx, term in enumerate(delivery_terms, 1):
+                    self.elements.append(Paragraph(f"{idx}. {term}", self.styles['Value']))
+                self.elements.append(Spacer(1, 8))
+            
+            # Add Other Terms section
+            if other_terms:
+                self.elements.append(Paragraph("<b>GENERAL TERMS:</b>", self.styles['SubHeader']))
+                for idx, term in enumerate(other_terms, 1):
+                    self.elements.append(Paragraph(f"{idx}. {term}", self.styles['Value']))
+                self.elements.append(Spacer(1, 8))
+        
+        else:
+            # Fallback to default terms if no terms are set
+            self.elements.append(Paragraph("<b>TAXES:</b> GST will be extra as applicable.", self.styles['Value']))
+            self.elements.append(Spacer(1, 5))
+            
+            self.elements.append(Paragraph("<b>PAYMENT TERMS:</b>", self.styles['SubHeader']))
+            default_payment_terms = [
+                "For HVAC Equipment: 100% advance along with PO against Performa Invoice.",
+                "Purchase Order and Cheque shall be made in the name of KRISNA AIRCONDITIONING, Pune.",
+                "Bank of India, Account Number: 051520100000616, IFSC Code: BKID0000515, GSTIN: 27AITPP8825B2ZS."
+            ]
+            for idx, term in enumerate(default_payment_terms, 1):
+                self.elements.append(Paragraph(f"{idx}. {term}", self.styles['Value']))
+            self.elements.append(Spacer(1, 8))
+            
+            self.elements.append(Paragraph("<b>DELIVERY TERMS:</b>", self.styles['SubHeader']))
+            default_delivery_terms = [
+                "Delivery will be made within 15-20 working days from the date of receipt of order.",
+                "Material will be delivered at site during working hours only."
+            ]
+            for idx, term in enumerate(default_delivery_terms, 1):
+                self.elements.append(Paragraph(f"{idx}. {term}", self.styles['Value']))
+            self.elements.append(Spacer(1, 8))
+        
+        # Add standard closing text
+        closing_text = [
             "We hope we are in line with your requirement and look forward to hear from you with interest.",
             "",
             "Thanking you and assuring you our best of services always."
         ]
         
-        for term in terms:
-            self.elements.append(Paragraph(term, self.styles['Value']))
-            if term == "":
-                self.elements.append(Spacer(1, 3))
+        for text in closing_text:
+            if text == "":
+                self.elements.append(Spacer(1, 5))
+            else:
+                self.elements.append(Paragraph(text, self.styles['Value']))
         
         self.elements.append(Spacer(1, 10))
 
@@ -637,5 +616,4 @@ def generate_quotation_pdf(quotation, version):
     """Generate PDF for quotation"""
     generator = QuotationPDFGenerator(quotation, version)
     return generator.generate()
-    generator = QuotationPDFGenerator(quotation, version)
-    return generator.generate()
+ 
