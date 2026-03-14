@@ -13,6 +13,9 @@ from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
 from django.http import HttpResponse
 from django.conf import settings
+from collections import defaultdict
+
+from rich.pretty import data
 
 logger = logging.getLogger(__name__)
 
@@ -252,141 +255,82 @@ class QuotationPDFGenerator:
         pass
 
     def add_high_side_items(self):
-        """Add high side items table"""
+        """Add high side items grouped by product"""
         try:
             high_items = self.version.high_side_items.all()
             if not high_items:
                 return
-                
-            self.elements.append(Paragraph("High side Installation work", self.styles['SubHeader']))
-            
-            # Table headers
-            headers = [
-                ['S.N', 'Description', 'Unit', 'Qty', 'Rate', 'Amount']
-            ]
-            
-            # Table data
-            data = headers.copy()
-            for idx, item in enumerate(high_items, 1):
-                # Get product variant and related product model
+    
+            # Group items by product model name
+            grouped_items = defaultdict(list)
+    
+            for item in high_items:
                 variant = item.product_variant
-                product_model = variant.product_model if hasattr(variant, 'product_model') else None
+                model = variant.product_model if hasattr(variant, "product_model") else None
+                product_name = model.name if model else "Product"
+    
+                grouped_items[product_name].append(item)
+    
+            # Create separate table per product group
+            for product_name, items in grouped_items.items():
+            
+                self.elements.append(
+                    Paragraph(f"Supply of {product_name} Airconditioners", self.styles["SubHeader"])
+                )
+    
+                data = [['S.N', 'Description', 'Unit', 'Qty', 'Rate', 'Amount']]
+    
+                subtotal = 0
+    
+                for idx, item in enumerate(items, 1):
                 
-                # Product name
-                product_name = product_model.name if product_model else 'N/A'
-                
-                # Model number
-                model_no = product_model.model_no if product_model else 'N/A'
-                
-                # Capacity
-                capacity = variant.capacity if hasattr(variant, 'capacity') else 'N/A'
-                
-                # Build description with product info and additional description
-                product_info = f"{product_name} {model_no} {capacity}"
-                
-                # Add item description if it exists
-                if item.description and item.description.strip():
-                    full_description = f"{product_info}<br/><i><font color='grey' size='8'>{item.description}</font></i>"
-                else:
-                    full_description = product_info
-                
-                # Main product row with description included in same cell
-                data.append([
-                    str(idx),
-                    Paragraph(full_description, self.styles['Value']),
-                    'Nos.',
-                    str(item.quantity),
-                    f"{float(item.unit_price):,.2f}",
-                    f"{float(item.total_with_gst):,.2f}"
-                ])
-            
-            # Add empty row between content and totals
-            data.append(['', '', '', '', '', ''])
-            
-            # Calculate subtotal
-            high_subtotal = sum(float(item.total_with_gst) for item in high_items)
-            
-            # Summary section - High side specific rows
-            data.append([
-                "Subtotal :", '', '', '', '', 
-                f"{high_subtotal:,.2f}"
-            ])
-            
-            # Calculate GST (18%)
-            gst_amount = high_subtotal * 0.18
-            data.append([
-                "GST @ 18% :", '', '', '', '', 
-                f"{gst_amount:,.2f}"
-            ])
-            
-            data.append([
-                "Mathadi Charges :", '', '', '', '', 
-                "Extra"
-            ])
-            
-            data.append([
-                "Transportation :", '', '', '', '', 
-                "Extra"
-            ])
-            
-            # Calculate total with GST
-            total_with_gst = high_subtotal + gst_amount
-            data.append([
-                "Total :", '', '', '', '', 
-                f"{total_with_gst:,.2f}"
-            ])
+                    variant = item.product_variant
+                    model = variant.product_model
+    
+                    description = f"{model.name} {model.model_no} {variant.capacity}"
+    
+                    amount = float(item.quantity) * float(item.unit_price)
+                    subtotal += amount
+    
+                    data.append([
+                        str(idx),
+                        Paragraph(description, self.styles['Value']),
+                        "Nos.",
+                        str(item.quantity),
+                        f"{float(item.unit_price):,.2f}",
+                        f"{amount:,.2f}",
+                    ])
+    
+                gst = subtotal * 0.18
+                total = subtotal + gst
 
-            col_widths = [25, 200, 40, 30, 70, 70]
-            table = Table(data, colWidths=col_widths)
-            
-            # Count data rows (excluding header)
-            data_rows = len(data) - 1
-            
-            empty_row_index = data_rows - 5  # Empty row is 6th from last
-            summary_start = data_rows - 4    # Summary rows start (Subtotal, GST, Mathadi, Transportation, Total)
-            
-            style = [
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),  # Header bold
-                ('ALIGN', (0, 0), (0, -1), 'CENTER'),   # S.N column center
-                ('ALIGN', (1, 0), (1, -1), 'LEFT'),     # Description column left
-                ('ALIGN', (2, 0), (-1, -1), 'RIGHT'),   # Unit, Qty, Rate, Amount right
-                ('FONTSIZE', (0, 0), (-1, -1), 9),
-                ('TOPPADDING', (0, 0), (-1, -1), 3),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-                
-                # Summary section spans - individual spans for each row to preserve horizontal lines
-                ('SPAN', (0, summary_start), (4, summary_start)),      # Subtotal row
-                ('SPAN', (0, summary_start+1), (4, summary_start+1)),  # GST row
-                ('SPAN', (0, summary_start+2), (4, summary_start+2)),  # Mathadi row
-                ('SPAN', (0, summary_start+3), (4, summary_start+3)),  # Transportation row
-                ('SPAN', (0, summary_start+4), (4, summary_start+4)),  # Total row
-                
-                ('ALIGN', (0, summary_start), (4, summary_start+4), 'RIGHT'),  # Labels right-aligned
-                ('ALIGN', (5, summary_start), (5, summary_start+4), 'RIGHT'),  # Amounts right-aligned
-                ('FONTNAME', (0, summary_start), (-1, summary_start+4), 'Helvetica-Bold'),
-                
-                # Light gray background for summary rows
-                ('BACKGROUND', (0, summary_start), (-1, summary_start+4), colors.HexColor('#F0F0F0')),
-                # No background for empty row
-                ('BACKGROUND', (0, empty_row_index), (-1, empty_row_index), colors.white),
-                
-                # Ensure horizontal lines between summary rows are visible
-                ('LINEBELOW', (0, summary_start), (-1, summary_start), 0.5, colors.black),
-                ('LINEBELOW', (0, summary_start+1), (-1, summary_start+1), 0.5, colors.black),
-                ('LINEBELOW', (0, summary_start+2), (-1, summary_start+2), 0.5, colors.black),
-                ('LINEBELOW', (0, summary_start+3), (-1, summary_start+3), 0.5, colors.black),
-            ]
-            
-            table.setStyle(TableStyle(style))
-            
-            self.elements.append(table)
-            self.elements.append(Spacer(1, 10))
+                data.append(['', '', '', '', 'Sub Total :', f"{subtotal:,.2f}"])
+                data.append(['', '', '', '', 'GST @ 18% :', f"{gst:,.2f}"])
+                data.append(['', '', '', '', 'Mathadi Charges :', 'Extra'])
+                data.append(['', '', '', '', 'Transportation :', 'Extra'])
+                data.append(['', '', '', '', 'Total :', f"{total:,.2f}"])
+    
+                col_widths = [25, 200, 40, 30, 70, 70]
+    
+                table = Table(data, colWidths=col_widths)
+    
+                table.setStyle(TableStyle([
+                    ('GRID', (0,0), (-1,-1), 0.5, colors.black),
+
+                    ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+
+                    ('ALIGN', (0,0), (0,-1), 'CENTER'),
+                    ('ALIGN', (2,1), (-1,-1), 'RIGHT'),
+
+                    # Green total row
+                    ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor("#8bc34a")),
+                    ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+                ]))
+                self.elements.append(table)
+                self.elements.append(Spacer(1,10))
+    
         except Exception as e:
             logger.error(f"Error in add_high_side_items: {str(e)}")
-            self.elements.append(Paragraph(f"Error loading high side items: {str(e)}", self.styles['Value']))
-
     def add_low_side_items(self):
         """Add low side items table"""
         try:
@@ -672,5 +616,4 @@ def generate_quotation_pdf(quotation, version):
     """Generate PDF for quotation"""
     generator = QuotationPDFGenerator(quotation, version)
     return generator.generate()
-    generator = QuotationPDFGenerator(quotation, version)
-    return generator.generate()
+ 
