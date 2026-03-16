@@ -149,8 +149,8 @@ class SiteManagement(models.Model):
     city = models.CharField(max_length=255)
     state = models.CharField(max_length=255)
     pincode = models.IntegerField()
-    owner_name = models.CharField(max_length=255)
-    owner_contact = models.CharField(max_length=20)
+    owner_name = models.CharField(max_length=255, blank=True, null=True)
+    owner_contact = models.CharField(max_length=20, blank=True, null=True)
 
     def generate_unique_shortcut(self):
         name_part = (self.name[:3] if self.name else "").upper()

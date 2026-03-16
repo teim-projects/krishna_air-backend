@@ -85,7 +85,9 @@ class PurchaseOrder(models.Model):
     branch = models.ForeignKey(
         BranchManagement,
         on_delete=models.PROTECT,
-        related_name="purchase_orders"
+        related_name="purchase_orders",
+        null= True,
+        blank= True
     )
 
     terms_conditions = models.ManyToManyField(

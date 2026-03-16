@@ -25,11 +25,11 @@ class VendorSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("PAN number must be 10 characters")
         return value
     
-    def validate_office_poc_phone(self, value):
-        """Validate office POC phone is 10 digits"""
-        if not value.isdigit() or len(value) != 10:
-            raise serializers.ValidationError("Phone number must be 10 digits")
-        return value
+    # def validate_office_poc_phone(self, value):
+    #     """Validate office POC phone is 10 digits"""
+    #     if not value.isdigit() or len(value) != 10:
+    #         raise serializers.ValidationError("Phone number must be 10 digits")
+    #     return value
 
 
 
