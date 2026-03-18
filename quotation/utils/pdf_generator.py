@@ -15,7 +15,6 @@ from django.http import HttpResponse
 from django.conf import settings
 from collections import defaultdict
 
-from rich.pretty import data
 
 logger = logging.getLogger(__name__)
 
