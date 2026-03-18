@@ -8,7 +8,8 @@ User = get_user_model()
 # Customer
 class Customer(models.Model):
   name = models.CharField(max_length=200)
-  contact_number = models.CharField(max_length=20, blank=True, null=True)
+  contact_number = models.CharField(max_length=20, blank=True, null=True , unique=True)
+  secondary_contact_number = models.CharField(max_length=20, blank=True, null=True)
   email = models.EmailField(blank=True, null=True)
   secondary_email = models.EmailField(blank=True, null=True)
   poc_name = models.CharField(max_length=200, blank=True, null=True)
@@ -48,14 +49,21 @@ class LeadStatus(models.TextChoices):
     CLOSED = 'closed', 'Closed'
     IN_PROCESS = 'in_process', 'In Process'
 
+
+class ServiceType(models.TextChoices):
+    SALES = "sales", "Sales"
+    SERVICE = "service", "Service"
+    BOTH = "both", "Both"
+
 # Lead management 
 class lead_management(models.Model):
   customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='leads')
   requirements_details = models.TextField(blank=True)
   lead_type = models.CharField(max_length=200, blank=True, null=True)
   lead_source = models.CharField(max_length=200)
-  is_service_lead = models.BooleanField(default=False, null=True, blank=True)
-  lead_source_input = models.CharField(max_length=200, blank=True, null=True)
+  is_service_lead = models.CharField( max_length=20, choices=ServiceType.choices, null=True, blank=True)
+  service_type = models.JSONField(blank=True, null=True)
+  lead_source_input = models.JSONField(blank=True, null=True)
   status = models.CharField(max_length=200, choices=LeadStatus)
   assign_to = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name='lead_assignment')
   date = models.DateField(blank=True, null=True)
@@ -65,7 +73,9 @@ class lead_management(models.Model):
   project_name = models.CharField(max_length=100, blank=True, null=True)
   project_adderess = models.CharField(max_length=500, blank=True, null=True)
   creatd_by = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name='lead_created')
-  referance_by = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name='lead_referance')
+#   referance_by = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name='lead_referance')
+  contact_person_name = models.CharField(max_length=200, blank=True, null=True)
+  contact_person_number = models.CharField(max_length=20, blank=True, null=True)
 
   def __str__(self):
         return f"Lead #{self.pk} - {self.customer.name or self.customer.email or self.customer.contact_number} - {self.get_status_display()}"

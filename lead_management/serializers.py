@@ -8,11 +8,29 @@ from product_management.models import *
 
 User = get_user_model()
 
+
 class CustomerSerializer(serializers.ModelSerializer):
-   class Meta:
+    class Meta:
         model = Customer
         fields = "__all__"
         read_only_fields = ('id',)
+
+    def validate_contact_number(self, value):
+        value = value.strip()
+
+        # Check if customer already exists
+        qs = Customer.objects.filter(contact_number=value)
+
+        # If update → exclude current instance
+        if self.instance:
+            qs = qs.exclude(id=self.instance.id)
+
+        if qs.exists():
+            raise serializers.ValidationError(
+                "Customer with this contact number already exists."
+            )
+
+        return value
 
 class LeadFAQSerializer(serializers.ModelSerializer):
     class Meta:
@@ -260,6 +278,7 @@ class LeadSerializer(serializers.ModelSerializer):
         'architect/interior_designe',
         'builder',
         'existing_customer',
+        'scgt',
         'ka_staff',
         'other',
     ]
@@ -272,12 +291,16 @@ class LeadSerializer(serializers.ModelSerializer):
     # Customer fields
     customer_name = serializers.CharField(source="customer.name", read_only=True)
     customer_contact = serializers.CharField(source="customer.contact_number", read_only=True)
+    customer_secondary_contact = serializers.CharField(source="customer.secondary_contact_number", read_only=True)
     customer_email = serializers.EmailField(source="customer.email", read_only=True)
     customer_secondary_email = serializers.EmailField(source="customer.secondary_email", read_only=True)
     customer_address = serializers.CharField(source="customer.address", read_only=True)
+    customer_city = serializers.CharField(source="customer.city", read_only=True)
+    customer_state = serializers.CharField(source="customer.state", read_only=True)
+    customer_pincode = serializers.CharField(source="customer.pincode", read_only=True)
     assign_to_details = CustomUserDetailsSerializer(source="assign_to", read_only=True)
     creatd_by_details = CustomUserDetailsSerializer(source="creatd_by", read_only=True)
-    referance_by_details = CustomUserDetailsSerializer(source="referance_by", read_only=True)
+    # referance_by_details = CustomUserDetailsSerializer(source="referance_by", read_only=True)
     followups = LeadFollowUpSerializer(many=True, read_only=True)
 
     class Meta:
@@ -299,15 +322,22 @@ class LeadSerializer(serializers.ModelSerializer):
             "customer",        
             "customer_name",
             "customer_contact",
+            "customer_secondary_contact",
             "customer_email",
             "customer_address",
+            "customer_city",
+            "customer_state",
+            "customer_pincode",
             "customer_secondary_email",
+            "contact_person_name",
+            "contact_person_number",
             "assign_to",        
             "creatd_by",
-            'referance_by', 
+            # 'referance_by', 
             "assign_to_details",
             "creatd_by_details",
-            "referance_by_details",
+            # "referance_by_details",
+            "service_type",
             "followups",
             "products",
             "product_details",   

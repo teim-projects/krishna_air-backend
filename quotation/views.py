@@ -65,15 +65,13 @@ class QuotationViewSet(viewsets.ModelViewSet):
 
     # PDF ACTIONS
     # quotation/views.py
-
     @action(detail=True, methods=['get'], url_path='pdf')
     def download_pdf(self, request, pk=None):
-        """Generate PDF for active version"""
         try:
             quotation = self.get_object()
-            # Get the version with all related data using correct paths
+
             version = QuotationVersion.objects.filter(
-                quotation=quotation, 
+                quotation=quotation,
                 is_active=True
             ).prefetch_related(
                 'high_side_items__product_variant__product_model',
@@ -84,26 +82,21 @@ class QuotationViewSet(viewsets.ModelViewSet):
                 'low_side_items__item__feature_type_id',
                 'low_side_items__item__brand'
             ).first()
-            
+
             if not version:
-                return HttpResponse(
-                    "No active version found for this quotation",
-                    status=404
-                )
-            
+                return HttpResponse("No active version found", status=404)
+
             pdf_content = generate_quotation_pdf(quotation, version)
-            
+
             response = HttpResponse(pdf_content, content_type='application/pdf')
-            response['Content-Disposition'] = f'attachment; filename="quotation_{quotation.quotation_no}_v{version.version_no}.pdf"'
-            
+            response['Content-Disposition'] = f'inline; filename="quotation_{quotation.quotation_no}_v{version.version_no}.pdf"'
+
             return response
+
         except Exception as e:
             logger.error(f"PDF generation error: {str(e)}")
-            return HttpResponse(
-                f"Error generating PDF: {str(e)}",
-                status=500
-            )
-    
+            return HttpResponse(f"Error generating PDF: {str(e)}", status=500)
+        
     @action(detail=True, methods=['get'], url_path='version/(?P<version_id>[^/.]+)/pdf')
     def download_version_pdf(self, request, pk=None, version_id=None):
         """Generate PDF for specific version"""
@@ -126,7 +119,7 @@ class QuotationViewSet(viewsets.ModelViewSet):
             pdf_content = generate_quotation_pdf(quotation, version)
             
             response = HttpResponse(pdf_content, content_type='application/pdf')
-            response['Content-Disposition'] = f'attachment; filename="quotation_{quotation.quotation_no}_v{version.version_no}.pdf"'
+            response['Content-Disposition'] = f'inline; filename="quotation_{quotation.quotation_no}_v{version.version_no}.pdf"'
             
             return response
         except Exception as e:
