@@ -127,7 +127,7 @@ class QuotationHighSideItem(models.Model):
     mathadi_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     transportation_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     description = models.TextField(blank=True, null=True)
-    
+    hsn_sac = models.CharField(max_length=50, null=True, blank=True)
 
     # 🔥 NEW FIELDS
     base_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -151,7 +151,7 @@ class QuotationLowSideItem(models.Model):
     quantity = models.PositiveIntegerField()
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     unit = models.CharField(max_length=20, default="NOS") 
-
+    hsn_sac = models.CharField(max_length=50, null=True, blank=True)
     mathadi_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     description = models.TextField(blank=True, null=True)
 

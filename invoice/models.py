@@ -135,7 +135,7 @@ class HighSideInvoiceItem(models.Model):
 
     description = models.TextField(blank=True, null=True)
 
-    hsn_sac = models.CharField(max_length=50)
+    hsn_sac = models.CharField(max_length=50, null=True, blank=True)
 
     gst_percent = models.DecimalField(max_digits=5, decimal_places=2)
 
@@ -165,6 +165,8 @@ class LowSideInvoiceItem(models.Model):
         on_delete=models.CASCADE
     )
 
+    hsn_sac = models.CharField(max_length=50, null=True, blank=True)
+    
     description = models.TextField(blank=True, null=True)
 
     gst_percent = models.DecimalField(max_digits=5, decimal_places=2)
