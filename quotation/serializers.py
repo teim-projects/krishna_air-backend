@@ -254,9 +254,6 @@ class QuotationSerializer(serializers.ModelSerializer):
         # ======================================
         # STEP 1️⃣ CREATE QUOTATION FIRST
         # ======================================
-        
-
-        terms_conditions = validated_data.pop("terms_conditions", [])
 
         quotation = Quotation.objects.create(
             quotation_no="TEMP",   # temporary value
