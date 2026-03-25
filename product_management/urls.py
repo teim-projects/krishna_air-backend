@@ -18,6 +18,7 @@ router.register(r'item-type', item_typeViewSet, basename='item-type')
 router.register(r'feature-type', feature_typeViewSet, basename='feature-type')
 router.register(r'item-class', item_classViewSet, basename='item-class')
 router.register(r'item', itemViewSet, basename='item')
+router.register(r'ac-material', ACTypeMaterialViewSet, basename='ac-material')
 
 urlpatterns = [
     

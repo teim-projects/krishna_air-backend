@@ -196,3 +196,17 @@ class item(models.Model):
 
     def __str__(self):
         return self.item_code
+
+
+class AcMaterials(models.Model):
+    ac_type = models.ForeignKey(acType, on_delete=models.CASCADE, related_name='materials')
+    material = models.ForeignKey(item, on_delete=models.CASCADE, related_name='ac_materials')
+    
+    class Meta:
+        unique_together = (
+            ('ac_type', 'material'),
+        )
+    
+    def __str__(self):
+        return f"{self.ac_type.name} - {self.material.item_code}"
+    
