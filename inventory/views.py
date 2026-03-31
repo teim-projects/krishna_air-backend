@@ -8,7 +8,7 @@ from .serializers import *
 from django.db import transaction
 from rest_framework import status
 from rest_framework.response import Response
-
+from rest_framework.decorators import action
 
 class VendorViewSet(ModelViewSet):
     queryset = Vendor.objects.all()
@@ -157,3 +157,36 @@ def purchase_order_pdf(request, pk):
         response["Content-Disposition"] = f'inline; filename="PO-{po.purchase_order_no}.pdf"'
 
     return response
+
+
+
+
+class GRNViewSet(ModelViewSet):
+    queryset = GRN.objects.all()
+    serializer_class = GRNSerializer
+
+    @action(detail=True, methods=["post"])
+    def complete(self, request, pk=None):
+        grn = self.get_object()
+
+        if grn.is_completed:
+            return Response({"error": "Already completed"}, status=400)
+
+        self.get_serializer().complete(grn)
+
+        return Response({"message": "GRN completed successfully"})
+    
+    
+
+class InventoryViewSet(ModelViewSet):
+    queryset = InventoryItem.objects.all().order_by("-updated_at")
+    serializer_class = InventorySerializer
+    # permission_classes = [IsAuthenticated]
+
+    # 🔍 filtering & search
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ["product_variant", "item"]
+    search_fields = [
+        "product_variant__name",
+        "item__name"
+    ]

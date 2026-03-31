@@ -314,7 +314,7 @@ class QuotationPDFGenerator:
                     data.append([
                         str(idx),
                         Paragraph(description, self.styles['Value']),
-                        "Nos.",
+                        str(item.unit),
                         str(item.quantity),
                         f"{rate:,.2f}",
                         f"{base_amount:,.2f}",   # 👈 show base amount
@@ -435,7 +435,7 @@ class QuotationPDFGenerator:
                 data.append([
                     str(idx),
                     Paragraph(full_description, self.styles['Value']),
-                    'Nos.',
+                    str(item.unit),
                     str(item.quantity),
                     f"{float(item.unit_price):,.2f}",
                     f"{float(item.total_with_gst):,.2f}"

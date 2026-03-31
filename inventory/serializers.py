@@ -1,6 +1,8 @@
 from rest_framework import serializers
-from .models import Vendor , TermsConditionType , TermsConditions , PurchaseOrder, PurchaseOrderProduct
+from .models import Vendor , TermsConditionType , TermsConditions , PurchaseOrder, PurchaseOrderProduct, GRN,GRNProduct , complete_grn, InventoryItem
 from .service import create_new_po_version
+from django.db import transaction
+from django.db.models import Sum, F
 
 class VendorSerializer(serializers.ModelSerializer):
     class Meta:
@@ -152,3 +154,196 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             new_po.terms_conditions.set(terms_conditions)
 
         return new_po
+
+
+class GRNProductSerializer(serializers.ModelSerializer):
+
+    description = serializers.CharField(
+        source="purchase_order_product.description", read_only=True
+    )
+    ordered_quantity = serializers.DecimalField(
+        source="purchase_order_product.quantity",
+        max_digits=10,
+        decimal_places=2,
+        read_only=True
+    )
+
+    total_accepted_quantity = serializers.SerializerMethodField()
+    remaining_quantity = serializers.SerializerMethodField()
+
+    class Meta:
+        model = GRNProduct
+        fields = [
+            "id",
+            "purchase_order_product",
+            "description",
+            "ordered_quantity",
+
+            # 🔥 NEW
+            "total_accepted_quantity",
+            "remaining_quantity",
+
+            "received_quantity",
+            "rejected_quantity",
+        ]
+
+    def get_total_accepted_quantity(self, obj):
+        total = GRNProduct.objects.filter(
+            purchase_order_product=obj.purchase_order_product
+        ).aggregate(
+            total=Sum(F("received_quantity") - F("rejected_quantity"))
+        )["total"]
+
+        return total or 0
+
+
+    def get_remaining_quantity(self, obj):
+        po_qty = obj.purchase_order_product.quantity
+
+        total_accepted = self.get_total_accepted_quantity(obj)
+
+        return po_qty - total_accepted
+    
+    
+    
+    def validate(self, data):
+        po_product = data["purchase_order_product"]
+
+        received = data["received_quantity"]
+        rejected = data["rejected_quantity"]
+
+        accepted_new = received - rejected
+
+        # exclude current instance (for update)
+        queryset = GRNProduct.objects.filter(
+            purchase_order_product=po_product
+        )
+
+        if self.instance:
+            queryset = queryset.exclude(id=self.instance.id)
+
+        # 🔥 calculate TOTAL ACCEPTED (not received)
+        total_accepted = queryset.aggregate(
+            total=Sum(F("received_quantity") - F("rejected_quantity"))
+        )["total"] or 0
+
+        remaining = po_product.quantity - total_accepted
+
+        # 🚨 MAIN FIX
+        if accepted_new > remaining:
+            raise serializers.ValidationError(
+                f"Cannot receive more than remaining qty ({remaining})"
+            )
+
+        if rejected > received:
+            raise serializers.ValidationError(
+                "Rejected qty cannot exceed received qty"
+            )
+
+        return data
+
+class GRNSerializer(serializers.ModelSerializer):
+    products = GRNProductSerializer(many=True)
+
+    class Meta:
+        model = GRN
+        fields = [
+            "id",
+            "purchase_order",
+            "grn_date",
+            "grn_no",
+            "is_completed",
+            "products",
+        ]
+        read_only_fields = ["grn_no", "is_completed"]
+
+    # -------------------------
+    # CREATE
+    # -------------------------
+    def create(self, validated_data):
+        products_data = validated_data.pop("products")
+
+        with transaction.atomic():
+            grn = GRN.objects.create(**validated_data)
+
+            for product_data in products_data:
+                GRNProduct.objects.create(grn=grn, **product_data)
+
+        return grn
+
+    # -------------------------
+    # UPDATE
+    # -------------------------
+    def update(self, instance, validated_data):
+        products_data = validated_data.pop("products", None)
+
+        instance.grn_date = validated_data.get("grn_date", instance.grn_date)
+        instance.save()
+
+        if products_data is not None:
+            instance.products.all().delete()
+
+            for product_data in products_data:
+                GRNProduct.objects.create(grn=instance, **product_data)
+
+        return instance
+
+    # -------------------------
+    # COMPLETE GRN 🔥
+    # -------------------------
+    def complete(self, instance):
+        complete_grn(instance)
+        return instance
+    
+class InventorySerializer(serializers.ModelSerializer):
+
+    product_variant_name = serializers.CharField(
+        source="product_variant.sku", read_only=True
+    )
+    item_name = serializers.CharField(
+        source="item.item_code", read_only=True
+    )
+
+    display_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = InventoryItem
+        fields = [
+            "id",
+            "product_variant",
+            "product_variant_name",
+            "item",
+            "item_name",
+
+            # 🔥 ADD THIS
+            "display_name",
+
+            "quantity",
+            "uom",
+            "updated_at",
+        ]
+        read_only_fields = ["updated_at"]
+
+    # 🔥 ADD THIS METHOD
+    def get_display_name(self, obj):
+        if obj.product_variant:
+            return obj.product_variant.sku
+        if obj.item:
+            return obj.item.item_code
+        return None
+
+    def validate(self, data):
+        product_variant = data.get("product_variant")
+        item_obj = data.get("item")
+
+        if not product_variant and not item_obj:
+            raise serializers.ValidationError(
+                "Either product_variant or item is required"
+            )
+
+        if product_variant and item_obj:
+            raise serializers.ValidationError(
+                "Only one of product_variant or item allowed"
+            )
+
+        return data
