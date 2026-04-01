@@ -190,3 +190,20 @@ class InventoryViewSet(ModelViewSet):
         "product_variant__name",
         "item__name"
     ]
+    
+    
+class MaterialIssueViewSet(ModelViewSet):
+    queryset = MaterialIssue.objects.all().prefetch_related("items")
+    serializer_class = MaterialIssueSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        issue = serializer.save()
+
+        return Response(
+            self.get_serializer(issue).data,
+            status=status.HTTP_201_CREATED
+        )

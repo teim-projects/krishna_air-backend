@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Vendor , TermsConditionType , TermsConditions , PurchaseOrder, PurchaseOrderProduct, GRN,GRNProduct , complete_grn, InventoryItem
+from .models import *
 from .service import create_new_po_version
 from django.db import transaction
 from django.db.models import Sum, F
@@ -347,3 +347,140 @@ class InventorySerializer(serializers.ModelSerializer):
             )
 
         return data
+    
+    
+
+
+class MaterialIssueItemSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+
+    inventory_item = serializers.PrimaryKeyRelatedField(
+        queryset=InventoryItem.objects.all()
+    )
+
+    quantity = serializers.DecimalField(max_digits=10, decimal_places=2)
+    uom = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+
+    product_name = serializers.CharField(read_only=True)
+
+    def validate(self, data):
+        if data["quantity"] <= 0:
+            raise serializers.ValidationError("Quantity must be greater than 0")
+        return data
+    
+
+
+
+
+class MaterialIssueSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+
+    issue_number = serializers.CharField()
+    issue_type = serializers.ChoiceField(choices=["site", "technician"])
+
+    branch = serializers.PrimaryKeyRelatedField(
+        queryset=BranchManagement.objects.all()
+    )
+
+    site = serializers.PrimaryKeyRelatedField(
+        queryset=SiteManagement.objects.all(),
+        required=False,
+        allow_null=True
+    )
+
+    technician = serializers.PrimaryKeyRelatedField(
+        queryset=CustomUser.objects.all(),
+        required=False,
+        allow_null=True
+    )
+
+    issue_date = serializers.DateField()
+
+    items = MaterialIssueItemSerializer(many=True)
+    
+    
+    def validate(self, data):
+        issue_type = data.get("issue_type")
+        site = data.get("site")
+        technician = data.get("technician")
+
+        if issue_type == "technician" and not technician:
+            raise serializers.ValidationError("Technician is required")
+
+        if issue_type == "site" and not site:
+            raise serializers.ValidationError("Site is required")
+
+        if site and technician:
+            raise serializers.ValidationError("Only one destination allowed")
+
+        return data
+    
+
+    def create(self, validated_data):
+        items_data = validated_data.pop("items")
+        user = self.context["request"].user
+
+        with transaction.atomic():
+            issue = MaterialIssue.objects.create(
+                created_by=user,
+                **validated_data   # ✅ now contains objects, not IDs
+            )
+
+            for item_data in items_data:
+                inventory = item_data["inventory_item"]  # already object
+                qty = item_data["quantity"]
+
+                # 🔥 branch validation (VERY IMPORTANT)
+                # if inventory.branch != issue.branch:
+                #     raise serializers.ValidationError(
+                #         f"{inventory} does not belong to this branch"
+                #     )
+
+                # 🔥 lock row
+                inventory = InventoryItem.objects.select_for_update().get(
+                    id=inventory.id
+                )
+
+                # 🔥 stock check
+                if inventory.quantity < qty:
+                    raise serializers.ValidationError(
+                        f"Insufficient stock for {inventory}"
+                    )
+
+                # 🔥 reduce stock
+                InventoryItem.objects.filter(id=inventory.id).update(
+                    quantity=F("quantity") - qty
+                )
+
+                # 🔥 create item
+                MaterialIssueItem.objects.create(
+                    material_issue=issue,
+                    inventory_item=inventory,
+                    quantity=qty,
+                    uom=item_data.get("uom")
+                )
+
+        return issue
+    
+    def to_representation(self, instance):
+        return {
+            "id": instance.id,
+            "issue_number": instance.issue_number,
+            "issue_type": instance.issue_type,
+            "branch": instance.branch.id,
+            "site": instance.site.id if instance.site else None,
+            "technician": instance.technician.id if instance.technician else None,
+            "issue_date": instance.issue_date,
+            "items": [
+                {
+                    "id": item.id,
+                    "inventory_item": item.inventory_item.id,
+                    "product_name": str(item.inventory_item),
+                    "quantity": item.quantity,
+                    "uom": item.uom,
+                }
+                for item in instance.items.all()
+            ]
+        }   
+        
+        

@@ -1,11 +1,13 @@
 from django.db import models
-from api.models import SiteManagement, BranchManagement
+from api.models import SiteManagement, BranchManagement ,CustomUser
 from product_management.models import ProductVariant, item
 from django.utils import timezone
 from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import transaction
+
+
 
 class Vendor(models.Model):
     # Required fields
@@ -435,4 +437,68 @@ def complete_grn(grn):
         grn.save(update_fields=["is_completed"])
         
         
-        
+from api.models import CustomUser ,BranchManagement
+
+
+class MaterialIssue(models.Model):
+    ISSUE_TYPE = [
+        ("site", "Site"),
+        ("technician", "Technician"),
+    ]
+
+    issue_number = models.CharField(max_length=50, unique=True)
+    issue_type = models.CharField(max_length=20, choices=ISSUE_TYPE)
+
+    branch = models.ForeignKey(
+        BranchManagement,
+        on_delete=models.PROTECT
+    )
+
+    site = models.ForeignKey(
+        SiteManagement,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True
+    )
+
+    technician = models.ForeignKey(
+        CustomUser,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True
+    )
+
+    issue_date = models.DateField()
+
+    created_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_issues"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.issue_number
+    
+    
+    
+class MaterialIssueItem(models.Model):
+    material_issue = models.ForeignKey(
+        MaterialIssue,
+        on_delete=models.CASCADE,
+        related_name="items"
+    )
+
+    inventory_item = models.ForeignKey(
+        InventoryItem,
+        on_delete=models.PROTECT
+    )
+
+    quantity = models.DecimalField(max_digits=10, decimal_places=2)
+    uom = models.CharField(max_length=20, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.material_issue.issue_number} - {self.inventory_item}"
