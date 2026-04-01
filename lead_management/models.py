@@ -24,6 +24,9 @@ class Customer(models.Model):
   site_city = models.CharField(max_length=100, blank=True, null=True)
   site_state = models.CharField(max_length=100, blank=True, null=True)
   site_pin_code = models.CharField(max_length=10, blank=True, null=True)
+  gst = models.CharField(max_length=15, blank=True, null=True)
+  pan = models.CharField(max_length=10, blank=True, null=True)
+
 
   def __str__(self):
         return f"{self.name} ({self.email or self.contact_number or ''})"
