@@ -297,7 +297,7 @@ class LeadSerializer(serializers.ModelSerializer):
     customer_address = serializers.CharField(source="customer.address", read_only=True)
     customer_city = serializers.CharField(source="customer.city", read_only=True)
     customer_state = serializers.CharField(source="customer.state", read_only=True)
-    customer_pincode = serializers.CharField(source="customer.pincode", read_only=True)
+    customer_pincode = serializers.CharField(source="customer.pin_code", read_only=True)
     assign_to_details = CustomUserDetailsSerializer(source="assign_to", read_only=True)
     creatd_by_details = CustomUserDetailsSerializer(source="creatd_by", read_only=True)
     # referance_by_details = CustomUserDetailsSerializer(source="referance_by", read_only=True)
