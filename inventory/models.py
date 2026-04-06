@@ -12,7 +12,7 @@ from django.db import transaction
 class Vendor(models.Model):
     # Required fields
     name = models.CharField(max_length=200)
-    email = models.EmailField()
+    email = models.EmailField(blank=True, null=True)
     mobile = models.CharField(max_length=15)
     office_address = models.TextField()
     gst_details = models.CharField(max_length=15)
