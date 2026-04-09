@@ -1,8 +1,7 @@
-# quotation/views.py
 from rest_framework import viewsets, status, filters
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
@@ -19,6 +18,21 @@ from .serializers import QuotationSerializer
 from .utils.pdf_generator import generate_quotation_pdf
 
 logger = logging.getLogger(__name__)
+
+
+@api_view(['GET'])
+def thank_you_suggestions(request):
+    search = request.GET.get('search', '')
+    
+    if len(search) < 2:
+        return Response([])
+    
+    notes = Quotation.objects.filter(
+        thank_you_note__icontains=search,
+        thank_you_note__isnull=False
+    ).exclude(thank_you_note='').values_list('thank_you_note', flat=True).distinct()[:10]
+    
+    return Response([{'id': i, 'text': note} for i, note in enumerate(notes)])
 
 
 class QuotationViewSet(viewsets.ModelViewSet):
