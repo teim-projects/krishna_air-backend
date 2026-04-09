@@ -207,3 +207,62 @@ class MaterialIssueViewSet(ModelViewSet):
             self.get_serializer(issue).data,
             status=status.HTTP_201_CREATED
         )
+        
+
+class MaterialReturnViewSet(ModelViewSet):
+    queryset = MaterialReturn.objects.all().prefetch_related("items")
+    serializer_class = MaterialReturnSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    # ✅ Create Return
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        material_return = serializer.save(created_by=request.user)
+
+        return Response(
+            self.get_serializer(material_return).data,
+            status=status.HTTP_201_CREATED
+        )
+
+    # ✅ Complete Return (VERY IMPORTANT)
+    @action(detail=True, methods=["post"])
+    def complete(self, request, pk=None):
+        material_return = self.get_object()
+
+        # 🔥 Prevent duplicate completion
+        if getattr(material_return, "is_completed", False):
+            return Response(
+                {"error": "Return already completed"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not material_return.items.exists():
+            return Response(
+                {"error": "No return items found"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        with transaction.atomic():
+            # 🔥 CALL YOUR FUNCTION
+            complete_return(material_return)
+
+            # ✅ mark completed (if field exists)
+            if hasattr(material_return, "is_completed"):
+                material_return.is_completed = True
+                material_return.save(update_fields=["is_completed"])
+
+        return Response({"message": "Return completed successfully"})
+
+    # ✅ Filter by issue (optional but useful)
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        issue_id = self.request.query_params.get("material_issue")
+
+        if issue_id:
+            queryset = queryset.filter(material_issue_id=issue_id)
+
+        return queryset.order_by("-id")

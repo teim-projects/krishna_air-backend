@@ -1,3 +1,4 @@
+
 from django.db import models
 from api.models import SiteManagement, BranchManagement ,CustomUser
 from product_management.models import ProductVariant, item
@@ -502,3 +503,97 @@ class MaterialIssueItem(models.Model):
 
     def __str__(self):
         return f"{self.material_issue.issue_number} - {self.inventory_item}"
+    
+    
+
+
+class MaterialReturn(models.Model):
+
+    material_issue = models.ForeignKey(   
+        MaterialIssue,
+        on_delete=models.PROTECT,
+        related_name="returns"
+    )
+
+    return_number = models.CharField(
+        max_length=50,
+        unique=True,
+        blank=True,
+        null=True
+    )
+    return_date = models.DateField()
+
+    created_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+    
+    is_completed = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+    
+        super().save(*args, **kwargs)
+    
+        if is_new and not self.return_number:
+            self.return_number = f"RET-{str(self.id).zfill(4)}"
+            super().save(update_fields=["return_number"])
+
+    def __str__(self):
+        return self.return_number
+    
+    
+
+class MaterialReturnItem(models.Model):
+    material_return = models.ForeignKey(
+        MaterialReturn,
+        on_delete=models.CASCADE,
+        related_name="items"
+    )
+
+    material_issue_item = models.ForeignKey(
+        MaterialIssueItem,
+        on_delete=models.PROTECT
+    )
+
+    quantity = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def clean(self):
+        issued_qty = self.material_issue_item.quantity
+
+        already_returned = MaterialReturnItem.objects.filter(
+            material_issue_item=self.material_issue_item
+        ).exclude(id=self.id).aggregate(
+            total=models.Sum("quantity")
+        )["total"] or 0
+
+        if self.quantity + already_returned > issued_qty:
+            raise ValidationError("Return exceeds issued quantity")
+        
+        
+
+
+def update_inventory_from_return(material_return):
+    for item in material_return.items.all():
+
+        issue_item = item.material_issue_item
+        inventory = issue_item.inventory_item
+
+        # 🔥 Lock inventory row (important)
+        inventory = InventoryItem.objects.select_for_update().get(id=inventory.id)
+
+        # 🔥 Increase stock
+        InventoryItem.objects.filter(id=inventory.id).update(
+            quantity=F("quantity") + item.quantity
+        )
+        
+def complete_return(material_return):
+    with transaction.atomic():
+        update_inventory_from_return(material_return)
+        
+        

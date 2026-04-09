@@ -12,6 +12,7 @@ router.register(r"purchase-orders-history", PurchaseOrderHistoryViewSet, basenam
 router.register(r"grn", GRNViewSet, basename="grn")
 router.register(r"inventory", InventoryViewSet, basename="inventory")
 router.register(r"material-issue", MaterialIssueViewSet, basename="material-issue")
+router.register(r"material-returns", MaterialReturnViewSet, basename="material-return")
 
 
 urlpatterns = [

@@ -3,6 +3,7 @@ from .models import *
 from .service import create_new_po_version
 from django.db import transaction
 from django.db.models import Sum, F
+import uuid
 
 class VendorSerializer(serializers.ModelSerializer):
     class Meta:
@@ -375,7 +376,7 @@ class MaterialIssueItemSerializer(serializers.Serializer):
 class MaterialIssueSerializer(serializers.Serializer):
     id = serializers.IntegerField(read_only=True)
 
-    issue_number = serializers.CharField()
+    issue_number = serializers.CharField(read_only=True)
     issue_type = serializers.ChoiceField(choices=["site", "technician"])
 
     branch = serializers.PrimaryKeyRelatedField(
@@ -421,38 +422,39 @@ class MaterialIssueSerializer(serializers.Serializer):
         user = self.context["request"].user
 
         with transaction.atomic():
+
+            # ✅ Generate issue number
+            last_issue = MaterialIssue.objects.order_by("-id").first()
+            if last_issue:
+                last_id = last_issue.id + 1
+            else:
+                last_id = 1
+
+            issue_number = f"ISS-{uuid.uuid4().hex[:6].upper()}"
+
             issue = MaterialIssue.objects.create(
+                issue_number=issue_number,   # 🔥 added
                 created_by=user,
-                **validated_data   # ✅ now contains objects, not IDs
+                **validated_data
             )
 
             for item_data in items_data:
-                inventory = item_data["inventory_item"]  # already object
+                inventory = item_data["inventory_item"]
                 qty = item_data["quantity"]
 
-                # 🔥 branch validation (VERY IMPORTANT)
-                # if inventory.branch != issue.branch:
-                #     raise serializers.ValidationError(
-                #         f"{inventory} does not belong to this branch"
-                #     )
-
-                # 🔥 lock row
                 inventory = InventoryItem.objects.select_for_update().get(
                     id=inventory.id
                 )
 
-                # 🔥 stock check
                 if inventory.quantity < qty:
                     raise serializers.ValidationError(
                         f"Insufficient stock for {inventory}"
                     )
 
-                # 🔥 reduce stock
                 InventoryItem.objects.filter(id=inventory.id).update(
                     quantity=F("quantity") - qty
                 )
 
-                # 🔥 create item
                 MaterialIssueItem.objects.create(
                     material_issue=issue,
                     inventory_item=inventory,
@@ -461,6 +463,8 @@ class MaterialIssueSerializer(serializers.Serializer):
                 )
 
         return issue
+
+
     
     def to_representation(self, instance):
         return {
@@ -484,3 +488,109 @@ class MaterialIssueSerializer(serializers.Serializer):
         }   
         
         
+
+
+class MaterialReturnItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MaterialReturnItem
+        fields = [
+            "id",
+            "material_issue_item",
+            "quantity",
+        ]
+
+    def validate(self, data):
+        issue_item = data["material_issue_item"]
+        qty = data["quantity"]
+
+        if qty <= 0:
+            raise serializers.ValidationError("Quantity must be greater than 0")
+
+        # 🔥 Already returned qty
+        already_returned = MaterialReturnItem.objects.filter(
+            material_issue_item=issue_item
+        ).aggregate(total=Sum("quantity"))["total"] or 0
+
+        if already_returned + qty > issue_item.quantity:
+            raise serializers.ValidationError(
+                f"Return exceeds issued qty. Issued={issue_item.quantity}, Returned={already_returned}"
+            )
+
+        return data
+ 
+
+class MaterialReturnSerializer(serializers.ModelSerializer):
+    items = MaterialReturnItemSerializer(many=True)
+
+    class Meta:
+        model = MaterialReturn
+        fields = [
+            "id",
+            "material_issue",
+            "return_number",
+            "return_date",
+            "created_by",
+            "items"
+        ]
+        read_only_fields = ["return_number", "created_by"]
+
+    def validate(self, data):
+        issue = data["material_issue"]
+        items = data.get("items", [])
+
+        if not items:
+            raise serializers.ValidationError("At least one item is required")
+
+        for item in items:
+            if item["material_issue_item"].material_issue != issue:
+                raise serializers.ValidationError(
+                    "All items must belong to selected Material Issue"
+                )
+
+        return data
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        items_data = validated_data.pop("items")
+
+        with transaction.atomic():
+            # ✅ create return
+            material_return = MaterialReturn.objects.create(
+                **validated_data,
+                # created_by=request.user
+            )
+
+            # 🔥 Lock issue items (important for concurrency)
+            issue_item_ids = [item["material_issue_item"].id for item in items_data]
+
+            issue_items_map = {
+                i.id: i for i in MaterialIssueItem.objects.select_for_update().filter(id__in=issue_item_ids)
+            }
+
+            return_items = []
+            for item in items_data:
+                issue_item = issue_items_map[item["material_issue_item"].id]
+
+                # 🔥 Re-check quantity inside transaction
+                already_returned = MaterialReturnItem.objects.filter(
+                    material_issue_item=issue_item
+                ).aggregate(total=Sum("quantity"))["total"] or 0
+
+                if already_returned + item["quantity"] > issue_item.quantity:
+                    raise serializers.ValidationError(
+                        f"Return exceeds issued qty for item {issue_item.id}"
+                    )
+
+                return_items.append(
+                    MaterialReturnItem(
+                        material_return=material_return,
+                        material_issue_item=issue_item,
+                        quantity=item["quantity"]
+                    )
+                )
+
+            MaterialReturnItem.objects.bulk_create(return_items)
+
+        return material_return 
+    
+    
