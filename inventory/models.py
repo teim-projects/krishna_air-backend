@@ -1,15 +1,19 @@
+
 from django.db import models
-from api.models import SiteManagement, BranchManagement
+from api.models import SiteManagement, BranchManagement ,CustomUser
 from product_management.models import ProductVariant, item
 from django.utils import timezone
 from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.db import transaction
+
+
 
 class Vendor(models.Model):
     # Required fields
     name = models.CharField(max_length=200)
-    email = models.EmailField()
+    email = models.EmailField(blank=True, null=True)
     mobile = models.CharField(max_length=15)
     office_address = models.TextField()
     gst_details = models.CharField(max_length=15)
@@ -242,3 +246,354 @@ class PurchaseOrderProduct(models.Model):
             self.purchase_order.calculate_totals()
 
 
+
+
+# GRN (Goods Receipt Note) model
+
+# def generate_grn_no(po):
+#     now = timezone.now()
+#     year = now.strftime("%Y")
+#     month = now.strftime("%m")
+
+#     last_grn = po.grns.order_by('-id').first()
+
+#     if last_grn and last_grn.grn_no:
+#         try:
+#             last_seq = int(last_grn.grn_no.split("/")[-1])
+#         except:
+#             last_seq = 0
+#     else:
+#         last_seq = 0
+
+#     new_seq = last_seq + 1
+
+#     return f"GRN/{year}/{month}/{po.id}/{str(new_seq).zfill(2)}"
+
+from django.db import transaction, IntegrityError
+import time
+from django.db.models import Max
+
+class GRN(models.Model):
+    purchase_order = models.ForeignKey(
+        PurchaseOrder,
+        on_delete=models.CASCADE,
+        related_name="grns"
+    )
+    grn_date = models.DateField(null=True, blank=True)
+    grn_no = models.CharField(max_length=50, unique=True, blank=True)
+
+    is_completed = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+
+        with transaction.atomic():
+
+            if is_new and not self.grn_no:
+                # 🔒 LOCK PurchaseOrder (IMPORTANT)
+                po = PurchaseOrder.objects.select_for_update().get(id=self.purchase_order_id)
+
+                # ✅ get last sequence safely
+                last_grn = GRN.objects.filter(
+                    purchase_order=po
+                ).aggregate(max_id=Max('id'))['max_id']
+
+                if last_grn:
+                    last_obj = GRN.objects.get(id=last_grn)
+                    try:
+                        last_seq = int(last_obj.grn_no.split("/")[-1])
+                    except:
+                        last_seq = 0
+                else:
+                    last_seq = 0
+
+                new_seq = last_seq + 1
+
+                self.grn_no = f"GRN/{timezone.now().year}/{timezone.now().month:02d}/{po.id}/{str(new_seq).zfill(2)}"
+
+            super().save(*args, **kwargs)
+
+
+class GRNProduct(models.Model):
+    grn = models.ForeignKey(
+        GRN,
+        on_delete=models.CASCADE,
+        related_name="products"
+    )
+
+    purchase_order_product = models.ForeignKey(
+        PurchaseOrderProduct,
+        on_delete=models.PROTECT
+    )
+
+    product_variant = models.ForeignKey(
+        ProductVariant,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True
+    )
+
+    item = models.ForeignKey(
+        item,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True
+    )
+
+    received_quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    rejected_quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    def clean(self):
+        if not self.purchase_order_product:
+            raise ValidationError("PO item is required")
+
+        if self.rejected_quantity > self.received_quantity:
+            raise ValidationError("Rejected qty cannot exceed received qty")
+
+    def save(self, *args, **kwargs):
+        # 🔥 Always sync from PO      
+        self.product_variant = self.purchase_order_product.product_variant
+        self.item = self.purchase_order_product.item
+
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        desc = self.purchase_order_product.description or ""
+        return f"{self.grn.grn_no} - {desc[:30]}"
+    
+    
+class InventoryItem(models.Model):
+    product_variant = models.ForeignKey(
+        ProductVariant,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True
+    )
+
+    item = models.ForeignKey(
+        item,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True
+    )
+
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    uom = models.CharField(max_length=20, blank=True, null=True)
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("product_variant", "item")
+
+    def clean(self):
+        if not self.product_variant and not self.item:
+            raise ValidationError("Either product_variant or item required")
+
+        if self.product_variant and self.item:
+            raise ValidationError("Only one allowed")
+
+    def __str__(self):
+        return f"{self.product_variant or self.item} - {self.quantity} {self.uom}"  
+   
+   
+    
+from django.db.models import F
+
+def update_inventory_from_grn(grn):
+    for item in grn.products.all():
+        accepted_qty = item.received_quantity - item.rejected_quantity
+
+        if accepted_qty <= 0:
+            continue
+
+        inventory, created = InventoryItem.objects.get_or_create(
+            product_variant=item.product_variant,
+            item=item.item,
+            defaults={
+                "quantity": 0,
+                "uom": item.purchase_order_product.uom
+            }
+        )
+
+        InventoryItem.objects.filter(id=inventory.id).update(
+            quantity=F('quantity') + accepted_qty
+        )    
+
+
+def complete_grn(grn):
+    if grn.is_completed:
+        raise Exception("GRN already completed")
+
+    if not grn.products.exists():
+        raise Exception("No GRN items found")
+
+    with transaction.atomic():
+        update_inventory_from_grn(grn)
+
+        grn.is_completed = True
+        grn.save(update_fields=["is_completed"])
+        
+        
+from api.models import CustomUser ,BranchManagement
+
+
+class MaterialIssue(models.Model):
+    ISSUE_TYPE = [
+        ("site", "Site"),
+        ("technician", "Technician"),
+    ]
+
+    issue_number = models.CharField(max_length=50, unique=True)
+    issue_type = models.CharField(max_length=20, choices=ISSUE_TYPE)
+
+    branch = models.ForeignKey(
+        BranchManagement,
+        on_delete=models.PROTECT
+    )
+
+    site = models.ForeignKey(
+        SiteManagement,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True
+    )
+
+    technician = models.ForeignKey(
+        CustomUser,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True
+    )
+
+    issue_date = models.DateField()
+
+    created_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_issues"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.issue_number
+    
+    
+    
+class MaterialIssueItem(models.Model):
+    material_issue = models.ForeignKey(
+        MaterialIssue,
+        on_delete=models.CASCADE,
+        related_name="items"
+    )
+
+    inventory_item = models.ForeignKey(
+        InventoryItem,
+        on_delete=models.PROTECT
+    )
+
+    quantity = models.DecimalField(max_digits=10, decimal_places=2)
+    uom = models.CharField(max_length=20, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.material_issue.issue_number} - {self.inventory_item}"
+    
+    
+
+
+class MaterialReturn(models.Model):
+
+    material_issue = models.ForeignKey(   
+        MaterialIssue,
+        on_delete=models.PROTECT,
+        related_name="returns"
+    )
+
+    return_number = models.CharField(
+        max_length=50,
+        unique=True,
+        blank=True,
+        null=True
+    )
+    return_date = models.DateField()
+
+    created_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+    
+    is_completed = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+    
+        super().save(*args, **kwargs)
+    
+        if is_new and not self.return_number:
+            self.return_number = f"RET-{str(self.id).zfill(4)}"
+            super().save(update_fields=["return_number"])
+
+    def __str__(self):
+        return self.return_number
+    
+    
+
+class MaterialReturnItem(models.Model):
+    material_return = models.ForeignKey(
+        MaterialReturn,
+        on_delete=models.CASCADE,
+        related_name="items"
+    )
+
+    material_issue_item = models.ForeignKey(
+        MaterialIssueItem,
+        on_delete=models.PROTECT
+    )
+
+    quantity = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def clean(self):
+        issued_qty = self.material_issue_item.quantity
+
+        already_returned = MaterialReturnItem.objects.filter(
+            material_issue_item=self.material_issue_item
+        ).exclude(id=self.id).aggregate(
+            total=models.Sum("quantity")
+        )["total"] or 0
+
+        if self.quantity + already_returned > issued_qty:
+            raise ValidationError("Return exceeds issued quantity")
+        
+        
+
+
+def update_inventory_from_return(material_return):
+    for item in material_return.items.all():
+
+        issue_item = item.material_issue_item
+        inventory = issue_item.inventory_item
+
+        # 🔥 Lock inventory row (important)
+        inventory = InventoryItem.objects.select_for_update().get(id=inventory.id)
+
+        # 🔥 Increase stock
+        InventoryItem.objects.filter(id=inventory.id).update(
+            quantity=F("quantity") + item.quantity
+        )
+        
+def complete_return(material_return):
+    with transaction.atomic():
+        update_inventory_from_return(material_return)
+        
+        

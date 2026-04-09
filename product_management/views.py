@@ -1,5 +1,7 @@
 from django.shortcuts import render
+from rest_framework.decorators import action
 from rest_framework.viewsets import ModelViewSet
+from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication 
 from rest_framework import status , filters
@@ -123,3 +125,54 @@ class itemViewSet(ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['item_type_id','item_class_id','material_type_id','feature_type_id']
     search_fields  = ['=item_code']
+  
+  
+class ACTypeMaterialViewSet(ModelViewSet):
+    queryset = AcMaterials.objects.select_related('ac_type', 'material')
+    serializer_class = AcMaterialSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    search_fields = ['ac_type__name']
+    filterset_fields = ['ac_type']
+    
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        objs = serializer.save()
+
+        return Response(
+            {
+                "message": "Materials mapped successfully",
+                "created_count": len(objs)
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+    # 🔥 BULK UPDATE (REPLACE)
+    @action(detail=False, methods=['post'], url_path='bulk-update')
+    def bulk_update(self, request):
+        ac_type_id = request.data.get('ac_type')
+        material_ids = request.data.get('material', [])
+
+        if not ac_type_id:
+            return Response({"error": "ac_type is required"}, status=400)
+
+        # remove duplicates
+        material_ids = list(set(material_ids))
+
+        # 🔴 Step 1: delete old mappings
+        AcMaterials.objects.filter(ac_type_id=ac_type_id).delete()
+
+        # 🟢 Step 2: create new mappings
+        objs = [
+            AcMaterials(ac_type_id=ac_type_id, material_id=mid)
+            for mid in material_ids
+        ]
+
+        AcMaterials.objects.bulk_create(objs)
+
+        return Response({
+            "message": "Materials updated successfully",
+            "updated_count": len(objs)
+        }, status=status.HTTP_200_OK)

@@ -1,4 +1,4 @@
-from .models import acType , acSubTypes , brand , ProductModel , ProductVariant, ProductInventory, material_type, item_type, item_class, feature_type, item
+from .models import acType , acSubTypes , brand , ProductModel , ProductVariant, ProductInventory, material_type, item_type, item_class, feature_type, item, AcMaterials
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
@@ -137,3 +137,63 @@ class ItemSerializer(serializers.ModelSerializer):
 
     def get_feature_type_name(self, obj):
         return obj.feature_type_id.name if obj.feature_type_id else None
+
+
+class AcMaterialSerializer(serializers.ModelSerializer):
+    # WRITE
+    material = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True
+    )
+
+    # READ
+    ac_type_name = serializers.CharField(source='ac_type.name', read_only=True)
+    material_id = serializers.IntegerField(source='material.id', read_only=True)
+    material_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AcMaterials
+        fields = [
+            'id',
+            'ac_type',
+            'material',
+            'material_id',
+            'material_name',
+            'ac_type_name'
+        ]
+
+    def get_material_name(self, obj):
+        item = obj.material
+
+        parts = [
+            item.material_type_id.name if item.material_type_id else "",
+            item.item_type_id.name if item.item_type_id else "",
+            item.feature_type_id.name if item.feature_type_id else "",
+            item.item_class_id.name if item.item_class_id else "",
+        ]
+
+        # remove empty values
+        parts = [p for p in parts if p]
+
+        return " ".join(parts)
+        
+    def create(self, validated_data):
+        ac_type = validated_data.get('ac_type')
+        material_ids = validated_data.pop('material', [])
+
+        material_ids = list(set(material_ids))
+
+        existing = set(
+            AcMaterials.objects.filter(
+                ac_type=ac_type,
+                material_id__in=material_ids
+            ).values_list('material_id', flat=True)
+        )
+
+        objs = [
+            AcMaterials(ac_type=ac_type, material_id=mid)
+            for mid in material_ids if mid not in existing
+        ]
+
+        AcMaterials.objects.bulk_create(objs)
+        return objs

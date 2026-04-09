@@ -1,10 +1,12 @@
 # quotation/utils/pdf_generator.py
 # Updated: 2026-03-10 - Match exact format from screenshots
+
 import io
 import logging
 import os
 from datetime import datetime
 from decimal import Decimal
+from PIL.Image import item
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
@@ -14,6 +16,13 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from django.http import HttpResponse
 from django.conf import settings
 from collections import defaultdict
+from reportlab.platypus import KeepTogether
+# from rich.pretty import data
+# from rich.pretty import data
+# from rich.pretty import data
+
+
+
 
 
 logger = logging.getLogger(__name__)
@@ -29,7 +38,7 @@ class QuotationPDFGenerator:
             pagesize=A4,
             rightMargin=15*mm,
             leftMargin=15*mm,
-            topMargin=15*mm,
+            topMargin=30*mm,
             bottomMargin=15*mm,
             showBoundary=1
         )
@@ -96,8 +105,9 @@ class QuotationPDFGenerator:
             fontSize=10,
             textColor=colors.black,
             fontName='Helvetica-Bold',
-            spaceBefore=5,
-            spaceAfter=3
+            alignment=TA_LEFT,   # ✅ CHANGE THIS
+            spaceBefore=2,
+            spaceAfter=1 
         ))
 
         self.styles.add(ParagraphStyle(
@@ -125,89 +135,44 @@ class QuotationPDFGenerator:
             fontName='Helvetica-Bold',
             leading=14
         ))
+        
+    def draw_company_header(self, canvas, doc, quotation):
+        canvas.saveState()
 
-    def add_company_header(self):
-        """Add company header with logo space and contact info"""
-        # Get branch information
-        if self.quotation.branch:
-            branch = self.quotation.branch
-            company_name = branch.name
-            address = branch.address
-            city_state = f"{branch.city}, {branch.state} - {branch.pincode}"
-            email = branch.email
-            
-            # Build address string
-            full_address = f"{address}<br/>{city_state}<br/>E-mail: {email}"
-        else:
-            # Fallback to default
-            company_name = "KRISNA AIR CONDITIONING"
-            full_address = "309/B, Patil Plaza, Saras Baug, Pune - 411 009.<br/>E-mail: sales@krisnatech.com ; krisnatech@vsnl.in"
-        
-        # Main header with logo space (left) and company details (right)
-        # Try to load logo, fallback to placeholder if not found
-        logo_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'logo.png')
-        
+        # Logo
+        logo_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'ka-logo.png')
         if os.path.exists(logo_path):
-            try:
-                logo = Image(logo_path, width=80, height=60)  # Adjust size as needed
-            except:
-                logo = Paragraph('[LOGO]<br/><font size="8">Logo file found but could not load</font>', 
-                               ParagraphStyle(name='LogoError', fontSize=10, textColor=colors.red, alignment=TA_CENTER))
-        else:
-            logo = Paragraph('[LOGO SPACE]<br/><font size="8">Put logo.png in static/images/</font>', 
-                           ParagraphStyle(name='LogoPlaceholder', fontSize=10, textColor=colors.grey, alignment=TA_CENTER))
-        
-        header_data = [
-            [
-                # Left side - Logo or placeholder
-                logo,
-                
-                # Right side - Dynamic company name and address
-                Paragraph(f'<b>{company_name}</b><br/>'
-                         f'<font size="9">{full_address}</font>', 
-                         ParagraphStyle(name='CompanyHeader', fontSize=12, fontName='Helvetica-Bold', alignment=TA_RIGHT))
-            ]
-        ]
-        
-        header_table = Table(header_data, colWidths=[self.doc.width*0.3, self.doc.width*0.7])
-        header_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (0, 0), 'CENTER'),  # Logo space centered
-            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),   # Company details right-aligned
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ]))
-        
-        self.elements.append(header_table)
-        self.elements.append(Spacer(1, 10))
-        
-        # Quotation reference and date
-        ref_data = [
-            [
-                '',  # Empty left column
-                Paragraph(f'Ref. No: {self.quotation.quotation_no}<br/>{self.quotation.created_at.strftime("%d-%m-%Y")}', 
-                         ParagraphStyle(name='RefStyle', fontSize=9, alignment=TA_RIGHT))
-            ]
-        ]
-        
-        ref_table = Table(ref_data, colWidths=[self.doc.width*0.7, self.doc.width*0.3])
-        ref_table.setStyle(TableStyle([
-            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ]))
-        
-        self.elements.append(ref_table)
-        self.elements.append(Spacer(1, 10))
+            canvas.drawImage(
+                logo_path,
+                40,
+                780,
+                width=60,
+                height=40,
+                mask='auto'   # 👈 IMPORTANT
+                )
 
-    def add_quotation_title(self):
-        """Add To, From, Subject section with dynamic branch and site info"""
-        
-        # Get branch information for "From" section
-        if self.quotation.branch:
-            branch_info = f"{self.quotation.branch.name}, {self.quotation.branch.city}"
+        # Company details
+        if quotation.branch:
+            branch = quotation.branch
+            company_name = branch.name
+            address = f"{branch.address}, {branch.city}, {branch.state} - {branch.pincode}"
+            email = branch.email
         else:
-            branch_info = "Pune"  # Default fallback
-        
+            company_name = "KRISNA AIR CONDITIONING"
+            address = "309/B, Patil Plaza, Pune - 411009"
+            email = "sales@krisnatech.com"
+
+        # Right side text
+        canvas.setFont("Helvetica-Bold", 11)
+        canvas.drawRightString(550, 800, company_name)
+
+        canvas.setFont("Helvetica", 8)
+        canvas.drawRightString(550, 785, address)
+        canvas.drawRightString(550, 770, f"Email: {email}")
+
+        canvas.restoreState()
+     
+    def add_quotation_title(self): 
         # Get site information
         site_info = ""
         if self.quotation.site:
@@ -215,15 +180,44 @@ class QuotationPDFGenerator:
         elif self.quotation.site_name:
             site_info = self.quotation.site_name
         
-        # To, From, Subject section
-        data = [
-            [Paragraph('<u><b>To,</b></u>', self.styles['UnderlinedLabel']), ''],
-            [Paragraph(f'<b>From,</b>', self.styles['Label']), ''],
-            [Paragraph(f'<b>{branch_info}:</b>', self.styles['Label']), ''],
-            [Paragraph(f'<u><b>Subject:</b></u> {self.quotation.subject}', self.styles['UnderlinedLabel']), ''],
-        ]
+        # To, Subject section
+        customer = self.quotation.customer
+
+        customer_name = customer.name if customer else ""
+        customer_contact = customer.contact_number if customer else ""
+        customer_email = getattr(customer, "email", "")
         
-        table = Table(data, colWidths=[self.doc.width, 0])
+        customer_address = ""
+        if hasattr(customer, "address") and customer.address:
+            customer_address = customer.address
+        
+        # Format date
+        quotation_date = self.quotation.created_at.strftime("%d-%m-%Y") if self.quotation.created_at else datetime.now().strftime("%d-%m-%Y")
+        quotation_no = self.version.version_no or self.quotation.quotation_no
+        data = [
+            [
+                Paragraph(f'<u><b>To,</b></u> <br /> <b>{customer_name}</b>', self.styles['Value']),
+                Paragraph(f'<b>Date:</b> {quotation_date}', self.styles['Value'])
+            ],
+            [
+                Paragraph(f'{customer_address}', self.styles['Value']),
+                Paragraph(f'<b>Quotation No:</b> {quotation_no}', self.styles['Value'])
+            ],
+            [
+                Paragraph(f'Contact: {customer_contact}', self.styles['Value']),
+                ''
+            ],
+            [
+                Paragraph(f'Email: {customer_email}', self.styles['Value']),
+                ''
+            ],
+            [
+                Paragraph(f'<u><b>Subject:</b></u> {self.quotation.subject}', self.styles['UnderlinedLabel']),
+                ''
+            ],
+        ]
+        table = Table(data, colWidths=[self.doc.width * 0.7, self.doc.width * 0.3])
+        # table = Table(data, colWidths=[self.doc.width, 0])
         table.setStyle(TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -232,26 +226,22 @@ class QuotationPDFGenerator:
         ]))
         
         self.elements.append(table)
-        self.elements.append(Spacer(1, 10))
+        self.elements.append(Spacer(1, 5))
         
         # Site Name section (if site information exists)
         if site_info:
             self.elements.append(Paragraph(f'<u><b>Site Name:</b></u> {site_info}', self.styles['UnderlinedLabel']))
-            self.elements.append(Spacer(1, 10))
+            self.elements.append(Spacer(1, 5))
         
         # Greeting
-        self.elements.append(Paragraph('Dear Sir,', self.styles['Value']))
+        self.elements.append(Paragraph('Dear Sir/Madam,', self.styles['Value']))
         self.elements.append(Spacer(1, 5))
         
         # Introduction text - only use thank_you_note if available
         if self.quotation.thank_you_note:
             intro_text = self.quotation.thank_you_note
             self.elements.append(Paragraph(intro_text, self.styles['Value']))
-            self.elements.append(Spacer(1, 10))
-
-    def add_customer_details(self):
-        """Add customer details - removed"""
-        pass
+            self.elements.append(Spacer(1, 2))
 
     def add_high_side_items(self):
         """Add high side items grouped by product"""
@@ -260,76 +250,142 @@ class QuotationPDFGenerator:
             if not high_items:
                 return
     
-            # Group items by product model name
+            from collections import defaultdict
             grouped_items = defaultdict(list)
     
+            # Group items by brand
             for item in high_items:
                 variant = item.product_variant
                 model = variant.product_model if hasattr(variant, "product_model") else None
-                product_name = model.name if model else "Product"
+                brand_name = model.brand_id.name if model and model.brand_id else "Unknown"
+                grouped_items[brand_name].append(item)
     
-                grouped_items[product_name].append(item)
-    
-            # Create separate table per product group
-            for product_name, items in grouped_items.items():
+            # Loop brand-wise
+            for brand_name, items in grouped_items.items():
             
-                self.elements.append(
-                    Paragraph(f"Supply of {product_name} Airconditioners", self.styles["SubHeader"])
+                # Header
+                header_table = Table(
+                    [[Paragraph(f"Supply of {brand_name} Airconditioners", self.styles["SubHeader"])]],
+                    colWidths=[self.doc.width - 10]
                 )
     
+                header_table.setStyle(TableStyle([
+                    ('BOX', (0, 0), (-1, -1), 1, colors.black),
+                    ('LEFTPADDING', (0, 0), (-1, -1), self.doc.width/2 - 80),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+                    ('TOPPADDING', (0, 0), (-1, -1), 3),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+                ]))
+    
+                self.elements.append(header_table)
+    
+                # Table Data
                 data = [['S.N', 'Description', 'Unit', 'Qty', 'Rate', 'Amount']]
     
                 subtotal = 0
-    
-                for idx, item in enumerate(items, 1):
+                gst_total = 0
+                mathadi_charges = 0
+                transportation = 0
+                grand_total = 0
+                total = 0
                 
+                for idx, item in enumerate(items, 1):
                     variant = item.product_variant
                     model = variant.product_model
-    
+                
                     description = f"{model.name} {model.model_no} {variant.capacity}"
-    
-                    amount = float(item.quantity) * float(item.unit_price)
-                    subtotal += amount
-    
+                
+                    qty = float(item.quantity)
+                    rate = float(item.unit_price)
+                
+                    # ✅ USE DB VALUES
+                    base_amount = float(getattr(item, "base_amount", 0) or 0)
+                    gst_amount = float(getattr(item, "gst_amount", 0) or 0)
+                    total_amount = float(getattr(item, "total_with_gst", 0) or 0)
+                
+                    # ✅ accumulate
+                    subtotal += base_amount
+                    gst_total += gst_amount
+                    grand_total += total_amount
+                
+                    mathadi_charges += float(getattr(item, "mathadi_charges", 0) or 0)
+                    transportation += float(getattr(item, "transportation_charges", 0) or 0)
+                    total += float(getattr(item, "total_with_gst", 0) or 0)
                     data.append([
                         str(idx),
                         Paragraph(description, self.styles['Value']),
-                        "Nos.",
+                        str(item.unit),
                         str(item.quantity),
-                        f"{float(item.unit_price):,.2f}",
-                        f"{amount:,.2f}",
+                        f"{rate:,.2f}",
+                        f"{base_amount:,.2f}",   # 👈 show base amount
                     ])
-    
+                # Calculations
                 gst = subtotal * 0.18
-                total = subtotal + gst
-
+                total = total
+    
+                # Format helper
+                def format_extra(value):
+                    return f"{value:,.2f}" if value > 0 else "Extra"
+    
+                # Totals rows
                 data.append(['', '', '', '', 'Sub Total :', f"{subtotal:,.2f}"])
                 data.append(['', '', '', '', 'GST @ 18% :', f"{gst:,.2f}"])
-                data.append(['', '', '', '', 'Mathadi Charges :', 'Extra'])
-                data.append(['', '', '', '', 'Transportation :', 'Extra'])
+                data.append(['', '', '', '', 'Mathadi Charges :', format_extra(mathadi_charges)])
+                data.append(['', '', '', '', 'Transportation :', format_extra(transportation)])
                 data.append(['', '', '', '', 'Total :', f"{total:,.2f}"])
     
-                col_widths = [25, 200, 40, 30, 70, 70]
+                # Column widths
+                total_width = self.doc.width
+                col_widths = [
+                    total_width * 0.05,
+                    total_width * 0.43,
+                    total_width * 0.10,
+                    total_width * 0.08,
+                    total_width * 0.16,
+                    total_width * 0.16,
+                ]
     
                 table = Table(data, colWidths=col_widths)
     
+                # Table Styling
                 table.setStyle(TableStyle([
-                    ('GRID', (0,0), (-1,-1), 0.5, colors.black),
-
-                    ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-
-                    ('ALIGN', (0,0), (0,-1), 'CENTER'),
-                    ('ALIGN', (2,1), (-1,-1), 'RIGHT'),
-
-                    # Green total row
-                    ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor("#8bc34a")),
-                    ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+                    # Grid only for items
+                    ('GRID', (0, 0), (-1, -6), 0.5, colors.black),
+    
+                    # Horizontal lines for totals
+                    ('LINEABOVE', (0, -5), (-1, -5), 0.5, colors.black),
+                    ('LINEBELOW', (0, -5), (-1, -1), 0.5, colors.black),
+                    ('LINEBELOW', (0, -1), (-1, -1), 1, colors.black),
+    
+                    # Only one vertical divider (label | value)
+                    ('LINEBEFORE', (5, -5), (5, -1), 0.5, colors.black),
+    
+                    # Fonts & alignment
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('ALIGN', (0, 0), (0, -1), 'CENTER'),
+                    ('ALIGN', (2, 1), (-1, -1), 'RIGHT'),
+    
+                    # Span totals
+                    ('SPAN', (0, -5), (3, -5)),
+                    ('SPAN', (0, -4), (3, -4)),
+                    ('SPAN', (0, -3), (3, -3)),
+                    ('SPAN', (0, -2), (3, -2)),
+                    ('SPAN', (0, -1), (3, -1)),
+    
+                    ('ALIGN', (4, -5), (4, -1), 'RIGHT'),
+                    ('ALIGN', (5, -5), (5, -1), 'RIGHT'),
+                    ('FONTNAME', (4, -5), (-1, -1), 'Helvetica-Bold'),
+    
+                    # Highlight total row
+                    ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor("#8bc34a")),
                 ]))
+    
                 self.elements.append(table)
-                self.elements.append(Spacer(1,10))
+                self.elements.append(Spacer(1, 10))
     
         except Exception as e:
-            logger.error(f"Error in add_high_side_items: {str(e)}")
+            logger.error(f"Error in add_high_side_items: {str(e)}")    
+                
     def add_low_side_items(self):
         """Add low side items table"""
         try:
@@ -379,7 +435,7 @@ class QuotationPDFGenerator:
                 data.append([
                     str(idx),
                     Paragraph(full_description, self.styles['Value']),
-                    'Nos.',
+                    str(item.unit),
                     str(item.quantity),
                     f"{float(item.unit_price):,.2f}",
                     f"{float(item.total_with_gst):,.2f}"
@@ -416,7 +472,16 @@ class QuotationPDFGenerator:
                 f"{total_with_gst:,.2f}"
             ])
 
-            col_widths = [25, 200, 40, 30, 70, 70]
+            total_width = self.doc.width-20
+
+            col_widths = [
+                total_width * 0.05,
+                total_width * 0.45,
+                total_width * 0.10,
+                total_width * 0.08,
+                total_width * 0.16,
+                total_width * 0.16,
+            ]
             table = Table(data, colWidths=col_widths)
             
             # Count data rows (excluding header)
@@ -433,8 +498,12 @@ class QuotationPDFGenerator:
                 ('ALIGN', (1, 0), (1, -1), 'LEFT'),     # Description column left
                 ('ALIGN', (2, 0), (-1, -1), 'RIGHT'),   # Unit, Qty, Rate, Amount right
                 ('FONTSIZE', (0, 0), (-1, -1), 9),
-                ('TOPPADDING', (0, 0), (-1, -1), 3),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+
+                # Extra spacing for description column (important)
+                ('LEFTPADDING', (1, 0), (1, -1), 6),
+                ('RIGHTPADDING', (1, 0), (1, -1), 6),
                 
                 # Summary section spans - individual spans for each row to preserve horizontal lines
                 ('SPAN', (0, summary_start), (4, summary_start)),      # Subtotal row
@@ -465,7 +534,7 @@ class QuotationPDFGenerator:
             if len(low_items) >= 4:
                 self.elements.append(PageBreak())
             else:
-                self.elements.append(Spacer(1, 10))
+                self.elements.append(Spacer(1, 5))
         except Exception as e:
             logger.error(f"Error in add_low_side_items: {str(e)}")
             self.elements.append(Paragraph(f"Error loading low side items: {str(e)}", self.styles['Value']))
@@ -481,7 +550,7 @@ class QuotationPDFGenerator:
         self.elements.append(PageBreak())
         
         self.elements.append(Paragraph("Terms & Conditions", self.styles['SectionHeader']))
-        self.elements.append(Spacer(1, 10))
+        self.elements.append(Spacer(1, 5))
         
         # Get terms and conditions from the quotation
         terms_conditions = self.quotation.terms_conditions.all()
@@ -559,7 +628,7 @@ class QuotationPDFGenerator:
             else:
                 self.elements.append(Paragraph(text, self.styles['Value']))
         
-        self.elements.append(Spacer(1, 10))
+        self.elements.append(Spacer(1, 5))
 
     def add_footer(self):
         """Add footer with signature"""
@@ -593,26 +662,94 @@ class QuotationPDFGenerator:
             return f"Rupees {num/1000:.1f} Thousand Only"
         else:
             return f"Rupees {num/100000:.1f} Lakh Only"
-
+    # def generate(self):
+        
+    #     self.add_quotation_title()
+    #     self.add_customer_details()
+    
+    #     has_high = self.version.high_side_items.exists()
+    #     has_low = self.version.low_side_items.exists()
+    
+    #     if has_high:
+    #         self.add_high_side_items()
+    
+    #     # 👇 IMPORTANT LOGIC
+    #     if has_high and has_low:
+    #         self.elements.append(PageBreak())
+    
+    #     if has_low:
+    #         self.add_low_side_items()
+    
+    #     self.add_tax_summary()
+    #     self.add_terms_and_conditions()
+    #     self.add_footer()
+    #     self.doc.build(
+    #         self.elements,
+    #         onFirstPage=lambda c, d: self.draw_company_header(c, d, self.quotation),
+    #         onLaterPages=lambda c, d: self.draw_company_header(c, d, self.quotation),
+    #     )
+    
+    #     pdf = self.buffer.getvalue()
+    #     self.buffer.close()
+    #     return pdf
     def generate(self):
-        """Generate the PDF"""
-        self.add_company_header()
+        top_elements = []
+
+        # Step 1: collect top content
+        self.elements = top_elements
         self.add_quotation_title()
-        self.add_customer_details()
-        self.add_high_side_items()
-        self.add_low_side_items()
+
+        has_high = self.version.high_side_items.exists()
+        has_low = self.version.low_side_items.exists()
+
+        if has_high:
+            self.add_high_side_items()
+
+        # ✅ Step 2: Create container PROPERLY
+        container = Table(
+            [[elem] for elem in top_elements],   # split rows
+            colWidths=[self.doc.width]
+        )
+
+        container.setStyle(TableStyle([
+            # ('BOX', (0, 0), (-1, -1), 1, colors.black),
+
+            # 🔥 reduce padding (IMPORTANT)
+            ('LEFTPADDING', (0, 0), (-1, -1), 5),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+
+            # 🔥 REMOVE extra row spacing
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+
+        # Step 3: reset elements
+        self.elements = [container]
+
+        # Step 4: continue rest
+        if has_high and has_low:
+            self.elements.append(PageBreak())
+
+        if has_low:
+            self.add_low_side_items()
+
         self.add_tax_summary()
         self.add_terms_and_conditions()
         self.add_footer()
-        
-        self.doc.build(self.elements)
+
+        # Step 5: build
+        self.doc.build(
+            self.elements,
+            onFirstPage=lambda c, d: self.draw_company_header(c, d, self.quotation),
+            onLaterPages=lambda c, d: self.draw_company_header(c, d, self.quotation),
+        )
+
         pdf = self.buffer.getvalue()
         self.buffer.close()
         return pdf
-
-
+    
 def generate_quotation_pdf(quotation, version):
     """Generate PDF for quotation"""
     generator = QuotationPDFGenerator(quotation, version)
     return generator.generate()
- 

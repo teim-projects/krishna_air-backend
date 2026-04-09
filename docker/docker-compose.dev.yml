@@ -6,11 +6,11 @@ services:
       dockerfile: docker/Dockerfile.dev
     ports:
       - "8000:8000"
-    restart: always
+    restart: "no"
     env_file:
       - ../env/.env.dev
     volumes:
-      - ..:/app
+      - ../:/app
     
 
     depends_on:
