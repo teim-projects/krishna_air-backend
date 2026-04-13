@@ -104,7 +104,11 @@ class ProductInventory(models.Model):
 
 
 # Helper functions for item code generation can be added here as well.
-def get_code_part(name: str):
+def get_code_part(name: str, shortcut: str = None):
+    # Use shortcut if available, otherwise fall back to name logic
+    if shortcut and shortcut.strip():
+        return shortcut.strip().upper()
+    
     if not name:
         return ""
 
@@ -113,8 +117,6 @@ def get_code_part(name: str):
         return parts[0][:2]   # first 2 letters if single word
     else:
         return "".join(p[0] for p in parts)  # first letter of each word
-
-
 
 class material_type(models.Model):
    name = models.CharField(max_length=100)
@@ -160,13 +162,17 @@ class item(models.Model):
 
     def generate_item_code(self):
         parts = [
-            get_code_part(self.material_type_id.name),
-            get_code_part(self.item_type_id.name),
+            get_code_part(self.material_type_id.name, self.material_type_id.shortcut),
+            get_code_part(self.item_type_id.name, self.item_type_id.shortcut),
         ]
-    
+
     # Add feature_type only if it exists
         if self.feature_type_id:
-            parts.append(get_code_part(self.feature_type_id.name))
+            parts.append(get_code_part(self.feature_type_id.name, self.feature_type_id.shortcut))
+
+    # Add item_class right after feature_type (if it exists)
+        if self.item_class_id:
+            parts.append(get_code_part(self.item_class_id.name, self.item_class_id.shortcut))
 
         if self.size:
             size_part = f"{self.size}{self.size_unit or ''}".upper()
@@ -175,10 +181,6 @@ class item(models.Model):
         if self.thickness:
             thickness_part = f"{self.thickness}{self.thickness_unit or ''}".upper()
             parts.append(thickness_part)
-
-    # Add item_class only if it exists
-        if self.item_class_id:
-            parts.append(get_code_part(self.item_class_id.name))
 
         return "-".join(parts)
 
