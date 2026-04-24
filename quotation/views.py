@@ -7,6 +7,9 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.db.models import Prefetch
 import logging
+# from rest_framework.decorators import api_view, authentication_classes, permission_classes
+# from rest_framework.permissions import IsAuthenticated
+# from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from .models import (
     Quotation,
@@ -33,6 +36,19 @@ def thank_you_suggestions(request):
     ).exclude(thank_you_note='').values_list('thank_you_note', flat=True).distinct()[:10]
     
     return Response([{'id': i, 'text': note} for i, note in enumerate(notes)])
+
+@api_view(['GET'])
+def subject_suggestions(request):
+    search = request.GET.get('search', '').strip()
+    
+    if not search or len(search) < 2:
+        return Response([])
+    
+    quotations = Quotation.objects.filter(
+        subject__icontains=search
+    ).values('id', 'subject').distinct()[:10]
+    
+    return Response([{'id': q['id'], 'text': q['subject']} for q in quotations])
 
 
 class QuotationViewSet(viewsets.ModelViewSet):

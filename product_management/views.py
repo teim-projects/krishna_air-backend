@@ -92,6 +92,7 @@ class material_typeViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter]
     search_fields  = ['name']
+    pagination_class = None  # Disable pagination for lookup tables
 
 class item_typeViewSet(ModelViewSet):
     queryset = item_type.objects.all()
@@ -100,6 +101,7 @@ class item_typeViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter]
     search_fields  = ['name']
+    pagination_class = None  # Disable pagination for lookup tables
 
 class item_classViewSet(ModelViewSet):
     queryset = item_class.objects.all()
@@ -108,6 +110,7 @@ class item_classViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter]
     search_fields  = ['name']
+    pagination_class = None  # Disable pagination for lookup tables
 
 class feature_typeViewSet(ModelViewSet):
     queryset = feature_type.objects.all()
@@ -116,6 +119,7 @@ class feature_typeViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter]
     search_fields  = ['name']
+    pagination_class = None  # Disable pagination for lookup tables
 
 class itemViewSet(ModelViewSet):
     queryset = item.objects.all()
@@ -226,7 +230,7 @@ def product_search_all(request):
         display_text = f"{variant.product_model.brand_id.name} {variant.product_model.name}"
         
         if variant.capacity:
-            display_text += f" - {variant.capacity}"
+            display_text += f" - {variant.capacity} {variant.unit}"
             
         if variant.product_model.ac_sub_type_id:
             display_text += f" {variant.product_model.ac_sub_type_id.name}"

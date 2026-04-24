@@ -99,6 +99,9 @@ class InvoiceSerializer(serializers.ModelSerializer):
     source="customer.contact_number",
     read_only=True
 )
+    
+    # Make invoice_no optional - will be auto-generated
+    invoice_no = serializers.CharField(required=False, allow_blank=True)
 
     
     
@@ -254,6 +257,27 @@ class InvoiceSerializer(serializers.ModelSerializer):
         high_items = validated_data.pop("high_side_items", [])
         low_items = validated_data.pop("low_side_items", [])
         terms = validated_data.pop("terms_conditions", [])
+        
+        # Auto-generate invoice_no if not provided
+        if not validated_data.get("invoice_no"):
+            # Get the last invoice number
+            last_invoice = Invoice.objects.order_by('-id').first()
+            if last_invoice and last_invoice.invoice_no:
+                # Try to extract number from last invoice_no
+                try:
+                    # Assuming format like INV-0001, INV-0002, etc.
+                    last_num = int(last_invoice.invoice_no.split('-')[-1])
+                    new_num = last_num + 1
+                except (ValueError, IndexError):
+                    # If parsing fails, start from 1
+                    new_num = 1
+            else:
+                new_num = 1
+            
+            # Generate new invoice number with format INV-YYYY-XXXX
+            from datetime import datetime
+            year = datetime.now().year
+            validated_data["invoice_no"] = f"INV-{year}-{new_num:04d}"
     
         invoice = Invoice.objects.create(**validated_data)
     

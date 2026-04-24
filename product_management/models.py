@@ -49,6 +49,7 @@ class ProductModel(models.Model):
 class ProductVariant(models.Model):
   product_model = models.ForeignKey(ProductModel, on_delete=models.CASCADE, related_name='variants')
   capacity = models.CharField(max_length=50)
+  unit = models.CharField(max_length=10, blank=True, null=True)
   star_rating = models.IntegerField()
  
   sku = models.CharField(max_length=100 , unique=True, blank=True)
