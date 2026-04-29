@@ -29,7 +29,7 @@ class ProductModel(models.Model):
   ac_sub_type_id = models.ForeignKey(acSubTypes, on_delete=models.CASCADE, related_name='product_model')
   brand_id = models.ForeignKey(brand, on_delete=models.CASCADE, related_name='product_model' )
   model_no = models.CharField(max_length=200)
-  phase = models.CharField(max_length=20)
+  phase = models.CharField(max_length=20, blank=True, null=True)
   inverter = models.BooleanField(default=False)
   is_active = models.BooleanField(default=True)
   year_of_manufacture = models.IntegerField(blank=True, null=True)
@@ -42,7 +42,8 @@ class ProductModel(models.Model):
 
   def __str__(self):
         inverter_text = "Inverter" if self.inverter else "Non-Inverter"
-        return f"{self.model_no}-{inverter_text}-{self.phase}"
+        phase_text = self.phase if self.phase else "No Phase"
+        return f"{self.model_no}-{inverter_text}-{phase_text}"
   
 
 
