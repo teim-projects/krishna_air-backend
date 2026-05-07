@@ -92,6 +92,7 @@ class material_typeViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter]
     search_fields  = ['name']
+    pagination_class = None  # Disable pagination for lookup tables
 
 class item_typeViewSet(ModelViewSet):
     queryset = item_type.objects.all()
@@ -100,6 +101,7 @@ class item_typeViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter]
     search_fields  = ['name']
+    pagination_class = None  # Disable pagination for lookup tables
 
 class item_classViewSet(ModelViewSet):
     queryset = item_class.objects.all()
@@ -108,6 +110,7 @@ class item_classViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter]
     search_fields  = ['name']
+    pagination_class = None  # Disable pagination for lookup tables
 
 class feature_typeViewSet(ModelViewSet):
     queryset = feature_type.objects.all()
@@ -116,6 +119,7 @@ class feature_typeViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter]
     search_fields  = ['name']
+    pagination_class = None  # Disable pagination for lookup tables
 
 class itemViewSet(ModelViewSet):
     queryset = item.objects.all()
@@ -176,3 +180,81 @@ class ACTypeMaterialViewSet(ModelViewSet):
             "message": "Materials updated successfully",
             "updated_count": len(objs)
         }, status=status.HTTP_200_OK)
+
+
+# ================= SMART PRODUCT SEARCH API =================
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.permissions import IsAuthenticated
+from django.db.models import Q
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def product_search_all(request):
+    """
+    Single endpoint that returns all product variants with combined searchable text
+    """
+    search_query = request.GET.get('search', '').strip()
+    
+    print(f"🔍 Search query received: '{search_query}'")
+    
+    # Get all product variants with related data
+    queryset = ProductVariant.objects.select_related(
+        'product_model__brand_id',
+        'product_model__ac_sub_type_id__ac_type_id',
+        'product_model__ac_sub_type_id'
+    ).filter(is_active=True)
+    
+    print(f"📊 Total active ProductVariants: {queryset.count()}")
+    
+    # If search query provided, filter results
+    if search_query:
+        queryset = queryset.filter(
+            Q(product_model__brand_id__name__icontains=search_query) |
+            Q(product_model__name__icontains=search_query) |
+            Q(sku__icontains=search_query) |
+            Q(product_model__ac_sub_type_id__name__icontains=search_query) |
+            Q(product_model__ac_sub_type_id__ac_type_id__name__icontains=search_query) |
+            Q(capacity__icontains=search_query)
+        )
+        
+        print(f"🎯 Filtered results count: {queryset.count()}")
+    
+    # Limit results to prevent performance issues
+    queryset = queryset[:50]
+    
+    # Format response with combined display text
+    results = []
+    for variant in queryset:
+        # Create combined display text
+        display_text = f"{variant.product_model.brand_id.name} {variant.product_model.name}"
+        
+        if variant.capacity:
+            display_text += f" - {variant.capacity} {variant.unit}"
+            
+        if variant.product_model.ac_sub_type_id:
+            display_text += f" {variant.product_model.ac_sub_type_id.name}"
+            
+        if variant.product_model.ac_sub_type_id and variant.product_model.ac_sub_type_id.ac_type_id:
+            display_text += f" {variant.product_model.ac_sub_type_id.ac_type_id.name}"
+        
+        result_item = {
+            'id': variant.id,
+            'sku': variant.sku,
+            'display_text': display_text,
+            'brand_name': variant.product_model.brand_id.name,
+            'model_name': variant.product_model.name,
+            'ac_type_name': variant.product_model.ac_sub_type_id.ac_type_id.name if variant.product_model.ac_sub_type_id and variant.product_model.ac_sub_type_id.ac_type_id else '',
+            'ac_sub_type_name': variant.product_model.ac_sub_type_id.name if variant.product_model.ac_sub_type_id else '',
+            'capacity': variant.capacity or '',
+            'variant_sku': variant.sku,
+        }
+        
+        results.append(result_item)
+        
+        # Print first few results for debugging
+        if len(results) <= 3:
+            print(f"📝 Sample result: {result_item}")
+    
+    print(f"✅ Returning {len(results)} results")
+    return Response(results)

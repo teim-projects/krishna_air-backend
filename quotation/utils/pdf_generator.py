@@ -17,9 +17,7 @@ from django.http import HttpResponse
 from django.conf import settings
 from collections import defaultdict
 from reportlab.platypus import KeepTogether
-# from rich.pretty import data
-# from rich.pretty import data
-# from rich.pretty import data
+
 
 
 
@@ -121,7 +119,7 @@ class QuotationPDFGenerator:
         self.styles.add(ParagraphStyle(
             name='Value',
             parent=self.styles['Normal'],
-            fontSize=9,
+            fontSize=10,
             textColor=colors.black,
             leading=12
         ))
@@ -194,39 +192,85 @@ class QuotationPDFGenerator:
         # Format date
         quotation_date = self.quotation.created_at.strftime("%d-%m-%Y") if self.quotation.created_at else datetime.now().strftime("%d-%m-%Y")
         quotation_no = self.version.version_no or self.quotation.quotation_no
-        data = [
-            [
-                Paragraph(f'<u><b>To,</b></u> <br /> <b>{customer_name}</b>', self.styles['Value']),
-                Paragraph(f'<b>Date:</b> {quotation_date}', self.styles['Value'])
-            ],
-            [
-                Paragraph(f'{customer_address}', self.styles['Value']),
-                Paragraph(f'<b>Quotation No:</b> {quotation_no}', self.styles['Value'])
-            ],
-            [
-                Paragraph(f'Contact: {customer_contact}', self.styles['Value']),
-                ''
-            ],
-            [
-                Paragraph(f'Email: {customer_email}', self.styles['Value']),
-                ''
-            ],
-            [
-                Paragraph(f'<u><b>Subject:</b></u> {self.quotation.subject}', self.styles['UnderlinedLabel']),
-                ''
-            ],
+        # data = [
+        #     [
+        #         Paragraph(f'<u><b>To,</b></u> <br /> <b>{customer_name}</b>', self.styles['Value']),
+        #         Paragraph(f'<b>Date:</b> {quotation_date}', self.styles['Value'])
+        #     ],
+        #     [
+        #         Paragraph(f'{customer_address}', self.styles['Value']),
+        #         Paragraph(f'<b>Quotation No:</b> {quotation_no}', self.styles['Value'])
+        #     ],
+        #     [
+        #         Paragraph(f'Contact: {customer_contact}', self.styles['Value']),
+        #         ''
+        #     ],
+        #     [
+        #         Paragraph(f'Email: {customer_email}', self.styles['Value']),
+        #         ''
+        #     ],
+        #     [
+        #         Paragraph(f'<u><b>Subject:</b></u> {self.quotation.subject}', self.styles['UnderlinedLabel']),
+        #         ''
+        #     ],
+        # ]
+        # LEFT SIDE (To, Customer Info)
+        left_data = [
+            [Paragraph(f'<u><b>To,</b></u>', self.styles['Value'])],
+            [Paragraph(f'<b>{customer_name}</b>', self.styles['Value'])],
+            [Paragraph(customer_address, self.styles['Value'])],
+            [Paragraph(f'Contact: {customer_contact}', self.styles['Value'])],
+            [Paragraph(f'Email: {customer_email}', self.styles['Value'])],
+            [Paragraph(f'<u><b>Subject:</b></u> {self.quotation.subject}', self.styles['UnderlinedLabel'])],
         ]
-        table = Table(data, colWidths=[self.doc.width * 0.7, self.doc.width * 0.3])
-        # table = Table(data, colWidths=[self.doc.width, 0])
-        table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+
+        left_table = Table(left_data, colWidths=[self.doc.width * 0.7])
+        left_table.setStyle(TableStyle([
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
             ('TOPPADDING', (0, 0), (-1, -1), 2),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
         ]))
-        
-        self.elements.append(table)
+
+        # RIGHT SIDE (Date + Quotation No)
+        right_data = [
+            [Paragraph(f'<b>Date:</b> {quotation_date}', self.styles['Value'])],
+            [Paragraph(f'<b>Quotation No:</b> {quotation_no}', self.styles['Value'])],
+        ]
+
+        right_table = Table(right_data, colWidths=[self.doc.width * 0.3])
+        right_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 5),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ]))
+
+        # 🔥 MAIN WRAPPER TABLE
+        main_table = Table(
+            [[left_table, right_table]],
+            colWidths=[self.doc.width * 0.7, self.doc.width * 0.3]
+        )
+
+        main_table.setStyle(TableStyle([   
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+
+        self.elements.append(main_table)
         self.elements.append(Spacer(1, 5))
+        
+        # table = Table(data, colWidths=[self.doc.width * 0.7, self.doc.width * 0.3])
+        # table = Table(data, colWidths=[self.doc.width, 0])
+        # table.setStyle(TableStyle([
+        #     ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        #     ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        #     ('TOPPADDING', (0, 0), (-1, -1), 2),
+        #     ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        # ]))
+        
+        # self.elements.append(table)
+        # self.elements.append(Spacer(1, 5))
         
         # Site Name section (if site information exists)
         if site_info:
@@ -293,7 +337,14 @@ class QuotationPDFGenerator:
                     variant = item.product_variant
                     model = variant.product_model
                 
-                    description = f"{model.name} {model.model_no} {variant.capacity}"
+                    # Use dynamic display name from database relationships
+                    product_name = variant.get_display_name_for_pdf()
+                    
+                    # Add item description below product name if it exists
+                    if item.description and item.description.strip():
+                        full_description = f"{product_name}<br/><i><font color='grey' size='8'>{item.description}</font></i>"
+                    else:
+                        full_description = product_name
                 
                     qty = float(item.quantity)
                     rate = float(item.unit_price)
@@ -313,7 +364,7 @@ class QuotationPDFGenerator:
                     total += float(getattr(item, "total_with_gst", 0) or 0)
                     data.append([
                         str(idx),
-                        Paragraph(description, self.styles['Value']),
+                        Paragraph(full_description, self.styles['Value']),
                         str(item.unit),
                         str(item.quantity),
                         f"{rate:,.2f}",

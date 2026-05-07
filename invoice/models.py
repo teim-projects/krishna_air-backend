@@ -47,7 +47,7 @@ class Invoice(models.Model):
     # ===== BUYER SNAPSHOT =====
     buyer_name = models.CharField(max_length=255)
     buyer_address = models.TextField()
-    buyer_gstin = models.CharField(max_length=50, blank=True, null=True)
+    buyer_gstin = models.CharField(max_length=20)
     buyer_state = models.CharField(max_length=100, blank=True, null=True)
     buyer_state_code = models.CharField(max_length=10, blank=True, null=True)
 
@@ -79,6 +79,7 @@ class Invoice(models.Model):
 
     delivery_note = models.CharField(max_length=100, blank=True, null=True)
     delivery_note_date = models.DateField(blank=True, null=True, verbose_name="Delivery Note Date")
+    delivery_chalan_date = models.DateField(blank=True, null=True)
     supplier_ref = models.CharField(max_length=100, blank=True, null=True)
     other_references = models.CharField(max_length=255, blank=True, null=True)
     buyer_order_no = models.CharField(max_length=100, blank=True, null=True)

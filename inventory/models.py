@@ -404,21 +404,34 @@ class InventoryItem(models.Model):
 from django.db.models import F
 
 def update_inventory_from_grn(grn):
-    for item in grn.products.all():
-        accepted_qty = item.received_quantity - item.rejected_quantity
+    """
+    Update inventory from GRN products
+    """
+    for grn_product in grn.products.all():
+        accepted_qty = grn_product.received_quantity - grn_product.rejected_quantity
 
         if accepted_qty <= 0:
             continue
 
+        # Get product_variant and item from GRN product
+        product_variant = grn_product.product_variant
+        item_obj = grn_product.item
+
+        # Skip if both are None
+        if not product_variant and not item_obj:
+            continue
+
+        # Get or create inventory item
         inventory, created = InventoryItem.objects.get_or_create(
-            product_variant=item.product_variant,
-            item=item.item,
+            product_variant=product_variant,
+            item=item_obj,
             defaults={
                 "quantity": 0,
-                "uom": item.purchase_order_product.uom
+                "uom": grn_product.purchase_order_product.uom if grn_product.purchase_order_product else ""
             }
         )
 
+        # Update inventory quantity
         InventoryItem.objects.filter(id=inventory.id).update(
             quantity=F('quantity') + accepted_qty
         )    

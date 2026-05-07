@@ -21,7 +21,7 @@ router.register(r'item', itemViewSet, basename='item')
 router.register(r'ac-material', ACTypeMaterialViewSet, basename='ac-material')
 
 urlpatterns = [
-    
+    path('product-search-all/', product_search_all, name='product_search_all'),
 ]
 
 urlpatterns += router.urls

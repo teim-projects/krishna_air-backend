@@ -29,7 +29,7 @@ class ProductModel(models.Model):
   ac_sub_type_id = models.ForeignKey(acSubTypes, on_delete=models.CASCADE, related_name='product_model')
   brand_id = models.ForeignKey(brand, on_delete=models.CASCADE, related_name='product_model' )
   model_no = models.CharField(max_length=200)
-  phase = models.CharField(max_length=20)
+  phase = models.CharField(max_length=20, blank=True, null=True)
   inverter = models.BooleanField(default=False)
   is_active = models.BooleanField(default=True)
   year_of_manufacture = models.IntegerField(blank=True, null=True)
@@ -42,13 +42,15 @@ class ProductModel(models.Model):
 
   def __str__(self):
         inverter_text = "Inverter" if self.inverter else "Non-Inverter"
-        return f"{self.model_no}-{inverter_text}-{self.phase}"
+        phase_text = self.phase if self.phase else "No Phase"
+        return f"{self.model_no}-{inverter_text}-{phase_text}"
   
 
 
 class ProductVariant(models.Model):
   product_model = models.ForeignKey(ProductModel, on_delete=models.CASCADE, related_name='variants')
   capacity = models.CharField(max_length=50)
+  unit = models.CharField(max_length=10, blank=True, null=True)
   star_rating = models.IntegerField()
  
   sku = models.CharField(max_length=100 , unique=True, blank=True)
@@ -75,6 +77,40 @@ class ProductVariant(models.Model):
     unique_code = uuid.uuid4().hex[:4].upper()
     
     return f"{brand_code}-{model_code}-{capacity_code}-{star_code}-{unique_code}"
+
+  def get_display_name_for_pdf(self):
+    """
+    Generate dynamic display name for PDF from existing database relationships.
+    Format: "Split AC 1.5 TR 5 Star Inverter"
+    
+    Pulls data from:
+    - AC Type: product_model.ac_sub_type_id.ac_type_id.name
+    - Capacity: self.capacity
+    - Unit: self.unit
+    - Star Rating: self.star_rating
+    - Inverter: product_model.inverter
+    """
+    try:
+        # Get AC Type from the relationship chain
+        ac_type_name = self.product_model.ac_sub_type_id.ac_type_id.name
+        
+        # Get capacity with unit
+        capacity_str = f"{self.capacity} {self.unit}" if self.unit else str(self.capacity)
+        
+        # Get star rating
+        star_str = f"{self.star_rating} Star"
+        
+        # Get inverter status
+        inverter_str = "Inverter" if self.product_model.inverter else "Non-Inverter"
+        
+        # Combine all parts
+        display_name = f"{ac_type_name} {capacity_str} {star_str} {inverter_str}"
+        
+        return display_name
+        
+    except (AttributeError, TypeError) as e:
+        # Fallback to SKU if any relationship is missing
+        return self.sku
 
   def __str__(self):
         return self.sku
@@ -104,7 +140,11 @@ class ProductInventory(models.Model):
 
 
 # Helper functions for item code generation can be added here as well.
-def get_code_part(name: str):
+def get_code_part(name: str, shortcut: str = None):
+    # Use shortcut if available, otherwise fall back to name logic
+    if shortcut and shortcut.strip():
+        return shortcut.strip().upper()
+    
     if not name:
         return ""
 
@@ -113,8 +153,6 @@ def get_code_part(name: str):
         return parts[0][:2]   # first 2 letters if single word
     else:
         return "".join(p[0] for p in parts)  # first letter of each word
-
-
 
 class material_type(models.Model):
    name = models.CharField(max_length=100)
@@ -160,13 +198,17 @@ class item(models.Model):
 
     def generate_item_code(self):
         parts = [
-            get_code_part(self.material_type_id.name),
-            get_code_part(self.item_type_id.name),
+            get_code_part(self.material_type_id.name, self.material_type_id.shortcut),
+            get_code_part(self.item_type_id.name, self.item_type_id.shortcut),
         ]
-    
+
     # Add feature_type only if it exists
         if self.feature_type_id:
-            parts.append(get_code_part(self.feature_type_id.name))
+            parts.append(get_code_part(self.feature_type_id.name, self.feature_type_id.shortcut))
+
+    # Add item_class right after feature_type (if it exists)
+        if self.item_class_id:
+            parts.append(get_code_part(self.item_class_id.name, self.item_class_id.shortcut))
 
         if self.size:
             size_part = f"{self.size}{self.size_unit or ''}".upper()
@@ -175,10 +217,6 @@ class item(models.Model):
         if self.thickness:
             thickness_part = f"{self.thickness}{self.thickness_unit or ''}".upper()
             parts.append(thickness_part)
-
-    # Add item_class only if it exists
-        if self.item_class_id:
-            parts.append(get_code_part(self.item_class_id.name))
 
         return "-".join(parts)
 

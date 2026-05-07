@@ -39,7 +39,7 @@ class Quotation(models.Model):
 
     subject = models.CharField(max_length=255)
     site_name = models.CharField(max_length=255, blank=True, null=True)
-    thank_you_note = models.TextField(blank=True, null=True)
+    thank_you_note = models.TextField(max_length=400)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
