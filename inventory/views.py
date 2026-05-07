@@ -164,15 +164,70 @@ def purchase_order_pdf(request, pk):
 class GRNViewSet(ModelViewSet):
     queryset = GRN.objects.all()
     serializer_class = GRNSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        """
+        Create GRN with better error handling
+        """
+        try:
+            return super().create(request, *args, **kwargs)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    def update(self, request, *args, **kwargs):
+        """
+        Prevent editing completed GRNs
+        """
+        grn = self.get_object()
+        
+        if grn.is_completed:
+            return Response(
+                {"error": "Cannot edit completed GRN. Inventory already updated."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Prevent deleting completed GRNs
+        """
+        grn = self.get_object()
+        
+        if grn.is_completed:
+            return Response(
+                {"error": "Cannot delete completed GRN. Inventory already updated."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        return super().destroy(request, *args, **kwargs)
 
     @action(detail=True, methods=["post"])
     def complete(self, request, pk=None):
+        """
+        Manual complete endpoint (optional - GRN auto-completes on create)
+        Kept for backward compatibility or manual completion if needed
+        """
         grn = self.get_object()
 
         if grn.is_completed:
-            return Response({"error": "Already completed"}, status=400)
+            return Response(
+                {"error": "GRN already completed"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        self.get_serializer().complete(grn)
+        # Complete the GRN
+        with transaction.atomic():
+            grn.is_completed = True
+            grn.save(update_fields=["is_completed"])
+            complete_grn(grn)
 
         return Response({"message": "GRN completed successfully"})
     

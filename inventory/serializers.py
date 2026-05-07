@@ -245,32 +245,62 @@ class GRNProductSerializer(serializers.ModelSerializer):
 
 class GRNSerializer(serializers.ModelSerializer):
     products = GRNProductSerializer(many=True)
+    
+    # Add read-only fields for display
+    purchase_order_no = serializers.CharField(
+        source='purchase_order.purchase_order_no',
+        read_only=True
+    )
+    vendor_name = serializers.CharField(
+        source='purchase_order.vendor.name',
+        read_only=True
+    )
+    po_date = serializers.DateField(
+        source='purchase_order.po_date',
+        read_only=True
+    )
 
     class Meta:
         model = GRN
         fields = [
             "id",
             "purchase_order",
+            "purchase_order_no",
+            "vendor_name",
+            "po_date",
             "grn_date",
             "grn_no",
             "is_completed",
             "products",
         ]
-        read_only_fields = ["grn_no", "is_completed"]
+        read_only_fields = ["grn_no", "is_completed", "purchase_order_no", "vendor_name", "po_date"]
 
     # -------------------------
-    # CREATE
+    # CREATE (AUTO-COMPLETE)
     # -------------------------
     def create(self, validated_data):
         products_data = validated_data.pop("products")
 
         with transaction.atomic():
+            # Create GRN
             grn = GRN.objects.create(**validated_data)
 
+            # Create GRN products
             for product_data in products_data:
                 GRNProduct.objects.create(grn=grn, **product_data)
 
+            # Refresh to get all products
+            grn.refresh_from_db()
+
+            # 🔥 AUTO-COMPLETE: Update inventory immediately
+            update_inventory_from_grn(grn)
+
+            # 🔥 AUTO-COMPLETE: Mark as completed
+            grn.is_completed = True
+            grn.save(update_fields=["is_completed"])
+
         return grn
+
 
     # -------------------------
     # UPDATE

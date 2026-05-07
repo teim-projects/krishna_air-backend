@@ -337,7 +337,14 @@ class QuotationPDFGenerator:
                     variant = item.product_variant
                     model = variant.product_model
                 
-                    description = f"{model.name} {model.model_no} {variant.capacity}"
+                    # Use dynamic display name from database relationships
+                    product_name = variant.get_display_name_for_pdf()
+                    
+                    # Add item description below product name if it exists
+                    if item.description and item.description.strip():
+                        full_description = f"{product_name}<br/><i><font color='grey' size='8'>{item.description}</font></i>"
+                    else:
+                        full_description = product_name
                 
                     qty = float(item.quantity)
                     rate = float(item.unit_price)
@@ -357,7 +364,7 @@ class QuotationPDFGenerator:
                     total += float(getattr(item, "total_with_gst", 0) or 0)
                     data.append([
                         str(idx),
-                        Paragraph(description, self.styles['Value']),
+                        Paragraph(full_description, self.styles['Value']),
                         str(item.unit),
                         str(item.quantity),
                         f"{rate:,.2f}",

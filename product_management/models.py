@@ -78,6 +78,40 @@ class ProductVariant(models.Model):
     
     return f"{brand_code}-{model_code}-{capacity_code}-{star_code}-{unique_code}"
 
+  def get_display_name_for_pdf(self):
+    """
+    Generate dynamic display name for PDF from existing database relationships.
+    Format: "Split AC 1.5 TR 5 Star Inverter"
+    
+    Pulls data from:
+    - AC Type: product_model.ac_sub_type_id.ac_type_id.name
+    - Capacity: self.capacity
+    - Unit: self.unit
+    - Star Rating: self.star_rating
+    - Inverter: product_model.inverter
+    """
+    try:
+        # Get AC Type from the relationship chain
+        ac_type_name = self.product_model.ac_sub_type_id.ac_type_id.name
+        
+        # Get capacity with unit
+        capacity_str = f"{self.capacity} {self.unit}" if self.unit else str(self.capacity)
+        
+        # Get star rating
+        star_str = f"{self.star_rating} Star"
+        
+        # Get inverter status
+        inverter_str = "Inverter" if self.product_model.inverter else "Non-Inverter"
+        
+        # Combine all parts
+        display_name = f"{ac_type_name} {capacity_str} {star_str} {inverter_str}"
+        
+        return display_name
+        
+    except (AttributeError, TypeError) as e:
+        # Fallback to SKU if any relationship is missing
+        return self.sku
+
   def __str__(self):
         return self.sku
   

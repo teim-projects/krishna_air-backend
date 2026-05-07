@@ -79,6 +79,7 @@ class Invoice(models.Model):
 
     delivery_note = models.CharField(max_length=100, blank=True, null=True)
     delivery_note_date = models.DateField(blank=True, null=True, verbose_name="Delivery Note Date")
+    delivery_chalan_date = models.DateField(blank=True, null=True)
     supplier_ref = models.CharField(max_length=100, blank=True, null=True)
     other_references = models.CharField(max_length=255, blank=True, null=True)
     buyer_order_no = models.CharField(max_length=100, blank=True, null=True)
