@@ -129,6 +129,7 @@ class itemViewSet(ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['item_type_id','item_class_id','material_type_id','feature_type_id']
     search_fields  = ['=item_code']
+    pagination_class = None  # Disable pagination to show all materials
   
   
 class ACTypeMaterialViewSet(ModelViewSet):
@@ -197,16 +198,12 @@ def product_search_all(request):
     try:
         search_query = request.GET.get('search', '').strip()
         
-        print(f"🔍 Search query received: '{search_query}'")
-        
         # Get all product variants with related data
         queryset = ProductVariant.objects.select_related(
             'product_model__brand_id',
             'product_model__ac_sub_type_id__ac_type_id',
             'product_model__ac_sub_type_id'
         ).filter(is_active=True)
-        
-        print(f"📊 Total active ProductVariants: {queryset.count()}")
         
         # If search query provided, filter results
         if search_query:
@@ -218,8 +215,6 @@ def product_search_all(request):
                 Q(product_model__ac_sub_type_id__ac_type_id__name__icontains=search_query) |
                 Q(capacity__icontains=search_query)
             )
-            
-            print(f"🎯 Filtered results count: {queryset.count()}")
         
         # Limit results to prevent performance issues
         queryset = queryset[:50]
@@ -269,25 +264,22 @@ def product_search_all(request):
                 }
                 
                 results.append(result_item)
-                
-                # Print first few results for debugging
-                if len(results) <= 3:
-                    print(f"📝 Sample result: {result_item}")
                     
             except Exception as e:
                 # Log the error but continue processing other variants
-                print(f"⚠️ Error processing variant {variant.id}: {str(e)}")
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Error processing variant {variant.id}: {str(e)}")
                 continue
         
-        print(f"✅ Returning {len(results)} results")
         return Response(results)
         
     except Exception as e:
         # Log the full error for debugging
+        import logging
         import traceback
-        error_trace = traceback.format_exc()
-        print(f"❌ Error in product_search_all: {str(e)}")
-        print(f"📋 Full traceback:\n{error_trace}")
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error in product_search_all: {str(e)}\n{traceback.format_exc()}")
         
         # Return a proper error response
         return Response(
