@@ -194,67 +194,106 @@ def product_search_all(request):
     """
     Single endpoint that returns all product variants with combined searchable text
     """
-    search_query = request.GET.get('search', '').strip()
-    
-    print(f"🔍 Search query received: '{search_query}'")
-    
-    # Get all product variants with related data
-    queryset = ProductVariant.objects.select_related(
-        'product_model__brand_id',
-        'product_model__ac_sub_type_id__ac_type_id',
-        'product_model__ac_sub_type_id'
-    ).filter(is_active=True)
-    
-    print(f"📊 Total active ProductVariants: {queryset.count()}")
-    
-    # If search query provided, filter results
-    if search_query:
-        queryset = queryset.filter(
-            Q(product_model__brand_id__name__icontains=search_query) |
-            Q(product_model__name__icontains=search_query) |
-            Q(sku__icontains=search_query) |
-            Q(product_model__ac_sub_type_id__name__icontains=search_query) |
-            Q(product_model__ac_sub_type_id__ac_type_id__name__icontains=search_query) |
-            Q(capacity__icontains=search_query)
+    try:
+        search_query = request.GET.get('search', '').strip()
+        
+        print(f"🔍 Search query received: '{search_query}'")
+        
+        # Get all product variants with related data
+        queryset = ProductVariant.objects.select_related(
+            'product_model__brand_id',
+            'product_model__ac_sub_type_id__ac_type_id',
+            'product_model__ac_sub_type_id'
+        ).filter(is_active=True)
+        
+        print(f"📊 Total active ProductVariants: {queryset.count()}")
+        
+        # If search query provided, filter results
+        if search_query:
+            queryset = queryset.filter(
+                Q(product_model__brand_id__name__icontains=search_query) |
+                Q(product_model__name__icontains=search_query) |
+                Q(sku__icontains=search_query) |
+                Q(product_model__ac_sub_type_id__name__icontains=search_query) |
+                Q(product_model__ac_sub_type_id__ac_type_id__name__icontains=search_query) |
+                Q(capacity__icontains=search_query)
+            )
+            
+            print(f"🎯 Filtered results count: {queryset.count()}")
+        
+        # Limit results to prevent performance issues
+        queryset = queryset[:50]
+        
+        # Format response with combined display text
+        results = []
+        for variant in queryset:
+            try:
+                # Safely get brand name
+                brand_name = variant.product_model.brand_id.name if variant.product_model and variant.product_model.brand_id else 'Unknown Brand'
+                model_name = variant.product_model.name if variant.product_model else 'Unknown Model'
+                
+                # Create combined display text
+                display_text = f"{brand_name} {model_name}"
+                
+                if variant.capacity:
+                    unit = variant.unit if variant.unit else ''
+                    display_text += f" - {variant.capacity} {unit}"
+                    
+                # Safely get ac_sub_type
+                if variant.product_model and variant.product_model.ac_sub_type_id:
+                    display_text += f" {variant.product_model.ac_sub_type_id.name}"
+                    
+                    # Safely get ac_type
+                    if variant.product_model.ac_sub_type_id.ac_type_id:
+                        display_text += f" {variant.product_model.ac_sub_type_id.ac_type_id.name}"
+                
+                # Safely get ac_type_name and ac_sub_type_name
+                ac_type_name = ''
+                ac_sub_type_name = ''
+                
+                if variant.product_model and variant.product_model.ac_sub_type_id:
+                    ac_sub_type_name = variant.product_model.ac_sub_type_id.name
+                    if variant.product_model.ac_sub_type_id.ac_type_id:
+                        ac_type_name = variant.product_model.ac_sub_type_id.ac_type_id.name
+                
+                result_item = {
+                    'id': variant.id,
+                    'sku': variant.sku,
+                    'display_text': display_text,
+                    'brand_name': brand_name,
+                    'model_name': model_name,
+                    'ac_type_name': ac_type_name,
+                    'ac_sub_type_name': ac_sub_type_name,
+                    'capacity': variant.capacity or '',
+                    'variant_sku': variant.sku,
+                }
+                
+                results.append(result_item)
+                
+                # Print first few results for debugging
+                if len(results) <= 3:
+                    print(f"📝 Sample result: {result_item}")
+                    
+            except Exception as e:
+                # Log the error but continue processing other variants
+                print(f"⚠️ Error processing variant {variant.id}: {str(e)}")
+                continue
+        
+        print(f"✅ Returning {len(results)} results")
+        return Response(results)
+        
+    except Exception as e:
+        # Log the full error for debugging
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"❌ Error in product_search_all: {str(e)}")
+        print(f"📋 Full traceback:\n{error_trace}")
+        
+        # Return a proper error response
+        return Response(
+            {
+                'error': 'An error occurred while searching products',
+                'detail': str(e)
+            },
+            status=500
         )
-        
-        print(f"🎯 Filtered results count: {queryset.count()}")
-    
-    # Limit results to prevent performance issues
-    queryset = queryset[:50]
-    
-    # Format response with combined display text
-    results = []
-    for variant in queryset:
-        # Create combined display text
-        display_text = f"{variant.product_model.brand_id.name} {variant.product_model.name}"
-        
-        if variant.capacity:
-            display_text += f" - {variant.capacity} {variant.unit}"
-            
-        if variant.product_model.ac_sub_type_id:
-            display_text += f" {variant.product_model.ac_sub_type_id.name}"
-            
-        if variant.product_model.ac_sub_type_id and variant.product_model.ac_sub_type_id.ac_type_id:
-            display_text += f" {variant.product_model.ac_sub_type_id.ac_type_id.name}"
-        
-        result_item = {
-            'id': variant.id,
-            'sku': variant.sku,
-            'display_text': display_text,
-            'brand_name': variant.product_model.brand_id.name,
-            'model_name': variant.product_model.name,
-            'ac_type_name': variant.product_model.ac_sub_type_id.ac_type_id.name if variant.product_model.ac_sub_type_id and variant.product_model.ac_sub_type_id.ac_type_id else '',
-            'ac_sub_type_name': variant.product_model.ac_sub_type_id.name if variant.product_model.ac_sub_type_id else '',
-            'capacity': variant.capacity or '',
-            'variant_sku': variant.sku,
-        }
-        
-        results.append(result_item)
-        
-        # Print first few results for debugging
-        if len(results) <= 3:
-            print(f"📝 Sample result: {result_item}")
-    
-    print(f"✅ Returning {len(results)} results")
-    return Response(results)
