@@ -91,22 +91,33 @@ class ProductVariant(models.Model):
     - Inverter: product_model.inverter
     """
     try:
-        # Get AC Type from the relationship chain
-        ac_type_name = self.product_model.ac_sub_type_id.ac_type_id.name
+        # Safely get AC Type from the relationship chain
+        ac_type_name = None
+        if (self.product_model and 
+            self.product_model.ac_sub_type_id and 
+            self.product_model.ac_sub_type_id.ac_type_id):
+            ac_type_name = self.product_model.ac_sub_type_id.ac_type_id.name
+        
+        # If no AC type found, fall back to SKU
+        if not ac_type_name:
+            return self.sku
         
         # Get capacity with unit
         capacity_str = f"{self.capacity} {self.unit}" if self.unit else str(self.capacity)
         
         # Get star rating
-        star_str = f"{self.star_rating} Star"
+        star_str = f"{self.star_rating} Star" if self.star_rating else ""
         
         # Get inverter status
-        inverter_str = "Inverter" if self.product_model.inverter else "Non-Inverter"
+        inverter_str = ""
+        if self.product_model:
+            inverter_str = "Inverter" if self.product_model.inverter else "Non-Inverter"
         
-        # Combine all parts
-        display_name = f"{ac_type_name} {capacity_str} {star_str} {inverter_str}"
+        # Combine all parts (filter out empty strings)
+        parts = [ac_type_name, capacity_str, star_str, inverter_str]
+        display_name = " ".join(part for part in parts if part)
         
-        return display_name
+        return display_name if display_name else self.sku
         
     except (AttributeError, TypeError) as e:
         # Fallback to SKU if any relationship is missing
