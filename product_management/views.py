@@ -129,7 +129,18 @@ class itemViewSet(ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['item_type_id','item_class_id','material_type_id','feature_type_id']
     search_fields  = ['=item_code']
-    pagination_class = None  # Disable pagination to show all materials
+    
+    def get_paginated_response(self, data):
+        """Override to return all items when requested via query param"""
+        if self.request.query_params.get('all') == 'true':
+            return Response(data)
+        return super().get_paginated_response(data)
+    
+    def paginate_queryset(self, queryset):
+        """Skip pagination when 'all=true' is in query params"""
+        if self.request.query_params.get('all') == 'true':
+            return None
+        return super().paginate_queryset(queryset)
   
   
 class ACTypeMaterialViewSet(ModelViewSet):
