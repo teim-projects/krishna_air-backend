@@ -502,14 +502,18 @@ class MaterialIssueSerializer(serializers.Serializer):
             "issue_number": instance.issue_number,
             "issue_type": instance.issue_type,
             "branch": instance.branch.id,
+            "branch_name": instance.branch.name if instance.branch else None,
             "site": instance.site.id if instance.site else None,
+            "site_name": instance.site.name if instance.site else None,
             "technician": instance.technician.id if instance.technician else None,
+            "technician_name": f"{instance.technician.first_name} {instance.technician.last_name}" if instance.technician else None,
             "issue_date": instance.issue_date,
             "items": [
                 {
                     "id": item.id,
                     "inventory_item": item.inventory_item.id,
-                    "product_name": str(item.inventory_item),
+                    "inventory_item_name": str(item.inventory_item),
+                    "display_name": str(item.inventory_item),
                     "quantity": item.quantity,
                     "uom": item.uom,
                 }
@@ -551,18 +555,21 @@ class MaterialReturnItemSerializer(serializers.ModelSerializer):
 
 class MaterialReturnSerializer(serializers.ModelSerializer):
     items = MaterialReturnItemSerializer(many=True)
+    issue_number = serializers.CharField(source='material_issue.issue_number', read_only=True)
 
     class Meta:
         model = MaterialReturn
         fields = [
             "id",
             "material_issue",
+            "issue_number",
             "return_number",
             "return_date",
             "created_by",
+            "is_completed",
             "items"
         ]
-        read_only_fields = ["return_number", "created_by"]
+        read_only_fields = ["return_number", "created_by", "issue_number", "is_completed"]
 
     def validate(self, data):
         issue = data["material_issue"]

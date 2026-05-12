@@ -151,6 +151,7 @@ class ACTypeMaterialViewSet(ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     search_fields = ['ac_type__name']
     filterset_fields = ['ac_type']
+    pagination_class = None  # Disable pagination to return all materials
     
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
