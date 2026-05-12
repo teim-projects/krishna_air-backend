@@ -370,9 +370,8 @@ class QuotationPDFGenerator:
                         f"{rate:,.2f}",
                         f"{base_amount:,.2f}",   # 👈 show base amount
                     ])
-                # Calculations
-                gst = subtotal * 0.18
-                total = total
+                # Calculations - use accumulated gst_total instead of recalculating
+                # gst_total is already accumulated from item.gst_amount above
     
                 # Format helper
                 def format_extra(value):
@@ -380,7 +379,7 @@ class QuotationPDFGenerator:
     
                 # Totals rows
                 data.append(['', '', '', '', 'Sub Total :', f"{subtotal:,.2f}"])
-                data.append(['', '', '', '', 'GST @ 18% :', f"{gst:,.2f}"])
+                data.append(['', '', '', '', 'GST :', f"{gst_total:,.2f}"])
                 data.append(['', '', '', '', 'Mathadi Charges :', format_extra(mathadi_charges)])
                 data.append(['', '', '', '', 'Transportation :', format_extra(transportation)])
                 data.append(['', '', '', '', 'Total :', f"{total:,.2f}"])
@@ -495,8 +494,10 @@ class QuotationPDFGenerator:
             # Add empty row between content and totals
             data.append(['', '', '', '', '', ''])
             
-            # Calculate subtotal
-            low_subtotal = sum(float(item.total_with_gst) for item in low_items)
+            # Calculate subtotal (base amounts only) and GST total from stored values
+            low_subtotal = sum(float(item.base_amount) for item in low_items)
+            low_gst_total = sum(float(item.gst_amount) for item in low_items)
+            low_mathadi_total = sum(float(item.mathadi_charges) for item in low_items)
             
             # Summary section - Low side specific rows
             data.append([
@@ -504,20 +505,21 @@ class QuotationPDFGenerator:
                 f"{low_subtotal:,.2f}"
             ])
             
-            # Calculate GST (18%)
-            gst_amount = low_subtotal * 0.18
+            # Use the actual GST amount from database instead of recalculating
             data.append([
-                "GST @ 18% :", '', '', '', '', 
-                f"{gst_amount:,.2f}"
+                "GST :", '', '', '', '', 
+                f"{low_gst_total:,.2f}"
             ])
             
+            # Format mathadi charges
+            mathadi_display = f"{low_mathadi_total:,.2f}" if low_mathadi_total > 0 else "Extra"
             data.append([
                 "Mathadi Charges :", '', '', '', '', 
-                "Extra"
+                mathadi_display
             ])
             
-            # Calculate total with GST
-            total_with_gst = low_subtotal + gst_amount
+            # Calculate total with GST from stored values
+            total_with_gst = sum(float(item.total_with_gst) for item in low_items)
             data.append([
                 "Total :", '', '', '', '', 
                 f"{total_with_gst:,.2f}"

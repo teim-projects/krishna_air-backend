@@ -233,15 +233,51 @@ class item(models.Model):
 
 
     def save(self, *args, **kwargs):
-      if not self.item_code:
-          base_code = self.generate_item_code()
-          code = base_code
-          i = 1
-          while item.objects.filter(item_code=code).exists():
-              code = f"{base_code}-{i}"
-              i += 1
-          self.item_code = code
-      super().save(*args, **kwargs)
+        # Check if this is an update (item already exists in DB)
+        is_update = self.pk is not None
+        
+        if is_update:
+            # Get the old instance from database
+            try:
+                old_instance = item.objects.get(pk=self.pk)
+                
+                # Check if any fields that affect item_code have changed
+                fields_changed = (
+                    old_instance.material_type_id != self.material_type_id or
+                    old_instance.item_type_id != self.item_type_id or
+                    old_instance.feature_type_id != self.feature_type_id or
+                    old_instance.item_class_id != self.item_class_id or
+                    old_instance.size != self.size or
+                    old_instance.size_unit != self.size_unit or
+                    old_instance.thickness != self.thickness or
+                    old_instance.thickness_unit != self.thickness_unit
+                )
+                
+                # If relevant fields changed, regenerate item_code
+                if fields_changed:
+                    base_code = self.generate_item_code()
+                    code = base_code
+                    i = 1
+                    # Exclude current item when checking for duplicates
+                    while item.objects.filter(item_code=code).exclude(pk=self.pk).exists():
+                        code = f"{base_code}-{i}"
+                        i += 1
+                    self.item_code = code
+            except item.DoesNotExist:
+                # Item doesn't exist yet, treat as new
+                pass
+        
+        # For new items, generate item_code if not set
+        if not self.item_code:
+            base_code = self.generate_item_code()
+            code = base_code
+            i = 1
+            while item.objects.filter(item_code=code).exists():
+                code = f"{base_code}-{i}"
+                i += 1
+            self.item_code = code
+        
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.item_code

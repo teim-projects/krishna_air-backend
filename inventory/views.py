@@ -18,6 +18,7 @@ class VendorViewSet(ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['is_active', 'state', 'supplier_category', 'company_type']
     search_fields = ['name', 'email', 'mobile', 'gst_details', 'pan_details', 'office_poc_name']
+    pagination_class = None  # Disable pagination to show all vendors in dropdown
 
 
 
