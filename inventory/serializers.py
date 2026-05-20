@@ -350,6 +350,8 @@ class InventorySerializer(serializers.ModelSerializer):
             "display_name",
 
             "quantity",
+            "total_in_quantity",
+            "total_out_quantity",
             "uom",
             "updated_at",
         ]
@@ -482,7 +484,8 @@ class MaterialIssueSerializer(serializers.Serializer):
                     )
 
                 InventoryItem.objects.filter(id=inventory.id).update(
-                    quantity=F("quantity") - qty
+                    quantity=F("quantity") - qty,
+                    total_out_quantity=F("total_out_quantity") + qty
                 )
 
                 MaterialIssueItem.objects.create(

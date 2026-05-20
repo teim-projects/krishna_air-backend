@@ -90,8 +90,8 @@ class PurchaseOrder(models.Model):
         BranchManagement,
         on_delete=models.PROTECT,
         related_name="purchase_orders",
-        null= True,
-        blank= True
+        null=False,  # Make branch required
+        blank=False  # Make branch required
     )
 
     terms_conditions = models.ManyToManyField(
@@ -382,6 +382,8 @@ class InventoryItem(models.Model):
     )
 
     quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total_in_quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # Total received via GRN
+    total_out_quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # Total issued
     uom = models.CharField(max_length=20, blank=True, null=True)
 
     updated_at = models.DateTimeField(auto_now=True)
@@ -427,13 +429,16 @@ def update_inventory_from_grn(grn):
             item=item_obj,
             defaults={
                 "quantity": 0,
+                "total_in_quantity": 0,
+                "total_out_quantity": 0,
                 "uom": grn_product.purchase_order_product.uom if grn_product.purchase_order_product else ""
             }
         )
 
-        # Update inventory quantity
+        # Update inventory quantity and total_in_quantity
         InventoryItem.objects.filter(id=inventory.id).update(
-            quantity=F('quantity') + accepted_qty
+            quantity=F('quantity') + accepted_qty,
+            total_in_quantity=F('total_in_quantity') + accepted_qty
         )    
 
 
@@ -600,9 +605,10 @@ def update_inventory_from_return(material_return):
         # 🔥 Lock inventory row (important)
         inventory = InventoryItem.objects.select_for_update().get(id=inventory.id)
 
-        # 🔥 Increase stock
+        # 🔥 Increase stock and total_in_quantity
         InventoryItem.objects.filter(id=inventory.id).update(
-            quantity=F("quantity") + item.quantity
+            quantity=F("quantity") + item.quantity,
+            total_in_quantity=F("total_in_quantity") + item.quantity
         )
         
 def complete_return(material_return):
