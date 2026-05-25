@@ -123,6 +123,7 @@ from django.contrib.staticfiles import finders
 from weasyprint import HTML
 from decimal import Decimal
 from .models import PurchaseOrder
+from .utils import format_amount_in_words
 
 
 def purchase_order_pdf(request, pk):
@@ -132,6 +133,9 @@ def purchase_order_pdf(request, pk):
 
     gst_amount = (po.subtotal * po.gst_percentage) / Decimal("100")
 
+    # Convert total amount to words
+    total_in_words = format_amount_in_words(po.grand_total)
+
     # logo_path = finders.find("images/ka-logo.png")
 
     html_string = render_to_string(
@@ -140,6 +144,7 @@ def purchase_order_pdf(request, pk):
             "po": po,
             "products": products,
             "gst_amount": gst_amount,
+            "total_in_words": total_in_words,  # Add total in words
             # "logo_path": logo_path,
         }
     )

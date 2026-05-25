@@ -150,6 +150,8 @@ class AcMaterialSerializer(serializers.ModelSerializer):
     ac_type_name = serializers.CharField(source='ac_type.name', read_only=True)
     material_id = serializers.IntegerField(source='material.id', read_only=True)
     material_name = serializers.SerializerMethodField()
+    brand_id = serializers.IntegerField(source='material.brand.id', read_only=True, allow_null=True)
+    brand_name = serializers.CharField(source='material.brand.name', read_only=True, allow_null=True)
 
     class Meta:
         model = AcMaterials
@@ -159,7 +161,9 @@ class AcMaterialSerializer(serializers.ModelSerializer):
             'material',
             'material_id',
             'material_name',
-            'ac_type_name'
+            'ac_type_name',
+            'brand_id',
+            'brand_name'
         ]
 
     def get_material_name(self, obj):
