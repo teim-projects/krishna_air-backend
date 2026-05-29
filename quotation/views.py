@@ -1,6 +1,7 @@
 from rest_framework import viewsets, status, filters
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action, api_view
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.http import HttpResponse
@@ -19,6 +20,15 @@ from .models import (
 )
 from .serializers import QuotationSerializer
 from .utils.pdf_generator import generate_quotation_pdf
+
+from .models import ServiceCategory, ServiceSubCategory, ServiceMaster, QuotationServiceItem
+from .serializers import (
+    ServiceCategorySerializer, 
+    ServiceSubCategorySerializer,
+    ServiceMasterSerializer, 
+    QuotationServiceItemSerializer,
+    QuotationServiceItemCreateSerializer
+)
 
 logger = logging.getLogger(__name__)
 
@@ -189,3 +199,54 @@ class QuotationViewSet(viewsets.ModelViewSet):
             latest.save(update_fields=["is_active"])
     
         return Response({"message": "Version deleted"})
+
+
+class ServiceCategoryViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = ServiceCategory.objects.filter(is_active=True).prefetch_related(
+        'subcategories__services__item',
+        'services__item'
+    )
+    serializer_class = ServiceCategorySerializer
+    pagination_class = None
+
+class ServiceCategoryCreateViewSet(viewsets.ModelViewSet):
+    queryset = ServiceCategory.objects.all()
+    serializer_class = ServiceCategorySerializer
+    pagination_class = None
+
+class ServiceSubCategoryCreateViewSet(viewsets.ModelViewSet):
+    queryset = ServiceSubCategory.objects.all()
+    serializer_class = ServiceSubCategorySerializer
+    pagination_class = None
+
+class ServiceMasterViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = ServiceMaster.objects.filter(is_active=True).select_related(
+        'category', 'subcategory', 'item'
+    )
+    serializer_class = ServiceMasterSerializer
+    pagination_class = None
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['category', 'subcategory', 'service_type']
+
+class QuotationServiceItemViewSet(viewsets.ModelViewSet):
+    queryset = QuotationServiceItem.objects.all().select_related(
+        'service__category', 'service__subcategory', 'service__item', 'quotation_version'
+    )
+    serializer_class = QuotationServiceItemSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['quotation_version']
+    
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return QuotationServiceItemCreateSerializer
+        return QuotationServiceItemSerializer
+    
+    @action(detail=False, methods=['get'])
+    def by_quotation_version(self, request):
+        version_id = request.query_params.get('version_id')
+        if not version_id:
+            return Response({'error': 'version_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        items = self.queryset.filter(quotation_version_id=version_id)
+        serializer = self.get_serializer(items, many=True)
+        return Response(serializer.data)

@@ -13,6 +13,7 @@ from .models import (
     QuotationLowSideItem,
 )
 
+from .models import ServiceCategory, ServiceSubCategory, ServiceMaster, QuotationServiceItem
 
 # =====================================================
 # HIGH SIDE SERIALIZER
@@ -364,3 +365,77 @@ class QuotationSerializer(serializers.ModelSerializer):
         self.calculate_totals(new_version, high_items, low_items)
 
         return instance
+
+
+class ServiceMasterSerializer(serializers.ModelSerializer):
+    item_name = serializers.CharField(source='item.item_code', read_only=True)
+    item_description = serializers.SerializerMethodField()
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    subcategory_name = serializers.CharField(source='subcategory.name', read_only=True)
+    material_rate = serializers.ReadOnlyField()
+    total_rate = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = ServiceMaster
+        fields = '__all__'
+    
+    def get_item_description(self, obj):
+        if obj.item:
+            # Build description from item details (same as low side items)
+            parts = []
+            if hasattr(obj.item, 'material_type_id') and obj.item.material_type_id:
+                parts.append(str(obj.item.material_type_id))
+            if hasattr(obj.item, 'item_type_id') and obj.item.item_type_id:
+                parts.append(str(obj.item.item_type_id))
+            if hasattr(obj.item, 'feature_type_id') and obj.item.feature_type_id:
+                parts.append(str(obj.item.feature_type_id))
+            if hasattr(obj.item, 'size') and obj.item.size:
+                size_str = f"{obj.item.size}{obj.item.size_unit or ''}"
+                parts.append(size_str)
+            if hasattr(obj.item, 'brand') and obj.item.brand:
+                parts.append(str(obj.item.brand))
+            return ' - '.join(parts) if parts else obj.item.item_code
+        return None
+
+class ServiceSubCategorySerializer(serializers.ModelSerializer):
+    services = ServiceMasterSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = ServiceSubCategory
+        fields = '__all__'
+
+class ServiceCategorySerializer(serializers.ModelSerializer):
+    subcategories = ServiceSubCategorySerializer(many=True, read_only=True)
+    services = ServiceMasterSerializer(many=True, read_only=True)  # Direct services without subcategory
+    
+    class Meta:
+        model = ServiceCategory
+        fields = '__all__'
+
+class QuotationServiceItemSerializer(serializers.ModelSerializer):
+    service_name = serializers.CharField(source='service.name', read_only=True)
+    service_type = serializers.CharField(source='service.service_type', read_only=True)
+    category_name = serializers.CharField(source='service.category.name', read_only=True)
+    subcategory_name = serializers.CharField(source='service.subcategory.name', read_only=True)
+    item_code = serializers.CharField(source='service.item.item_code', read_only=True)
+    
+    class Meta:
+        model = QuotationServiceItem
+        fields = '__all__'
+        read_only_fields = ['base_amount', 'gst_amount', 'total_with_gst']
+
+class QuotationServiceItemCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QuotationServiceItem
+        fields = ['quotation_version', 'service', 'quantity', 'unit_price', 'description', 'gst_percentage', 'mathadi_charges', 'transportation_charges']
+    
+    def create(self, validated_data):
+        # Auto-set unit from service
+        service = validated_data['service']
+        validated_data['unit'] = service.unit
+        
+        # Auto-set unit_price if not provided
+        if not validated_data.get('unit_price'):
+            validated_data['unit_price'] = service.total_rate
+            
+        return super().create(validated_data)
