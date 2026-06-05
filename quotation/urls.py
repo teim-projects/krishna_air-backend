@@ -7,7 +7,8 @@ from .views import (
     ServiceCategoryViewSet, 
     ServiceCategoryCreateViewSet,
     ServiceSubCategoryCreateViewSet,
-    ServiceMasterViewSet, 
+    ServiceMasterViewSet,
+    ServiceMasterCreateViewSet, 
     QuotationServiceItemViewSet
 )
 
@@ -16,6 +17,7 @@ router = DefaultRouter()
 router.register(r'quotation',QuotationViewSet,basename='quotation')
 router.register(r'service-categories', ServiceCategoryViewSet)
 router.register(r'service-masters', ServiceMasterViewSet)
+router.register(r'service-masters-create', ServiceMasterCreateViewSet, basename='service-masters-create')
 router.register(r'quotation-service-items', QuotationServiceItemViewSet)
 router.register(r'service-categories-create', ServiceCategoryCreateViewSet, basename='service-categories-create')
 router.register(r'service-subcategories', ServiceSubCategoryCreateViewSet, basename='service-subcategories')

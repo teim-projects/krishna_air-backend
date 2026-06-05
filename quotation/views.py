@@ -218,6 +218,8 @@ class ServiceSubCategoryCreateViewSet(viewsets.ModelViewSet):
     queryset = ServiceSubCategory.objects.all()
     serializer_class = ServiceSubCategorySerializer
     pagination_class = None
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['category']
 
 class ServiceMasterViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ServiceMaster.objects.filter(is_active=True).select_related(
@@ -227,6 +229,11 @@ class ServiceMasterViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = None
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['category', 'subcategory', 'service_type']
+
+class ServiceMasterCreateViewSet(viewsets.ModelViewSet):
+    queryset = ServiceMaster.objects.all()
+    serializer_class = ServiceMasterSerializer
+    pagination_class = None
 
 class QuotationServiceItemViewSet(viewsets.ModelViewSet):
     queryset = QuotationServiceItem.objects.all().select_related(
