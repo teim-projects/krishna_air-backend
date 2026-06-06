@@ -206,8 +206,8 @@ class ServiceMaster(models.Model):
     service_type = models.CharField(max_length=10, choices=SERVICE_TYPES, default='LABOR')
     
     # For material-based services - Link to existing Item Master
-    item = models.ForeignKey('product_management.item', on_delete=models.CASCADE, null=True, blank=True, 
-                           help_text="Link to existing item from Item Master (for material-based services)")
+    items = models.ManyToManyField('product_management.item', blank=True, 
+                           help_text="Link to existing items from Item Master (for material-based services)")
     
     # Pricing
     unit = models.CharField(max_length=50)  # Mtr, Nos, Kg, Lot, etc.
@@ -225,10 +225,10 @@ class ServiceMaster(models.Model):
     
     @property
     def material_rate(self):
-        """Get material rate from linked item"""
-        if self.item and self.service_type == 'MATERIAL':
-            # You can customize this logic based on how you store rates in item model
-            return getattr(self.item, 'rate', 0) or 0
+        """Get material rate from linked items"""
+        if self.service_type == 'MATERIAL':
+            # Sum rates of all linked items
+            return sum(getattr(i, 'rate', 0) or 0 for i in self.items.all())
         return 0
     
     @property

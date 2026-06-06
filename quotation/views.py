@@ -203,8 +203,8 @@ class QuotationViewSet(viewsets.ModelViewSet):
 
 class ServiceCategoryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ServiceCategory.objects.filter(is_active=True).prefetch_related(
-        'subcategories__services__item',
-        'services__item'
+        'subcategories__services__items',
+        'services__items'
     )
     serializer_class = ServiceCategorySerializer
     pagination_class = None
@@ -223,22 +223,24 @@ class ServiceSubCategoryCreateViewSet(viewsets.ModelViewSet):
 
 class ServiceMasterViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ServiceMaster.objects.filter(is_active=True).select_related(
-        'category', 'subcategory', 'item'
-    )
+        'category', 'subcategory'
+    ).prefetch_related('items')
     serializer_class = ServiceMasterSerializer
     pagination_class = None
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['category', 'subcategory', 'service_type']
 
 class ServiceMasterCreateViewSet(viewsets.ModelViewSet):
-    queryset = ServiceMaster.objects.all()
+    queryset = ServiceMaster.objects.all().select_related(
+        'category', 'subcategory'
+    ).prefetch_related('items')
     serializer_class = ServiceMasterSerializer
     pagination_class = None
 
 class QuotationServiceItemViewSet(viewsets.ModelViewSet):
     queryset = QuotationServiceItem.objects.all().select_related(
-        'service__category', 'service__subcategory', 'service__item', 'quotation_version'
-    )
+        'service__category', 'service__subcategory', 'quotation_version'
+    ).prefetch_related('service__items')
     serializer_class = QuotationServiceItemSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['quotation_version']

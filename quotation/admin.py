@@ -31,12 +31,12 @@ class ServiceMasterAdmin(admin.ModelAdmin):
             'fields': ('name', 'description', 'category', 'subcategory', 'service_type', 'sequence')
         }),
         ('Material Link (for Material-based services)', {
-            'fields': ('item',),
+            'fields': ('items',),
             'classes': ('collapse',)
         }),
         ('Pricing', {
             'fields': ('unit', 'labor_rate'),
-            'description': 'Material rate will be auto-fetched from linked item'
+            'description': 'Material rate will be auto-fetched from linked items'
         }),
         ('Settings', {
             'fields': ('is_active',)
