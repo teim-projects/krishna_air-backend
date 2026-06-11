@@ -161,60 +161,20 @@ class QuotationLowSideItem(models.Model):
     gst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total_with_gst = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
-class ServiceCategory(models.Model):
-    name = models.CharField(max_length=200)  # REFRIGERANT PIPING, CONTROL CABLING, etc.
-    description = models.TextField(blank=True, null=True)
-    sequence = models.IntegerField(default=0)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    class Meta:
-        ordering = ['sequence', 'name']
-        verbose_name_plural = "Service Categories"
-    
-    def __str__(self):
-        return self.name
-
-class ServiceSubCategory(models.Model):
-    category = models.ForeignKey(ServiceCategory, on_delete=models.CASCADE, related_name='subcategories')
-    name = models.CharField(max_length=200)  # between IDU to ODU, with Insulation, etc.
-    description = models.TextField(blank=True, null=True)
-    sequence = models.IntegerField(default=0)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    class Meta:
-        ordering = ['sequence', 'name']
-        verbose_name_plural = "Service Sub Categories"
-    
-    def __str__(self):
-        return f"{self.category.name} - {self.name}"
-
 class ServiceMaster(models.Model):
     SERVICE_TYPES = [
         ('MATERIAL', 'Material Based'),
         ('LABOR', 'Labor Only'),
     ]
     
-    category = models.ForeignKey(ServiceCategory, on_delete=models.CASCADE, related_name='services')
-    subcategory = models.ForeignKey(ServiceSubCategory, on_delete=models.CASCADE, related_name='services', null=True, blank=True)
-    
-    name = models.CharField(max_length=300)  # 12 HP ODU, Installation & Commissioning, etc.
+    category = models.CharField(max_length=200)
+    subcategory = models.CharField(max_length=200, blank=True, null=True)
+    name = models.CharField(max_length=300)  # Make sure this exists
     description = models.TextField(blank=True, null=True)
     service_type = models.CharField(max_length=10, choices=SERVICE_TYPES, default='LABOR')
-    
-    # For material-based services - Link to existing Item Master
-    items = models.ManyToManyField('product_management.item', blank=True, 
-                           help_text="Link to existing items from Item Master (for material-based services)")
-    
-    # Pricing
-    unit = models.CharField(max_length=50)  # Mtr, Nos, Kg, Lot, etc.
-    labor_rate = models.DecimalField(max_digits=10, decimal_places=2, default=0, 
-                                   help_text="Labor cost per unit")
-    
-    # Settings
+    items = models.ManyToManyField('product_management.item', blank=True)
+    unit = models.CharField(max_length=50, blank=True, null=True)
+    labor_rate = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     sequence = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -222,19 +182,6 @@ class ServiceMaster(models.Model):
     
     class Meta:
         ordering = ['sequence', 'name']
-    
-    @property
-    def material_rate(self):
-        """Get material rate from linked items"""
-        if self.service_type == 'MATERIAL':
-            # Sum rates of all linked items
-            return sum(getattr(i, 'rate', 0) or 0 for i in self.items.all())
-        return 0
-    
-    @property
-    def total_rate(self):
-        """Calculate total rate (material + labor)"""
-        return self.material_rate + self.labor_rate
     
     def __str__(self):
         return self.name

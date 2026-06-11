@@ -13,7 +13,7 @@ from .models import (
     QuotationLowSideItem,
 )
 
-from .models import ServiceCategory, ServiceSubCategory, ServiceMaster, QuotationServiceItem
+from .models import ServiceMaster, QuotationServiceItem
 
 # =====================================================
 # HIGH SIDE SERIALIZER
@@ -371,8 +371,6 @@ class ServiceMasterSerializer(serializers.ModelSerializer):
     item_code = serializers.SerializerMethodField()
     item_name = serializers.SerializerMethodField()
     item_description = serializers.SerializerMethodField()
-    category_name = serializers.CharField(source='category.name', read_only=True)
-    subcategory_name = serializers.CharField(source='subcategory.name', read_only=True)
     material_rate = serializers.ReadOnlyField()
     total_rate = serializers.ReadOnlyField()
     
@@ -405,26 +403,11 @@ class ServiceMasterSerializer(serializers.ModelSerializer):
             descriptions.append(desc)
         return ", ".join(descriptions) if descriptions else None
 
-class ServiceSubCategorySerializer(serializers.ModelSerializer):
-    services = ServiceMasterSerializer(many=True, read_only=True)
-    
-    class Meta:
-        model = ServiceSubCategory
-        fields = '__all__'
-
-class ServiceCategorySerializer(serializers.ModelSerializer):
-    subcategories = ServiceSubCategorySerializer(many=True, read_only=True)
-    services = ServiceMasterSerializer(many=True, read_only=True)  # Direct services without subcategory
-    
-    class Meta:
-        model = ServiceCategory
-        fields = '__all__'
-
 class QuotationServiceItemSerializer(serializers.ModelSerializer):
     service_name = serializers.CharField(source='service.name', read_only=True)
     service_type = serializers.CharField(source='service.service_type', read_only=True)
-    category_name = serializers.CharField(source='service.category.name', read_only=True)
-    subcategory_name = serializers.CharField(source='service.subcategory.name', read_only=True)
+    category_name = serializers.CharField(source='service.category', read_only=True)
+    subcategory_name = serializers.CharField(source='service.subcategory', read_only=True)
     item_code = serializers.SerializerMethodField()
     
     class Meta:

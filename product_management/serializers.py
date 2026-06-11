@@ -150,6 +150,12 @@ class AcMaterialSerializer(serializers.ModelSerializer):
     ac_type_name = serializers.CharField(source='ac_type.name', read_only=True)
     material_id = serializers.IntegerField(source='material.id', read_only=True)
     material_name = serializers.SerializerMethodField()
+    item_code = serializers.CharField(source='material.item_code', read_only=True)
+    size = serializers.CharField(source='material.size', read_only=True, allow_null=True)
+    size_unit = serializers.CharField(source='material.size_unit', read_only=True, allow_null=True)
+    thickness = serializers.CharField(source='material.thickness', read_only=True, allow_null=True)
+    thickness_unit = serializers.CharField(source='material.thickness_unit', read_only=True, allow_null=True)
+    item_type_name = serializers.CharField(source='material.item_type_id.name', read_only=True)
     brand_id = serializers.IntegerField(source='material.brand.id', read_only=True, allow_null=True)
     brand_name = serializers.CharField(source='material.brand.name', read_only=True, allow_null=True)
 
@@ -161,6 +167,12 @@ class AcMaterialSerializer(serializers.ModelSerializer):
             'material',
             'material_id',
             'material_name',
+            'item_code',
+            'size',
+            'size_unit',
+            'thickness',
+            'thickness_unit',
+            'item_type_name',
             'ac_type_name',
             'brand_id',
             'brand_name'

@@ -21,10 +21,8 @@ from .models import (
 from .serializers import QuotationSerializer
 from .utils.pdf_generator import generate_quotation_pdf
 
-from .models import ServiceCategory, ServiceSubCategory, ServiceMaster, QuotationServiceItem
+from .models import ServiceMaster, QuotationServiceItem
 from .serializers import (
-    ServiceCategorySerializer, 
-    ServiceSubCategorySerializer,
     ServiceMasterSerializer, 
     QuotationServiceItemSerializer,
     QuotationServiceItemCreateSerializer
@@ -200,42 +198,20 @@ class QuotationViewSet(viewsets.ModelViewSet):
     
         return Response({"message": "Version deleted"})
 
-
-class ServiceCategoryViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = ServiceCategory.objects.filter(is_active=True).prefetch_related(
-        'subcategories__services__items',
-        'services__items'
-    )
-    serializer_class = ServiceCategorySerializer
-    pagination_class = None
-
-class ServiceCategoryCreateViewSet(viewsets.ModelViewSet):
-    queryset = ServiceCategory.objects.all()
-    serializer_class = ServiceCategorySerializer
-    pagination_class = None
-
-class ServiceSubCategoryCreateViewSet(viewsets.ModelViewSet):
-    queryset = ServiceSubCategory.objects.all()
-    serializer_class = ServiceSubCategorySerializer
-    pagination_class = None
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['category']
-
-class ServiceMasterViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = ServiceMaster.objects.filter(is_active=True).select_related(
-        'category', 'subcategory'
-    ).prefetch_related('items')
+class ServiceMasterViewSet(viewsets.ModelViewSet):
+    queryset = ServiceMaster.objects.all()  # ✅ REMOVE select_related
     serializer_class = ServiceMasterSerializer
-    pagination_class = None
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['category', 'subcategory', 'service_type']
+    pagination_class = None  # Disable pagination
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['service_type', 'is_active']
+    search_fields = ['name', 'category', 'subcategory']
+    permission_classes = [IsAuthenticated]
 
 class ServiceMasterCreateViewSet(viewsets.ModelViewSet):
-    queryset = ServiceMaster.objects.all().select_related(
-        'category', 'subcategory'
-    ).prefetch_related('items')
+    queryset = ServiceMaster.objects.all().prefetch_related('items')
     serializer_class = ServiceMasterSerializer
     pagination_class = None
+    permission_classes = [IsAuthenticated]
 
 class QuotationServiceItemViewSet(viewsets.ModelViewSet):
     queryset = QuotationServiceItem.objects.all().select_related(
