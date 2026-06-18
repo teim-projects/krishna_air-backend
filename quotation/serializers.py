@@ -368,15 +368,20 @@ class QuotationSerializer(serializers.ModelSerializer):
 
 
 class ServiceMasterSerializer(serializers.ModelSerializer):
+    # ✅ Add this to include linked items
+    items = serializers.SerializerMethodField()
     item_code = serializers.SerializerMethodField()
     item_name = serializers.SerializerMethodField()
     item_description = serializers.SerializerMethodField()
-    material_rate = serializers.ReadOnlyField()
-    total_rate = serializers.ReadOnlyField()
     
     class Meta:
         model = ServiceMaster
         fields = '__all__'
+    
+    # ✅ Add this method to return items data
+    def get_items(self, obj):
+        from product_management.serializers import ItemSerializer
+        return ItemSerializer(obj.items.all(), many=True).data
     
     def get_item_code(self, obj):
         return ", ".join([i.item_code for i in obj.items.all()])
