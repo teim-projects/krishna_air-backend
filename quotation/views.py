@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action, api_view
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from .filters import QuotationFilter
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.db.models import Prefetch
@@ -65,7 +66,8 @@ class QuotationViewSet(viewsets.ModelViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
-    filter_backends = [filters.SearchFilter]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_class = QuotationFilter
 
     search_fields = [
         "quotation_no",
