@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     'quotation',
     'invoice',
     'inventory',
+    'amc',
 ] 
 
 SITE_ID = 1
