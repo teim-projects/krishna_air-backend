@@ -142,12 +142,14 @@ class AMCServiceViewSet(viewsets.ModelViewSet):
         inventory_item_id = request.data.get('inventory_item')
         quantity = request.data.get('quantity', 1)
         rate = request.data.get('rate_per_unit')
+        include_in_invoice = request.data.get('include_in_customer_invoice', False)
         
         part = AMCServiceParts.objects.create(
             service=service,
             inventory_item_id=inventory_item_id,
             quantity_used=quantity,
-            rate_per_unit=rate
+            rate_per_unit=rate,
+            include_in_customer_invoice=include_in_invoice
         )
         
         serializer = AMCServicePartsSerializer(part)

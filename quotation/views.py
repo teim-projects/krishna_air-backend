@@ -237,3 +237,13 @@ class QuotationServiceItemViewSet(viewsets.ModelViewSet):
         items = self.queryset.filter(quotation_version_id=version_id)
         serializer = self.get_serializer(items, many=True)
         return Response(serializer.data)
+
+
+class QuotationCustomerViewSet(viewsets.ReadOnlyModelViewSet):
+    from lead_management.models import Customer
+    from lead_management.serializers import CustomerSerializer
+    queryset = Customer.objects.filter(quotations__isnull=False).distinct().order_by('id')
+    serializer_class = CustomerSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    pagination_class = None

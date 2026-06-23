@@ -11,11 +11,22 @@ class AMCPackageSerializer(serializers.ModelSerializer):
 
 
 class AMCServicePartsSerializer(serializers.ModelSerializer):
-    product_name = serializers.CharField(source='inventory_item.product_variant.product_model.model_no', read_only=True)
+    product_name = serializers.SerializerMethodField()
     
     class Meta:
         model = AMCServiceParts
-        fields = ['id', 'inventory_item', 'item_code', 'quantity_used', 'rate_per_unit', 'total_cost', 'include_in_customer_invoice']
+        fields = ['id', 'inventory_item', 'product_name', 'quantity_used', 'rate_per_unit', 'total_cost', 'include_in_customer_invoice']
+
+    def get_product_name(self, obj):
+        if not obj.inventory_item:
+            return "Unknown"
+        if obj.inventory_item.product_variant:
+            sku = obj.inventory_item.product_variant.sku
+            model_no = getattr(getattr(obj.inventory_item.product_variant, 'product_model', None), 'model_no', '')
+            return f"{sku} {model_no}".strip()
+        if obj.inventory_item.item:
+            return obj.inventory_item.item.item_code
+        return "Unknown"
 
 
 class AMCServiceLaborSerializer(serializers.ModelSerializer):

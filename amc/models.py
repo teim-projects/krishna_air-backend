@@ -114,8 +114,8 @@ class AMCService(models.Model):
     engineer_assigned = models.CharField(max_length=100, blank=True, null=True)
     
     # Description
-    issue_reported = models.TextField()  # What customer complained about
-    work_performed = models.TextField()  # What engineer did
+    issue_reported = models.TextField(blank=True, null=True)  # What customer complained about
+    work_performed = models.TextField(blank=True, null=True)  # What engineer did
     
     # For non-comprehensive: This determines if customer invoice is generated
     is_billable = models.BooleanField(default=False)  # True = Generate customer invoice (non-comprehensive only)
@@ -155,12 +155,14 @@ class AMCServiceParts(models.Model):
         
         # Reduce inventory for both comprehensive and non-comprehensive
         self.inventory_item.quantity -= self.quantity_used
+        self.inventory_item.total_out_quantity += self.quantity_used
         self.inventory_item.save()
         
         super().save(*args, **kwargs)
     
     def __str__(self):
-        return f"Parts - {self.inventory_item.product_variant} - {self.quantity_used} units"
+        item_name = self.inventory_item.product_variant.sku if self.inventory_item.product_variant else self.inventory_item.item.item_code
+        return f"Parts - {item_name} - {self.quantity_used} units"
 
 
 class AMCServiceLabor(models.Model):
