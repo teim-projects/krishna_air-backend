@@ -3,6 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication 
 from rest_framework.response import Response
 from rest_framework import status , filters
+from rest_framework.filters import OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
 from .models import Customer , lead_management , LeadFAQ ,LeadFollowUp
@@ -30,8 +31,18 @@ class LeadViewSet(viewsets.ModelViewSet):
     serializer_class = LeadSerializer
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, OrderingFilter]
     filterset_class = LeadFilter
+
+    # Sorting: ?ordering=date / -date / customer__name / followup_date
+    ordering_fields = [
+        "date",
+        "followup_date",
+        "customer__name",
+        "status",
+    ]
+    # Default ordering is handled inside get_queryset (priority-based)
+    # Only override when the client explicitly passes ?ordering=
 
     filterset_fields = ['assign_to', 'status','followup_date','date']
     search_fields = [

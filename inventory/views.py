@@ -168,10 +168,22 @@ def purchase_order_pdf(request, pk):
 
 
 class GRNViewSet(ModelViewSet):
-    queryset = GRN.objects.all()
+    queryset = GRN.objects.all().select_related(
+        "purchase_order__vendor"
+    ).order_by("-id")
     serializer_class = GRNSerializer
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
+
+    # ── search & ordering ────────────────────────────────────────────────────────
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = [
+        "grn_no",
+        "purchase_order__purchase_order_no",   # search by PO number
+        "purchase_order__vendor__name",         # search by vendor name
+    ]
+    ordering_fields = ["grn_date", "id"]
+    ordering = ["-id"]
 
     def create(self, request, *args, **kwargs):
         """
