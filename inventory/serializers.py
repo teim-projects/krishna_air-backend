@@ -394,7 +394,27 @@ class MaterialIssueItemSerializer(serializers.Serializer):
     quantity = serializers.DecimalField(max_digits=10, decimal_places=2)
     uom = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
-    product_name = serializers.CharField(read_only=True)
+    product_name = serializers.SerializerMethodField()
+    item_code = serializers.SerializerMethodField()
+    
+    def get_product_name(self, obj):
+        """Get product name from inventory item"""
+        if obj.inventory_item:
+            # Try different name fields
+            if hasattr(obj.inventory_item, 'item') and obj.inventory_item.item:
+                return obj.inventory_item.item.material_type_name or obj.inventory_item.item.item_code
+            elif hasattr(obj.inventory_item, 'product_variant') and obj.inventory_item.product_variant:
+                return obj.inventory_item.product_variant.product_model.model_no
+        return "Unknown"
+    
+    def get_item_code(self, obj):
+        """Get item code from inventory item"""
+        if obj.inventory_item:
+            if hasattr(obj.inventory_item, 'item') and obj.inventory_item.item:
+                return obj.inventory_item.item.item_code
+            elif hasattr(obj.inventory_item, 'product_variant') and obj.inventory_item.product_variant:
+                return obj.inventory_item.product_variant.sku
+        return "Unknown"
 
     def validate(self, data):
         if data["quantity"] <= 0:
