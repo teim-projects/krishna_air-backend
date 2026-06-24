@@ -38,10 +38,14 @@ class AMCServiceLaborSerializer(serializers.ModelSerializer):
 class AMCServiceSerializer(serializers.ModelSerializer):
     parts_used = AMCServicePartsSerializer(many=True, read_only=True)
     labor = AMCServiceLaborSerializer(read_only=True)
+    amc_contract_number = serializers.CharField(source='amc_contract.contract_number', read_only=True)
+    customer_name = serializers.CharField(source='amc_contract.customer.name', read_only=True)
+    covered_product = serializers.CharField(source='amc_contract.product_variant.sku', read_only=True)
     
     class Meta:
         model = AMCService
         fields = '__all__'
+
 
 
 class AMCInvoiceSerializer(serializers.ModelSerializer):

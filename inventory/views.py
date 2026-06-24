@@ -263,7 +263,23 @@ class InventoryViewSet(ModelViewSet):
         "product_variant__name",
         "item__name"
     ]
-    
+
+    @action(detail=False, methods=['get'])
+    def all(self, request):
+        """Return all inventory items without pagination (for dropdown selects)"""
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def low_side(self, request):
+        """Return only low-side material items (exclude high-side ACs) without pagination"""
+        queryset = self.get_queryset().filter(
+            item__isnull=False,
+            product_variant__isnull=True
+        )
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
     
 class MaterialIssueViewSet(ModelViewSet):
     queryset = MaterialIssue.objects.all().prefetch_related("items")
