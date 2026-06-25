@@ -118,24 +118,33 @@ class AMCServiceViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         instance = serializer.save()
-        
-        # If non-comprehensive and service is completed, create invoice
+        # If non-comprehensive and created as COMPLETED, auto-create invoice
         if instance.amc_contract.package.package_type == 'NON_COMPREHENSIVE':
             if instance.status == 'COMPLETED':
+                if not hasattr(instance, 'customer_invoice'):
+                    self._create_invoice_for_service(instance)
+
+    def perform_update(self, serializer):
+        old_status = serializer.instance.status
+        instance = serializer.save()
+        # If status just changed to COMPLETED on a non-comprehensive contract, create invoice
+        if (instance.amc_contract.package.package_type == 'NON_COMPREHENSIVE'
+                and instance.status == 'COMPLETED'
+                and old_status != 'COMPLETED'):
+            if not hasattr(instance, 'customer_invoice'):
                 self._create_invoice_for_service(instance)
-    
+
     def _create_invoice_for_service(self, service):
         """Auto-create invoice for non-comprehensive services"""
         parts_total = sum([p.total_cost for p in service.parts_used.filter(include_in_customer_invoice=True)])
-        labor_total = service.labor.total_labor_cost if hasattr(service, 'labor') and service.labor.include_in_customer_invoice else 0
-        
-        if parts_total > 0 or labor_total > 0:
-            AMCInvoice.objects.create(
-                service=service,
-                parts_total=parts_total,
-                labor_total=labor_total,
-                other_charges=0
-            )
+        labor_total = (service.labor.total_labor_cost
+                       if hasattr(service, 'labor') and service.labor.include_in_customer_invoice else 0)
+        AMCInvoice.objects.create(
+            service=service,
+            parts_total=parts_total,
+            labor_total=labor_total,
+            other_charges=0
+        )
     
     @action(detail=True, methods=['post'])
     def add_parts(self, request, pk=None):
