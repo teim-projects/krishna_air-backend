@@ -23,6 +23,8 @@ class AMCPackageViewSet(viewsets.ModelViewSet):
     serializer_class = AMCPackageSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = None
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    search_fields = ['name', 'package_type']
     
     @action(detail=False, methods=['get'])
     def by_type(self, request):
@@ -110,33 +112,46 @@ class AMCServiceViewSet(viewsets.ModelViewSet):
     queryset = AMCService.objects.all()
     serializer_class = AMCServiceSerializer
     permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['amc_contract', 'service_type', 'status']
+    search_fields = ['amc_contract__contract_number', 'engineer_assigned', 'amc_contract__customer__name']
     
     def perform_create(self, serializer):
         instance = serializer.save()
-        
-        # If non-comprehensive and service is completed, create invoice
+        # If non-comprehensive and created as COMPLETED, auto-create invoice
         if instance.amc_contract.package.package_type == 'NON_COMPREHENSIVE':
             if instance.status == 'COMPLETED':
+                if not hasattr(instance, 'customer_invoice'):
+                    self._create_invoice_for_service(instance)
+
+    def perform_update(self, serializer):
+        old_status = serializer.instance.status
+        instance = serializer.save()
+        # If status just changed to COMPLETED on a non-comprehensive contract, create invoice
+        if (instance.amc_contract.package.package_type == 'NON_COMPREHENSIVE'
+                and instance.status == 'COMPLETED'
+                and old_status != 'COMPLETED'):
+            if not hasattr(instance, 'customer_invoice'):
                 self._create_invoice_for_service(instance)
-    
+
     def _create_invoice_for_service(self, service):
         """Auto-create invoice for non-comprehensive services"""
         parts_total = sum([p.total_cost for p in service.parts_used.filter(include_in_customer_invoice=True)])
-        labor_total = service.labor.total_labor_cost if hasattr(service, 'labor') and service.labor.include_in_customer_invoice else 0
-        
-        if parts_total > 0 or labor_total > 0:
-            AMCInvoice.objects.create(
-                service=service,
-                parts_total=parts_total,
-                labor_total=labor_total,
-                other_charges=0
-            )
+        labor_total = (service.labor.total_labor_cost
+                       if hasattr(service, 'labor') and service.labor.include_in_customer_invoice else 0)
+        AMCInvoice.objects.create(
+            service=service,
+            parts_total=parts_total,
+            labor_total=labor_total,
+            other_charges=0
+        )
     
     @action(detail=True, methods=['post'])
     def add_parts(self, request, pk=None):
-        """Add parts used in service"""
+        """Add parts used in service (low-side materials only)"""
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from inventory.models import InventoryItem
+        
         service = self.get_object()
         
         inventory_item_id = request.data.get('inventory_item')
@@ -144,13 +159,37 @@ class AMCServiceViewSet(viewsets.ModelViewSet):
         rate = request.data.get('rate_per_unit')
         include_in_invoice = request.data.get('include_in_customer_invoice', False)
         
-        part = AMCServiceParts.objects.create(
-            service=service,
-            inventory_item_id=inventory_item_id,
-            quantity_used=quantity,
-            rate_per_unit=rate,
-            include_in_customer_invoice=include_in_invoice
-        )
+        # Validate the inventory item exists and is low-side only
+        try:
+            inv_item = InventoryItem.objects.get(id=inventory_item_id)
+        except InventoryItem.DoesNotExist:
+            return Response(
+                {'detail': 'Inventory item not found.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if inv_item.product_variant is not None:
+            return Response(
+                {'detail': 'Only low-side materials can be added as spare parts. AC units (high-side) are not allowed.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            part = AMCServiceParts.objects.create(
+                service=service,
+                inventory_item_id=inventory_item_id,
+                quantity_used=quantity,
+                rate_per_unit=rate,
+                include_in_customer_invoice=include_in_invoice
+            )
+        except (DjangoValidationError, Exception) as e:
+            error_msg = str(e)
+            if hasattr(e, 'message'):
+                error_msg = e.message
+            return Response(
+                {'detail': error_msg},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         serializer = AMCServicePartsSerializer(part)
         return Response(serializer.data, status=status.HTTP_201_CREATED)

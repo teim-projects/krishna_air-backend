@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
+from django.core.exceptions import ValidationError
 from lead_management.models import Customer
 from product_management.models import ProductVariant
 
@@ -150,18 +151,55 @@ class AMCServiceParts(models.Model):
     include_in_customer_invoice = models.BooleanField(default=False)
     
     def save(self, *args, **kwargs):
+        from django.db import transaction
+        from inventory.models import InventoryItem
+        
         # Auto-calculate total cost
         self.total_cost = self.quantity_used * self.rate_per_unit
         
-        # Reduce inventory for both comprehensive and non-comprehensive
-        self.inventory_item.quantity -= self.quantity_used
-        self.inventory_item.total_out_quantity += self.quantity_used
-        self.inventory_item.save()
+        is_new = self.pk is None
         
-        super().save(*args, **kwargs)
+        if is_new:
+            # Only deduct stock on creation, not on updates
+            with transaction.atomic():
+                # Lock the inventory row to prevent race conditions
+                inv = InventoryItem.objects.select_for_update().get(id=self.inventory_item_id)
+                
+                if inv.quantity < self.quantity_used:
+                    raise ValidationError(
+                        f"Insufficient stock. Available: {inv.quantity}, Requested: {self.quantity_used}"
+                    )
+                
+                inv.quantity -= self.quantity_used
+                inv.total_out_quantity += self.quantity_used
+                inv.save(update_fields=['quantity', 'total_out_quantity'])
+                
+                super().save(*args, **kwargs)
+        else:
+            super().save(*args, **kwargs)
+    
+    def delete(self, *args, **kwargs):
+        from django.db import transaction
+        from inventory.models import InventoryItem
+        
+        with transaction.atomic():
+            try:
+                inv = InventoryItem.objects.select_for_update().get(id=self.inventory_item_id)
+                inv.quantity += self.quantity_used
+                inv.total_out_quantity -= self.quantity_used
+                inv.save(update_fields=['quantity', 'total_out_quantity'])
+            except InventoryItem.DoesNotExist:
+                pass
+            
+            super().delete(*args, **kwargs)
     
     def __str__(self):
-        item_name = self.inventory_item.product_variant.sku if self.inventory_item.product_variant else self.inventory_item.item.item_code
+        if self.inventory_item.item:
+            item_name = self.inventory_item.item.item_code
+        elif self.inventory_item.product_variant:
+            item_name = self.inventory_item.product_variant.sku
+        else:
+            item_name = "Unknown"
         return f"Parts - {item_name} - {self.quantity_used} units"
 
 
