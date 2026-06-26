@@ -79,6 +79,10 @@ class lead_management(models.Model):
 #   referance_by = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name='lead_referance')
   contact_person_name = models.CharField(max_length=200, blank=True, null=True)
   contact_person_number = models.CharField(max_length=20, blank=True, null=True)
+  # Lead Qualifying Questions — set True by manager/admin after initial review
+  is_qualified = models.BooleanField(default=False)
+  # JSON: { "<faq_id>": "<answer_text>", ... }
+  qualifying_answers = models.JSONField(blank=True, null=True, default=dict)
 
   def __str__(self):
         return f"Lead #{self.pk} - {self.customer.name or self.customer.email or self.customer.contact_number} - {self.get_status_display()}"
