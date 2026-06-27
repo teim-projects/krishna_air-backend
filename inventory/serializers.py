@@ -653,4 +653,85 @@ class MaterialReturnSerializer(serializers.ModelSerializer):
 
         return material_return 
     
-    
+
+class DeliveryChallanItemSerializer(serializers.ModelSerializer):
+    inventory_item_name = serializers.CharField(
+        source="material_issue_item.inventory_item",
+        read_only=True
+    )
+    issued_quantity = serializers.DecimalField(
+        source="material_issue_item.quantity",
+        max_digits=10,
+        decimal_places=2,
+        read_only=True
+    )
+
+    class Meta:
+        model = DeliveryChallanItem
+        fields = (
+            "id",
+            "material_issue_item",
+            "inventory_item_name",
+            "issued_quantity",
+            "quantity",
+        )
+
+    def validate(self, data):
+        issue_item = data["material_issue_item"]
+        issued_qty = issue_item.quantity
+
+        dispatched_qty = DeliveryChallanItem.objects.filter(
+            material_issue_item=issue_item
+        ).aggregate(
+            total=Sum("quantity")
+        )["total"] or 0
+
+        remaining = issued_qty - dispatched_qty
+
+        if data["quantity"] > remaining:
+            raise serializers.ValidationError(
+                f"Only {remaining} quantity remaining"
+            )
+
+        return data
+
+class DeliveryChallanSerializer(serializers.ModelSerializer):
+    items = DeliveryChallanItemSerializer(many=True)
+    issue_number = serializers.CharField(
+        source="material_issue.issue_number",
+        read_only=True
+    )
+
+    class Meta:
+        model = DeliveryChallan
+        fields = "__all__"
+        read_only_fields = (
+            "dc_number",
+            "created_by",
+            "issue_number",
+        )
+
+    def create(self, validated_data):
+        items_data = validated_data.pop("items")
+        
+        dc = DeliveryChallan.objects.create(
+            **validated_data,
+            created_by=self.context["request"].user
+        )
+
+        for item_data in items_data:
+            DeliveryChallanItem.objects.create(
+                delivery_challan=dc,
+                **item_data
+            )
+
+        return dc
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["issue_number"] = (
+            instance.material_issue.issue_number
+            if instance.material_issue
+            else None
+        )
+        return data

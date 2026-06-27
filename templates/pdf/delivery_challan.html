@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+@page {
+    size: A4;
+    margin: 12mm; /* Standard professional printing margin */
+}
+
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    background-color: #ffffff; /* Updated to clean white */
+    color: #000;
+}
+
+/* Master container wrapper to handle clean height scaling */
+.challan-container {
+    border: 2px solid #000;
+    padding: 15px;
+    background-color: #ffffff; /* Updated to clean white */
+    box-sizing: border-box;
+    min-height: 96%; /* Ensures it fills up the entire printable vertical area elegantly */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.content-wrapper {
+    width: 100%;
+}
+
+/* Header Grid Layout */
+.header-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 0px;
+}
+
+.header-table td {
+    border: 2px solid #000;
+    vertical-align: top;
+    padding: 12px;
+}
+
+.company-info {
+    width: 55%;
+}
+
+.company-title {
+    font-size: 26px;
+    font-weight: bold;
+    font-family: 'Times New Roman', Times, serif;
+    font-style: italic;
+    letter-spacing: 1px;
+}
+
+.company-subtitle {
+    font-size: 12px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.company-details {
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+.meta-info {
+    width: 45%;
+    padding: 0 !important;
+}
+
+.main-title {
+    font-size: 20px;
+    font-weight: bold;
+    text-align: center;
+    border-bottom: 2px solid #000;
+    padding: 8px 0;
+    letter-spacing: 1px;
+}
+
+.meta-fields-container {
+    padding: 10px 12px;
+}
+
+.meta-field {
+    display: flex;
+    align-items: flex-end;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+.meta-field strong {
+    white-space: nowrap;
+    margin-right: 5px;
+}
+
+.meta-field .line {
+    flex-grow: 1;
+    border-bottom: 1px dashed #000;
+    padding-left: 5px;
+}
+
+/* Client/Destination Box */
+.client-section {
+    border: 2px solid #000;
+    border-top: none;
+    border-bottom: none;
+    padding: 15px 12px;
+}
+
+.client-field {
+    display: flex;
+    align-items: flex-end;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+.client-field:last-child {
+    margin-bottom: 0;
+}
+
+.client-field strong {
+    white-space: nowrap;
+    margin-right: 8px;
+    min-width: 110px;
+}
+
+.client-field .line {
+    flex-grow: 1;
+    border-bottom: 1px dashed #000;
+    padding-left: 5px;
+}
+
+/* Item Specifications Grid */
+.items {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.items th,
+.items td {
+    border: 2px solid #000;
+    padding: 14px 10px; /* Enhanced clean padding for professional look */
+    vertical-align: middle;
+}
+
+.items th {
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 12px;
+    text-align: center;
+    height: 30px;
+}
+
+/* Precise Column Matrix */
+.col-qty { width: 14%; text-align: center; }
+.col-part { width: 44%; text-align: left; }
+.col-rate { width: 14%; text-align: right; }
+.col-amount { width: 14%; text-align: right; }
+.col-per { width: 14%; text-align: center; }
+
+/* Grand Total Row Design */
+.grand-total-row td {
+    font-weight: bold;
+    border-top: 2px solid #000;
+    border-bottom: 2px solid #000;
+    padding: 14px 10px;
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.grand-total-row .col-part {
+    text-align: right;
+    padding-right: 15px;
+}
+
+.grand-total-row .col-amount {
+    font-size: 14px;
+}
+
+/* Footer Specifications pushed to the bottom of the page seamlessly */
+.footer-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 2px solid #000;
+    margin-top: auto; /* Dynamically grounds the footer block on absolute bottom */
+}
+
+.footer-table td {
+    padding: 15px 12px;
+    vertical-align: bottom;
+}
+
+.footer-notes {
+    width: 65%;
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+.signature-area {
+    width: 35%;
+    text-align: right;
+    font-weight: bold;
+    font-size: 13px;
+    padding-bottom: 20px !important;
+}
+</style>
+</head>
+
+<body>
+
+<div class="challan-container">
+
+    <div class="content-wrapper">
+        <table class="header-table">
+            <tr>
+                <td class="company-info">
+                    <div class="company-title">Krisna</div>
+                    <div class="company-subtitle">Air Conditioning</div>
+                    <div class="company-subtitle" style="font-size: 9px; letter-spacing: 0.5px;">SALES, SERVICE & MAINTENANCE OF</div>
+                    <div class="company-details">
+                        309-B, Patil Plaza, Saras Baug, Pune - 411 009.<br>
+                        ☎ : 020-24441964<br>
+                        Cell : 9822011219, 9373366601<br>
+                        E-mail : service@crisnatech.com
+                    </div>
+                </td>
+                <td class="meta-info">
+                    <div class="main-title">DELIVERY CHALLAN</div>
+                    <div class="meta-fields-container">
+                        <div class="meta-field"><strong>Challan NO.:</strong> <div class="line">{{ dc.dc_number }}</div></div>
+                        <div class="meta-field"><strong>P. O. No.:</strong> <div class="line">{{ dc.material_issue.issue_number }}</div></div>
+                        <div class="meta-field"><strong>Date :</strong> <div class="line">{{ dc.dispatch_date }}</div></div>
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        <div class="client-section">
+            <div class="client-field"><strong>To</strong> <div class="line">{{ dc.transporter_name }}</div></div>
+            <div class="client-field"><strong>Contact Person</strong> <div class="line">{{ contact_person }}</div></div>
+            <div class="client-field"><strong>Contact No</strong> <div class="line">{{ contact_no }}</div></div>
+            <div class="client-field"><strong>Site</strong> <div class="line">{{ dc.material_issue.site }}</div></div>
+        </div>
+
+        <table class="items">
+            <thead>
+                <tr>
+                    <th class="col-qty">Quantity</th>
+                    <th class="col-part">Particulars</th>
+                    <th class="col-rate">Rate</th>
+                    <th class="col-amount">Amount</th>
+                    <th class="col-per">Per</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td class="col-qty">{{ item.quantity }}</td>
+                    <td class="col-part">{{ item.product_name }}</td>
+                    <td class="col-rate">{{ item.rate|floatformat:2 }}</td>
+                    <td class="col-amount">{{ item.amount|floatformat:2 }}</td>
+                    <td class="col-per">-</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td class="col-qty"></td>
+                    <td class="col-part" style="color: #555; font-style: italic;">No Items Found</td>
+                    <td class="col-rate"></td>
+                    <td class="col-amount"></td>
+                    <td class="col-per"></td>
+                </tr>
+                {% endfor %}
+                
+                <tr class="grand-total-row">
+                    <td class="col-qty"></td>
+                    <td class="col-part"><strong>Grand Total</strong></td>
+                    <td class="col-rate"></td>
+                    <td class="col-amount"><strong>{{ grand_total|floatformat:2 }}</strong></td>
+                    <td class="col-per"></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <table class="footer-table">
+        <tr>
+            <td class="footer-notes">
+                <strong>Note :</strong> No Complaints will be entertained if the same are received after 24 hours of delivery.<br>
+                <strong>GST No.</strong> 27AITPP8825B2ZS<br>
+                <strong>PAN No.</strong> AITPP8825B<br>
+                <span style="font-style: italic; font-size: 10px; margin-top: 5px; display: inline-block;">Please return the copy duly signed.</span>
+            </td>
+            <td class="signature-area">
+                <br><br><br>
+                Receiver's Signature
+            </td>
+        </tr>
+    </table>
+
+</div>
+
+</body>
+</html>

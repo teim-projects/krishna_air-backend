@@ -615,4 +615,117 @@ def complete_return(material_return):
     with transaction.atomic():
         update_inventory_from_return(material_return)
         
-        
+
+# ==========================================================
+# DELIVERY CHALLAN
+# ==========================================================
+
+class DeliveryChallan(models.Model):
+
+    STATUS_CHOICES = (
+        ("pending", "Pending"),
+        ("in_transit", "In Transit"),
+        ("delivered", "Delivered"),
+    )
+
+    material_issue = models.ForeignKey(
+        MaterialIssue,
+        on_delete=models.PROTECT,
+        related_name="delivery_challans"
+    )
+
+    dc_number = models.CharField(
+        max_length=50,
+        unique=True,
+        blank=True
+    )
+
+    dispatch_date = models.DateField()
+
+    transporter_name = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True
+    )
+
+    vehicle_number = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True
+    )
+
+    delivery_date = models.DateField(
+        blank=True,
+        null=True
+    )
+
+    receiver_name = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True
+    )
+
+    receiver_mobile = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True
+    )
+
+    delivery_proof = models.FileField(
+        upload_to="delivery_proofs/",
+        blank=True,
+        null=True
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="pending"
+    )
+
+    created_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+
+        is_new = self.pk is None
+
+        super().save(*args, **kwargs)
+
+        if is_new and not self.dc_number:
+            self.dc_number = f"DC-{str(self.id).zfill(5)}"
+            super().save(update_fields=["dc_number"])
+
+    def __str__(self):
+        return self.dc_number
+
+
+class DeliveryChallanItem(models.Model):
+
+    delivery_challan = models.ForeignKey(
+        DeliveryChallan,
+        on_delete=models.CASCADE,
+        related_name="items"
+    )
+
+    material_issue_item = models.ForeignKey(
+        MaterialIssueItem,
+        on_delete=models.PROTECT
+    )
+
+    quantity = models.DecimalField(
+        max_digits=10,
+        decimal_places=2
+    )
+
+    def __str__(self):
+        return (
+            f"{self.delivery_challan.dc_number} "
+            f"- {self.material_issue_item.id}"
+        )        

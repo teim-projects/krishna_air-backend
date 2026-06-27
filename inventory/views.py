@@ -355,3 +355,168 @@ class MaterialReturnViewSet(ModelViewSet):
             queryset = queryset.filter(material_issue_id=issue_id)
 
         return queryset.order_by("-id")
+    
+    
+class DeliveryChallanViewSet(ModelViewSet):
+
+    queryset = DeliveryChallan.objects.all().prefetch_related(
+        "items"
+    )
+
+    serializer_class = DeliveryChallanSerializer
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.SearchFilter
+    ]
+
+    filterset_fields = [
+        "status",
+        "material_issue"
+    ]
+
+    search_fields = [
+        "dc_number",
+        "material_issue__issue_number",
+        "transporter_name",
+        "vehicle_number"
+    ]
+
+    @action(detail=True, methods=["post"])
+    def mark_in_transit(self, request, pk=None):
+
+        dc = self.get_object()
+
+        dc.status = "in_transit"
+        dc.save(update_fields=["status"])
+
+        return Response(
+            {"message": "Marked In Transit"}
+        )
+
+    @action(detail=True, methods=["post"])
+    def mark_delivered(self, request, pk=None):
+
+        dc = self.get_object()
+
+        dc.status = "delivered"
+        dc.delivery_date = request.data.get(
+            "delivery_date"
+        )
+
+        dc.receiver_name = request.data.get(
+            "receiver_name"
+        )
+
+        dc.receiver_mobile = request.data.get(
+            "receiver_mobile"
+        )
+
+        if request.FILES.get("delivery_proof"):
+            dc.delivery_proof = request.FILES.get(
+                "delivery_proof"
+            )
+
+        dc.save()
+
+        return Response(
+            {"message": "Delivery Completed"}
+        )
+
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+from weasyprint import HTML
+
+from .models import DeliveryChallan, PurchaseOrderProduct
+
+
+def delivery_challan_pdf(request, pk):
+
+    dc = DeliveryChallan.objects.select_related(
+        "material_issue",
+        "material_issue__site"
+    ).prefetch_related(
+        "items__material_issue_item__inventory_item"
+    ).get(pk=pk)
+
+    items = dc.items.all()
+
+    grand_total = 0
+    contact_person = ""
+    contact_no = ""
+
+    for dc_item in items:
+
+        inventory_item = dc_item.material_issue_item.inventory_item
+
+        po_product = None
+
+        if inventory_item.product_variant:
+            po_product = PurchaseOrderProduct.objects.filter(
+                product_variant=inventory_item.product_variant,
+                is_section=False
+            ).order_by("-id").first()
+
+            dc_item.product_name = str(inventory_item.product_variant)
+
+        elif inventory_item.item:
+            po_product = PurchaseOrderProduct.objects.filter(
+                item=inventory_item.item,
+                is_section=False
+            ).order_by("-id").first()
+
+            dc_item.product_name = str(inventory_item.item)
+
+        else:
+            dc_item.product_name = "-"
+
+        # Rate & Amount
+        dc_item.rate = po_product.rate if po_product else 0
+        dc_item.amount = dc_item.quantity * dc_item.rate
+
+        # Contact Person from PO
+        if po_product and po_product.purchase_order:
+            contact_person = (
+                po_product.purchase_order.contact_name or ""
+            )
+
+            contact_no = (
+                po_product.purchase_order.contact_no or ""
+            )
+
+        grand_total += dc_item.amount
+
+    html_string = render_to_string(
+        "pdf/delivery_challan.html",
+        {
+            "dc": dc,
+            "items": items,
+            "grand_total": grand_total,
+            "contact_person": contact_person,
+            "contact_no": contact_no,
+        }
+    )
+
+    pdf = HTML(
+        string=html_string,
+        base_url=request.build_absolute_uri("/")
+    ).write_pdf()
+
+    response = HttpResponse(
+        pdf,
+        content_type="application/pdf"
+    )
+
+    if request.GET.get("download"):
+        response["Content-Disposition"] = (
+            f'attachment; filename="DC-{dc.dc_number}.pdf"'
+        )
+    else:
+        response["Content-Disposition"] = (
+            f'inline; filename="DC-{dc.dc_number}.pdf"'
+        )
+
+    return response
