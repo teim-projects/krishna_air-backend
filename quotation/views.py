@@ -9,6 +9,10 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.db.models import Prefetch
 import logging
+from django.template.loader import render_to_string
+from weasyprint import HTML
+from decimal import Decimal
+from .models import Quotation
 # from rest_framework.decorators import api_view, authentication_classes, permission_classes
 # from rest_framework.permissions import IsAuthenticated
 # from rest_framework_simplejwt.authentication import JWTAuthentication
@@ -31,6 +35,76 @@ from .serializers import (
 
 logger = logging.getLogger(__name__)
 
+def generate_quotation_pdf(request, quotation_id):
+    """Generate Quotation PDF using WeasyPrint"""
+    
+    try:
+        quotation = Quotation.objects.get(id=quotation_id)
+    except Quotation.DoesNotExist:
+        return HttpResponse("Quotation not found", status=404)
+    
+    # Get all quotation items
+    quotation_items = quotation.items.all()
+    
+    # Calculate totals
+    total_quantity = sum([item.quantity for item in quotation_items], Decimal('0'))
+    subtotal = sum([item.amount for item in quotation_items], Decimal('0'))
+    gst_amount = (subtotal * quotation.gst_percentage) / Decimal('100')
+    grand_total = subtotal + gst_amount
+    
+    # Prepare summary sections (High Side, Low Side, Services, etc.)
+    # Adjust based on your quotation item categories
+    summary_sections = [
+        {
+            'title': 'Part A: High Side Equipment',
+            'items': [
+                {
+                    'description': item.description or str(item),
+                    'amount': item.amount
+                }
+                for item in quotation_items.filter(section='high_side')
+            ],
+            'subtotal': sum([item.amount for item in quotation_items.filter(section='high_side')], Decimal('0'))
+        },
+        {
+            'title': 'Part B: Low Side Installation Work',
+            'items': [
+                {
+                    'description': item.description or str(item),
+                    'amount': item.amount
+                }
+                for item in quotation_items.filter(section='low_side')
+            ],
+            'subtotal': sum([item.amount for item in quotation_items.filter(section='low_side')], Decimal('0'))
+        }
+    ]
+    
+    # Context data
+    context = {
+        'quotation': quotation,
+        'quotation_items': quotation_items,
+        'summary_sections': summary_sections,
+        'total_quantity': total_quantity,
+        'quotation.subtotal': subtotal,
+        'quotation.gst_amount': gst_amount,
+        'quotation.grand_total': grand_total,
+    }
+    
+    # Render HTML
+    html_string = render_to_string('pdf/quotation.html', context)
+    
+    # Generate PDF
+    pdf = HTML(
+        string=html_string,
+        base_url=request.build_absolute_uri('/')
+    ).write_pdf()
+    
+    # Return PDF response
+    filename = f"{quotation.quotation_no}.pdf"
+    response = HttpResponse(pdf, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    return response
 
 @api_view(['GET'])
 def thank_you_suggestions(request):

@@ -2,42 +2,180 @@ from django.db import models
 from django.utils import timezone
 from datetime import timedelta
 from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.db.models import F
 from lead_management.models import Customer
 from product_management.models import ProductVariant
+from django.db import models
+from api.models import CustomUser, BranchManagement
+from product_management.models import item
+from inventory.models import InventoryItem
 
-class AMCPackage(models.Model):
-    """Different AMC package types"""
-    COMPREHENSIVE = 'COMPREHENSIVE'
-    NON_COMPREHENSIVE = 'NON_COMPREHENSIVE'
+class ServiceManagementRecord(models.Model):
+    """Service Management Record for tracking AC maintenance and services"""
     
-    PACKAGE_TYPES = [
-        (COMPREHENSIVE, 'Comprehensive Service'),
-        (NON_COMPREHENSIVE, 'Non-Comprehensive Service'),
+    SEGMENT_CHOICES = [
+        ('residential', 'Residential'),
+        ('commercial', 'Commercial'),
+        ('industrial', 'Industrial'),
     ]
     
-    name = models.CharField(max_length=100)  # e.g., "Gold", "Platinum"
-    package_type = models.CharField(max_length=50, choices=PACKAGE_TYPES)
-    description = models.TextField(blank=True, null=True)
+    CONTRACT_TYPE_CHOICES = [
+        ('one_time', 'One Time'),
+        ('amc', 'AMC'),
+        ('warranty', 'Warranty'),
+    ]
+    
+    CONTRACT_STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('inactive', 'Inactive'),
+    ]
+
+    AMC_SERVICE_TYPE_CHOICES = [
+        ('COMPREHENSIVE', 'Comprehensive'),
+        ('NON_COMPREHENSIVE', 'Non-Comprehensive'),
+    ]
+    
+    # Customer Info
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='service_management_records'
+    )
+    customer_contact = models.CharField(max_length=15)
+    customer_name = models.CharField(max_length=255)
+    customer_email = models.EmailField(null=True, blank=True)
+    subject = models.CharField(max_length=500)
+    
+    # Contract Details
+    contract_type = models.CharField(
+        max_length=20,
+        choices=CONTRACT_TYPE_CHOICES,
+        default='one_time'
+    )
+    contract_status = models.CharField(
+        max_length=20,
+        choices=CONTRACT_STATUS_CHOICES,
+        default='active'
+    )
+    amc_service_type = models.CharField(
+        max_length=20,
+        choices=AMC_SERVICE_TYPE_CHOICES,
+        blank=True,
+        default=''
+    )
+    segment = models.CharField(
+        max_length=20,
+        choices=SEGMENT_CHOICES,
+        default='residential'
+    )
+    service_start_date = models.DateField(null=True, blank=True)
+    service_end_date = models.DateField(null=True, blank=True)
+    
+    # Location
+    state = models.CharField(max_length=100)
+    city = models.CharField(max_length=100)
+    pincode = models.CharField(max_length=10)
+    address = models.TextField()
     
     # Pricing
-    annual_cost = models.DecimalField(max_digits=10, decimal_places=2)
+    apply_gst = models.BooleanField(default=True)
+    gst_percentage = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=18.00
+    )
+    total_price_without_gst = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0
+    )
+    gst_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0
+    )
+    total_price_with_gst = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0
+    )
     
-    # Service details
-    service_visits_per_year = models.IntegerField(default=4)  # Quarterly, half-yearly, etc.
-    parts_replacement_limit = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # For non-comprehensive
-    response_time_hours = models.IntegerField(default=24)  # How quickly engineer responds
-    includes_emergency_calls = models.BooleanField(default=True)
-    emergency_call_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # For non-comprehensive
-    
-    is_active = models.BooleanField(default=True)
+    # Meta
+    created_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+    branch = models.ForeignKey(
+        BranchManagement,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
+    class Meta:
+        ordering = ['-created_at']
+    
     def __str__(self):
-        return f"{self.name} ({self.get_package_type_display()})"
+        return f"{self.customer_name} - {self.contract_type}"
+    
+    def calculate_totals(self):
+        """Calculate GST and totals"""
+        if self.apply_gst:
+            self.gst_amount = (self.total_price_without_gst * self.gst_percentage) / 100
+            self.total_price_with_gst = self.total_price_without_gst + self.gst_amount
+        else:
+            self.gst_amount = 0
+            self.total_price_with_gst = self.total_price_without_gst
+
+
+class ServiceManagementMaterial(models.Model):
+    """Materials/AC Types selected for a Service Management Record"""
+    
+    service_record = models.ForeignKey(
+        ServiceManagementRecord,
+        on_delete=models.CASCADE,
+        related_name='materials'
+    )
+    
+    # AC Type (Product from low side)
+    ac_type = models.ForeignKey(
+        item,
+        on_delete=models.PROTECT,
+        related_name='service_records'
+    )
+    
+    # Material/Service Details
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1)
+    unit = models.CharField(max_length=50, default='Nos')
+    rate = models.DecimalField(max_digits=10, decimal_places=2)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, editable=False)
+    description = models.TextField(blank=True, null=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
-        ordering = ['name']
+        ordering = ['created_at']
+    
+    def save(self, *args, **kwargs):
+        self.amount = (self.quantity or 0) * (self.rate or 0)
+        super().save(*args, **kwargs)
+        
+        # Update parent record totals
+        self.service_record.total_price_without_gst = sum(
+            m.amount for m in self.service_record.materials.all()
+        )
+        self.service_record.calculate_totals()
+        self.service_record.save()
+    
+    def __str__(self):
+        return f"{self.service_record.customer_name} - {self.ac_type.item_code}"
 
 
 class AMCContract(models.Model):
@@ -48,45 +186,60 @@ class AMCContract(models.Model):
         ('EXPIRED', 'Expired'),
         ('CANCELLED', 'Cancelled'),
     ]
+
+    AMC_TYPE_CHOICES = [
+        ('COMPREHENSIVE', 'Comprehensive'),
+        ('NON_COMPREHENSIVE', 'Non-Comprehensive'),
+    ]
+
+    VISIT_FREQUENCY_CHOICES = [
+        ('MONTHLY', 'Monthly'),
+        ('QUARTERLY', 'Quarterly'),
+        ('HALF_YEARLY', 'Half Yearly'),
+        ('YEARLY', 'Yearly'),
+    ]
     
     # Links
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='amc_contracts')
-    package = models.ForeignKey(AMCPackage, on_delete=models.PROTECT)
-    product_variant = models.ForeignKey(ProductVariant, on_delete=models.PROTECT)  # Which AC model
+    amc_type = models.CharField(max_length=20, choices=AMC_TYPE_CHOICES, default='COMPREHENSIVE')
+    visit_frequency = models.CharField(
+        max_length=20,
+        choices=VISIT_FREQUENCY_CHOICES,
+        default='QUARTERLY'
+    )
+    product_variant = models.ForeignKey(ProductVariant, on_delete=models.PROTECT)
     
     # Contract details
     contract_number = models.CharField(max_length=50, unique=True)
     
     # Dates
-    sale_date = models.DateField()  # When AC was sold/installed
-    warranty_end_date = models.DateField()  # Standard 1-year warranty
-    amc_start_date = models.DateField()  # When AMC starts (after warranty or immediately)
-    amc_end_date = models.DateField()  # When AMC ends
+    sale_date = models.DateField()
+    warranty_end_date = models.DateField()
+    amc_start_date = models.DateField()
+    amc_end_date = models.DateField()
     
     # Type logic
-    amc_included_in_sale = models.BooleanField(default=False)  # True = AMC included in sale price, False = Separate purchase
+    amc_included_in_sale = models.BooleanField(default=False)
     
     # Status
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ACTIVE')
     
     # Cost tracking
-    amc_cost = models.DecimalField(max_digits=10, decimal_places=2)  # What customer paid for this AMC
+    amc_cost = models.DecimalField(max_digits=10, decimal_places=2)
     
     # Renewal
-    is_renewal = models.BooleanField(default=False)  # Is this a renewal of previous AMC?
+    is_renewal = models.BooleanField(default=False)
     previous_contract = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
     def save(self, *args, **kwargs):
-        # Auto-generate contract number if not set
         if not self.contract_number:
             prefix = f"AMC-{self.customer.id}"
             count = AMCContract.objects.filter(contract_number__startswith=prefix).count() + 1
             self.contract_number = f"{prefix}-{count:03d}"
         
-        # Validate dates
         if self.amc_start_date < self.warranty_end_date and not self.amc_included_in_sale:
             self.amc_start_date = self.warranty_end_date + timedelta(days=1)
         
@@ -99,173 +252,79 @@ class AMCContract(models.Model):
         ordering = ['-created_at']
 
 
-class AMCService(models.Model):
-    """Individual service visit under AMC"""
-    SERVICE_TYPES = [
-        ('SCHEDULED', 'Scheduled Maintenance'),
-        ('EMERGENCY', 'Emergency Repair'),
-        ('FOLLOW_UP', 'Follow-up Visit'),
-    ]
-    
-    amc_contract = models.ForeignKey(AMCContract, on_delete=models.CASCADE, related_name='services')
-    service_type = models.CharField(max_length=20, choices=SERVICE_TYPES)
-    
-    # Visit details
-    visit_date = models.DateField()
-    engineer_assigned = models.CharField(max_length=100, blank=True, null=True)
-    
-    # Description
-    issue_reported = models.TextField(blank=True, null=True)  # What customer complained about
-    work_performed = models.TextField(blank=True, null=True)  # What engineer did
-    
-    # For non-comprehensive: This determines if customer invoice is generated
-    is_billable = models.BooleanField(default=False)  # True = Generate customer invoice (non-comprehensive only)
-    
-    status = models.CharField(max_length=20, choices=[
-        ('SCHEDULED', 'Scheduled'),
-        ('COMPLETED', 'Completed'),
-        ('CANCELLED', 'Cancelled'),
-        ('PENDING_PARTS', 'Pending Parts'),
-    ], default='SCHEDULED')
-    
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    def __str__(self):
-        return f"Service - {self.amc_contract.contract_number} - {self.visit_date}"
-    
-    class Meta:
-        ordering = ['-visit_date']
-
-
-class AMCServiceParts(models.Model):
-    """Parts used in each service visit"""
-    service = models.ForeignKey(AMCService, on_delete=models.CASCADE, related_name='parts_used')
-    inventory_item = models.ForeignKey('inventory.InventoryItem', on_delete=models.PROTECT)
-    
-    quantity_used = models.PositiveIntegerField(default=1)
+class AMCSparePart(models.Model):
+    """Spare parts used on non-comprehensive AMC contracts — deducts inventory stock."""
+    amc_contract = models.ForeignKey(
+        AMCContract,
+        on_delete=models.CASCADE,
+        related_name='spare_parts'
+    )
+    inventory_item = models.ForeignKey(
+        InventoryItem,
+        on_delete=models.PROTECT,
+        related_name='amc_spare_parts'
+    )
+    quantity_used = models.DecimalField(max_digits=10, decimal_places=2)
+    unit = models.CharField(max_length=20, default='Nos')
     rate_per_unit = models.DecimalField(max_digits=10, decimal_places=2)
-    total_cost = models.DecimalField(max_digits=12, decimal_places=2)  # quantity * rate
-    
-    # For non-comprehensive: Include in customer invoice?
-    include_in_customer_invoice = models.BooleanField(default=False)
-    
+    gst_percent = models.DecimalField(max_digits=5, decimal_places=2, default=18)
+    hsn_sac = models.CharField(max_length=50, blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
+    total_cost = models.DecimalField(max_digits=12, decimal_places=2, editable=False)
+    invoice = models.ForeignKey(
+        'invoice.Invoice',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='amc_spare_parts'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Spare part - {self.amc_contract.contract_number}"
+
+    def _validate_low_side(self):
+        if not self.inventory_item_id:
+            return
+        if self.inventory_item.product_variant_id is not None:
+            raise ValidationError('Only low-side materials can be used as AMC spare parts.')
+        if not self.inventory_item.item_id:
+            raise ValidationError('Inventory item must be a low-side material.')
+
     def save(self, *args, **kwargs):
-        from django.db import transaction
-        from inventory.models import InventoryItem
-        
-        # Auto-calculate total cost
-        self.total_cost = self.quantity_used * self.rate_per_unit
-        
+        self._validate_low_side()
+        self.total_cost = (self.quantity_used or 0) * (self.rate_per_unit or 0)
         is_new = self.pk is None
-        
+
         if is_new:
-            # Only deduct stock on creation, not on updates
             with transaction.atomic():
-                # Lock the inventory row to prevent race conditions
                 inv = InventoryItem.objects.select_for_update().get(id=self.inventory_item_id)
-                
                 if inv.quantity < self.quantity_used:
                     raise ValidationError(
-                        f"Insufficient stock. Available: {inv.quantity}, Requested: {self.quantity_used}"
+                        f'Insufficient stock. Available: {inv.quantity}, Requested: {self.quantity_used}'
                     )
-                
-                inv.quantity -= self.quantity_used
-                inv.total_out_quantity += self.quantity_used
-                inv.save(update_fields=['quantity', 'total_out_quantity'])
-                
+                InventoryItem.objects.filter(id=inv.id).update(
+                    quantity=F('quantity') - self.quantity_used,
+                    total_out_quantity=F('total_out_quantity') + self.quantity_used
+                )
                 super().save(*args, **kwargs)
         else:
             super().save(*args, **kwargs)
-    
+
     def delete(self, *args, **kwargs):
-        from django.db import transaction
-        from inventory.models import InventoryItem
-        
         with transaction.atomic():
             try:
                 inv = InventoryItem.objects.select_for_update().get(id=self.inventory_item_id)
-                inv.quantity += self.quantity_used
-                inv.total_out_quantity -= self.quantity_used
-                inv.save(update_fields=['quantity', 'total_out_quantity'])
+                InventoryItem.objects.filter(id=inv.id).update(
+                    quantity=F('quantity') + self.quantity_used,
+                    total_out_quantity=F('total_out_quantity') - self.quantity_used
+                )
             except InventoryItem.DoesNotExist:
                 pass
-            
             super().delete(*args, **kwargs)
-    
-    def __str__(self):
-        if self.inventory_item.item:
-            item_name = self.inventory_item.item.item_code
-        elif self.inventory_item.product_variant:
-            item_name = self.inventory_item.product_variant.sku
-        else:
-            item_name = "Unknown"
-        return f"Parts - {item_name} - {self.quantity_used} units"
-
-
-class AMCServiceLabor(models.Model):
-    """Labor charges for service visit (mainly for non-comprehensive)"""
-    service = models.OneToOneField(AMCService, on_delete=models.CASCADE, related_name='labor')
-    
-    engineer_name = models.CharField(max_length=100)
-    labor_hours = models.DecimalField(max_digits=5, decimal_places=2)
-    rate_per_hour = models.DecimalField(max_digits=10, decimal_places=2)
-    total_labor_cost = models.DecimalField(max_digits=12, decimal_places=2)
-    
-    # For non-comprehensive: Include in customer invoice?
-    include_in_customer_invoice = models.BooleanField(default=False)
-    
-    def save(self, *args, **kwargs):
-        self.total_labor_cost = self.labor_hours * self.rate_per_hour
-        super().save(*args, **kwargs)
-    
-    def __str__(self):
-        return f"Labor - {self.engineer_name} - {self.labor_hours} hrs"
-
-
-class AMCInvoice(models.Model):
-    """Customer invoice for non-comprehensive services only"""
-    service = models.OneToOneField(AMCService, on_delete=models.CASCADE, related_name='customer_invoice')
-    
-    invoice_number = models.CharField(max_length=50, unique=True)
-    invoice_date = models.DateField(auto_now_add=True)
-    
-    # Costs
-    parts_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    labor_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    other_charges = models.DecimalField(max_digits=12, decimal_places=2, default=0)  # Travel, etc.
-    
-    subtotal = models.DecimalField(max_digits=12, decimal_places=2)
-    gst_percent = models.DecimalField(max_digits=5, decimal_places=2, default=18)
-    gst_amount = models.DecimalField(max_digits=12, decimal_places=2)
-    total_amount = models.DecimalField(max_digits=12, decimal_places=2)
-    
-    # Payment
-    payment_status = models.CharField(max_length=20, choices=[
-        ('UNPAID', 'Unpaid'),
-        ('PARTIAL', 'Partial Payment'),
-        ('PAID', 'Paid'),
-    ], default='UNPAID')
-    
-    def save(self, *args, **kwargs):
-        # Auto-generate invoice number
-        if not self.invoice_number:
-            prefix = f"AMC-INV-{self.service.amc_contract.customer.id}"
-            count = AMCInvoice.objects.filter(invoice_number__startswith=prefix).count() + 1
-            self.invoice_number = f"{prefix}-{count:03d}"
-        
-        # Calculate totals
-        self.subtotal = self.parts_total + self.labor_total + self.other_charges
-        self.gst_amount = (self.subtotal * self.gst_percent) / 100
-        self.total_amount = self.subtotal + self.gst_amount
-        
-        super().save(*args, **kwargs)
-    
-    def __str__(self):
-        return f"{self.invoice_number}"
-    
-    class Meta:
-        ordering = ['-invoice_date']
 
 
 class AMCRenewal(models.Model):
