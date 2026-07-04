@@ -8,7 +8,7 @@ from .views import (
     ServiceMasterCreateViewSet, 
     QuotationServiceItemViewSet,
     QuotationCustomerViewSet,
-    generate_quotation_pdf
+    quotation_pdf_view,
 )
 
 router = DefaultRouter()
@@ -22,7 +22,7 @@ router.register(r'customer', QuotationCustomerViewSet, basename='quotation-custo
 urlpatterns = [
     path('thank-you-suggestions/', thank_you_suggestions, name='thank_you_suggestions'),
     path('subject-suggestions/', subject_suggestions, name='subject_suggestions'),
-    path('quotations/<int:quotation_id>/pdf/', generate_quotation_pdf, name='quotation-pdf'),
+    path('quotations/<int:quotation_id>/pdf/', quotation_pdf_view, name='quotation-pdf'),
 ]
 
 urlpatterns += router.urls
