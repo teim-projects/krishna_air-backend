@@ -244,14 +244,14 @@
         <!-- TOP INFO -->
         <div class="top-info">
             <div class="top-info-left">
-                <div class="info-row"><span class="info-label">Ref. No:</span> {{ quotation.quotation_no }}</div>
-                <div class="info-row"><span class="info-label">Date:</span> {{ quotation.quotation_date|date:"d/m/Y" }}</div>
-                <div class="info-row"><span class="info-label">To:</span> {{ quotation.customer_name }}</div>
-                <div class="info-row"><span class="info-label">Site:</span> {{ quotation.site_name }}</div>
+                <div class="info-row"><span class="info-label">Ref. No:</span> {{ quotation_no }}</div>
+                <div class="info-row"><span class="info-label">Date:</span> {{ quotation_date|date:"d/m/Y" }}</div>
+                <div class="info-row"><span class="info-label">To:</span> {{ customer_name }}</div>
+                <div class="info-row"><span class="info-label">Site:</span> {{ site_name }}</div>
             </div>
             <div class="top-info-right">
-                <div class="info-row"><span class="info-label">Validity:</span> 30 days</div>
-                <div class="info-row"><span class="info-label">Status:</span> {{ quotation.status }}</div>
+                <div class="info-row"><span class="info-label">Subject:</span> {{ subject }}</div>
+                <div class="info-row"><span class="info-label">Version:</span> {{ version.version_no }}</div>
             </div>
         </div>
 
@@ -290,15 +290,15 @@
                 {% endfor %}
                 <tr class="summary-total-row">
                     <td colspan="2">GRAND SUBTOTAL:</td>
-                    <td class="amount-cell">{{ quotation.subtotal|floatformat:2|intcomma }}</td>
+                    <td class="amount-cell">{{ subtotal|floatformat:2|intcomma }}</td>
                 </tr>
                 <tr class="gst-row">
-                    <td colspan="2">GST @ {{ quotation.gst_percentage|floatformat:0 }}%:</td>
-                    <td class="amount-cell">{{ quotation.gst_amount|floatformat:2|intcomma }}</td>
+                    <td colspan="2">GST @ {{ gst_percentage|floatformat:0 }}%:</td>
+                    <td class="amount-cell">{{ gst_amount|floatformat:2|intcomma }}</td>
                 </tr>
                 <tr class="grand-total-row">
                     <td colspan="2">GRAND TOTAL (INCLUDING GST):</td>
-                    <td class="amount-cell">Rs. {{ quotation.grand_total|floatformat:2|intcomma }}</td>
+                    <td class="amount-cell">Rs. {{ grand_total|floatformat:2|intcomma }}</td>
                 </tr>
             </tbody>
         </table>
@@ -340,7 +340,7 @@
                     <td class="qty-cell"><strong>{{ total_quantity|floatformat:2 }}</strong></td>
                     <td></td>
                     <td></td>
-                    <td class="amount-cell"><strong>{{ quotation.subtotal|floatformat:2|intcomma }}</strong></td>
+                    <td class="amount-cell"><strong>{{ subtotal|floatformat:2|intcomma }}</strong></td>
                 </tr>
             </tbody>
         </table>

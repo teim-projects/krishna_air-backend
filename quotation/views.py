@@ -24,7 +24,7 @@ from .models import (
     QuotationLowSideItem,
 )
 from .serializers import QuotationSerializer
-from .utils.pdf_generator import generate_quotation_pdf
+from .utils.pdf_generator import generate_quotation_pdf as build_quotation_pdf, generate_quotation_print_pdf
 
 from .models import ServiceMaster, QuotationServiceItem
 from .serializers import (
@@ -35,75 +35,32 @@ from .serializers import (
 
 logger = logging.getLogger(__name__)
 
-def generate_quotation_pdf(request, quotation_id):
-    """Generate Quotation PDF using WeasyPrint"""
-    
+def quotation_pdf_view(request, quotation_id):
+    """Legacy URL: Generate Quotation PDF using WeasyPrint."""
     try:
-        quotation = Quotation.objects.get(id=quotation_id)
+        quotation = Quotation.objects.select_related('customer', 'site').get(id=quotation_id)
     except Quotation.DoesNotExist:
         return HttpResponse("Quotation not found", status=404)
-    
-    # Get all quotation items
-    quotation_items = quotation.items.all()
-    
-    # Calculate totals
-    total_quantity = sum([item.quantity for item in quotation_items], Decimal('0'))
-    subtotal = sum([item.amount for item in quotation_items], Decimal('0'))
-    gst_amount = (subtotal * quotation.gst_percentage) / Decimal('100')
-    grand_total = subtotal + gst_amount
-    
-    # Prepare summary sections (High Side, Low Side, Services, etc.)
-    # Adjust based on your quotation item categories
-    summary_sections = [
-        {
-            'title': 'Part A: High Side Equipment',
-            'items': [
-                {
-                    'description': item.description or str(item),
-                    'amount': item.amount
-                }
-                for item in quotation_items.filter(section='high_side')
-            ],
-            'subtotal': sum([item.amount for item in quotation_items.filter(section='high_side')], Decimal('0'))
-        },
-        {
-            'title': 'Part B: Low Side Installation Work',
-            'items': [
-                {
-                    'description': item.description or str(item),
-                    'amount': item.amount
-                }
-                for item in quotation_items.filter(section='low_side')
-            ],
-            'subtotal': sum([item.amount for item in quotation_items.filter(section='low_side')], Decimal('0'))
-        }
-    ]
-    
-    # Context data
-    context = {
-        'quotation': quotation,
-        'quotation_items': quotation_items,
-        'summary_sections': summary_sections,
-        'total_quantity': total_quantity,
-        'quotation.subtotal': subtotal,
-        'quotation.gst_amount': gst_amount,
-        'quotation.grand_total': grand_total,
-    }
-    
-    # Render HTML
-    html_string = render_to_string('pdf/quotation.html', context)
-    
-    # Generate PDF
-    pdf = HTML(
-        string=html_string,
-        base_url=request.build_absolute_uri('/')
-    ).write_pdf()
-    
-    # Return PDF response
+
+    version = QuotationVersion.objects.filter(
+        quotation=quotation, is_active=True
+    ).first()
+    if not version:
+        return HttpResponse("No active version found", status=404)
+
+    try:
+        pdf_content = build_quotation_pdf(
+            quotation,
+            version,
+            base_url=request.build_absolute_uri('/'),
+        )
+    except Exception as e:
+        logger.error(f"PDF generation error: {str(e)}")
+        return HttpResponse(f"Error generating PDF: {str(e)}", status=500)
+
     filename = f"{quotation.quotation_no}.pdf"
-    response = HttpResponse(pdf, content_type='application/pdf')
+    response = HttpResponse(pdf_content, content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    
     return response
 
 @api_view(['GET'])
@@ -182,7 +139,7 @@ class QuotationViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'], url_path='pdf')
     def download_pdf(self, request, pk=None):
         try:
-            quotation = self.get_object()
+            quotation = Quotation.objects.select_related('customer', 'site').get(pk=pk)
 
             version = QuotationVersion.objects.filter(
                 quotation=quotation,
@@ -200,7 +157,11 @@ class QuotationViewSet(viewsets.ModelViewSet):
             if not version:
                 return HttpResponse("No active version found", status=404)
 
-            pdf_content = generate_quotation_pdf(quotation, version)
+            pdf_content = build_quotation_pdf(
+                quotation,
+                version,
+                base_url=request.build_absolute_uri('/'),
+            )
 
             response = HttpResponse(pdf_content, content_type='application/pdf')
             response['Content-Disposition'] = f'inline; filename="quotation_{quotation.quotation_no}_v{version.version_no}.pdf"'
@@ -230,7 +191,11 @@ class QuotationViewSet(viewsets.ModelViewSet):
                 quotation=quotation
             )
             
-            pdf_content = generate_quotation_pdf(quotation, version)
+            pdf_content = build_quotation_pdf(
+                quotation,
+                version,
+                base_url=request.build_absolute_uri('/'),
+            )
             
             response = HttpResponse(pdf_content, content_type='application/pdf')
             response['Content-Disposition'] = f'inline; filename="quotation_{quotation.quotation_no}_v{version.version_no}.pdf"'
@@ -242,6 +207,66 @@ class QuotationViewSet(viewsets.ModelViewSet):
                 f"Error generating PDF: {str(e)}",
                 status=500
             )
+
+    @action(detail=True, methods=['get'], url_path='print-pdf')
+    def download_print_pdf(self, request, pk=None):
+        """New WeasyPrint quotation PDF (invoice-style, dummy table for design stage)."""
+        try:
+            quotation = self.get_object()
+            version = QuotationVersion.objects.filter(
+                quotation=quotation,
+                is_active=True
+            ).first()
+
+            if not version:
+                return HttpResponse("No active version found", status=404)
+
+            pdf_content = generate_quotation_print_pdf(
+                quotation,
+                version,
+                base_url=request.build_absolute_uri('/'),
+            )
+
+            response = HttpResponse(pdf_content, content_type='application/pdf')
+            filename = f"quotation_{quotation.quotation_no}_v{version.version_no}_print.pdf"
+            if request.GET.get('download'):
+                response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            else:
+                response['Content-Disposition'] = f'inline; filename="{filename}"'
+            return response
+
+        except Exception as e:
+            logger.error(f"Print PDF generation error: {str(e)}")
+            return HttpResponse(f"Error generating PDF: {str(e)}", status=500)
+
+    @action(detail=True, methods=['get'], url_path='version/(?P<version_id>[^/.]+)/print-pdf')
+    def download_version_print_pdf(self, request, pk=None, version_id=None):
+        """New WeasyPrint PDF for a specific quotation version."""
+        try:
+            quotation = self.get_object()
+            version = get_object_or_404(
+                QuotationVersion,
+                pk=version_id,
+                quotation=quotation,
+            )
+
+            pdf_content = generate_quotation_print_pdf(
+                quotation,
+                version,
+                base_url=request.build_absolute_uri('/'),
+            )
+
+            response = HttpResponse(pdf_content, content_type='application/pdf')
+            filename = f"quotation_{quotation.quotation_no}_v{version.version_no}_print.pdf"
+            if request.GET.get('download'):
+                response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            else:
+                response['Content-Disposition'] = f'inline; filename="{filename}"'
+            return response
+
+        except Exception as e:
+            logger.error(f"Version print PDF error: {str(e)}")
+            return HttpResponse(f"Error generating PDF: {str(e)}", status=500)
 
 
     @action(detail=True, methods=["delete"], url_path="version/(?P<version_id>[^/.]+)/delete")
