@@ -78,55 +78,47 @@ class ProductVariant(models.Model):
     
     return f"{brand_code}-{model_code}-{capacity_code}-{star_code}-{unique_code}"
 
-  def get_display_name_for_pdf(self):
-    """
-    Generate dynamic display name for PDF from existing database relationships.
-    Format: "Split AC 1.5 TR 5 Star Inverter"
-    
-    Pulls data from:
-    - AC Type: product_model.ac_sub_type_id.ac_type_id.name
-    - Capacity: self.capacity
-    - Unit: self.unit
-    - Star Rating: self.star_rating
-    - Inverter: product_model.inverter
-    """
+def get_display_name_for_pdf(self):
     try:
-        # Safely get AC Type from the relationship chain
         ac_type_name = None
         if (self.product_model and 
             self.product_model.ac_sub_type_id and 
             self.product_model.ac_sub_type_id.ac_type_id):
             ac_type_name = self.product_model.ac_sub_type_id.ac_type_id.name
         
-        # If no AC type found, fall back to SKU
-        if not ac_type_name:
-            return self.sku
-        
-        # Get capacity with unit
-        capacity_str = f"{self.capacity} {self.unit}" if self.unit else str(self.capacity)
-        
-        # Get star rating
+        # Clean capacity and unit
+        capacity_text = str(self.capacity).strip()
+        for suffix in ['TR', 'TON', 'T']:
+            if capacity_text.upper().endswith(suffix):
+                idx = capacity_text.upper().rfind(suffix)
+                capacity_text = capacity_text[:idx].strip()
+                break
+
+        unit = (self.unit or '').strip().upper()
+        unit_label_map = {
+            'TR': 'TR',
+            'TON': 'Ton',
+            'T': 'TR',
+        }
+        unit_label = unit_label_map.get(unit, 'TR')
+        capacity_str = f"{capacity_text} {unit_label}".strip()
+
         star_str = f"{self.star_rating} Star" if self.star_rating else ""
         
-        # Get inverter status
         inverter_str = ""
         if self.product_model:
             inverter_str = "Inverter" if self.product_model.inverter else "Non-Inverter"
         
-        # Combine all parts (filter out empty strings)
-        parts = [ac_type_name, capacity_str, star_str, inverter_str]
+        brand_name = self.product_model.brand_id.name if self.product_model and self.product_model.brand_id else ""
+        
+        parts = [brand_name, ac_type_name, capacity_str, star_str, inverter_str]
         display_name = " ".join(part for part in parts if part)
         
         return display_name if display_name else self.sku
         
     except (AttributeError, TypeError) as e:
-        # Fallback to SKU if any relationship is missing
-        return self.sku
-
-  def __str__(self):
         return self.sku
   
-
 INVENTORY_STATUS = [
             ('IN_STOCK', 'IN_STOCK'),
             ('SOLD', 'SOLD'),

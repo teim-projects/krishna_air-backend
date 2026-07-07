@@ -1,416 +1,617 @@
-{% load static %}
-{% load humanize %}
+{% load static %} {% load humanize %}
 <!doctype html>
 <html>
-<head>
+  <head>
     <meta charset="utf-8" />
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            font-size: 11px;
-            margin: 0;
-            padding: 0;
-            line-height: 1.4;
-        }
+      body {
+        font-family: Arial, sans-serif;
+        font-size: 11px;
+        margin: 0;
+        padding: 0;
+        line-height: 1.4;
+      }
 
-        .page-border {
-            border: 1px solid #000;
-            padding: 15px;
-            min-height: 1050px;
-            position: relative;
-        }
+      .page-border {
+        padding: 0;
+        min-height: 1000px;
+        position: relative;
+      }
 
-        /* HEADER */
-        .company-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #000;
-            padding-bottom: 10px;
-        }
+      /* HEADER */
+      .company-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #000;
+        padding-bottom: 10px;
+      }
 
-        .company-header img {
-            width: 100px;
-            height: auto;
-        }
+      .company-header img {
+        width: 100px;
+        height: auto;
+        padding: 0 20px 0 20px;
+      }
 
-        .company-header .header-text {
-            text-align: center;
-            flex: 1;
-        }
+      .header-text {
+        text-align: center;
+      }
 
-        .company-header h1 {
-            margin: 5px 0;
-            font-size: 18px;
-            font-weight: bold;
-        }
+      .header-text h1 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: bold;
+      }
 
-        .company-header p {
-            margin: 2px 0;
-            font-size: 10px;
-        }
+      .header-text p {
+        margin: 4px 0 0;
+        font-size: 10px;
+      }
 
-        /* TOP INFO */
-        .top-info {
-            margin-bottom: 15px;
-            display: flex;
-            justify-content: space-between;
-            font-size: 11px;
-        }
+      .company-header {
+        margin-top: 15px;
+        padding: 0 20px 5px 20px;
+      }
 
-        .top-info-left, .top-info-right {
-            flex: 1;
-        }
+      .company-header h1 {
+        margin: 5px 0 5px 0;
+        font-size: 18px;
+        font-weight: bold;
+      }
 
-        .top-info-right {
-            text-align: right;
-        }
+      .company-header p {
+        margin: 1px 0;
+        font-size: 10px;
+      }
 
-        .info-row {
-            margin: 3px 0;
-        }
+      /* TOP INFO */
+      .top-info {
+        margin-bottom: 15px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+      }
 
-        .info-label {
-            font-weight: bold;
-        }
+      .top-info-left,
+      .top-info-right {
+        flex: 1;
+      }
 
-        /* SECTION TITLES */
-        .section-title {
-            background-color: #e0e0e0;
-            padding: 8px;
-            margin-top: 15px;
-            margin-bottom: 10px;
-            font-weight: bold;
-            border-left: 4px solid #2c3e50;
-        }
+      .top-info-right {
+        text-align: right;
+      }
 
-        /* TABLES */
-        .summary-table, .items-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 10px;
-            font-size: 11px;
-        }
+      .info-row {
+        margin: 3px 0;
+      }
 
-        .summary-table th, .items-table th {
-            background-color: #34495e;
-            color: white;
-            padding: 8px;
-            text-align: left;
-            border: 1px solid #000;
-            font-weight: bold;
-        }
+      .info-label {
+        font-weight: bold;
+      }
 
-        .summary-table td, .items-table td {
-            padding: 6px 8px;
-            border: 1px solid #000;
-        }
+      /* SECTION TITLES */
+      .section-title {
+        background-color: #cecece;     /* Light gray background block */
+        padding: 6px 10px;             /* Padding around the text */
+        margin-top: 20px;
+        margin-bottom: 10px;
+        font-weight: bold;
+        font-size: 13px;               /* Bolder and bigger main headings */
+        text-transform: uppercase;     /* Capitalized letters */
+        border-left: 5px solid #012ca2;        /* Clean border matching the tables */
+        break-after: avoid;
+        page-break-after: avoid;
+      }
 
-        .summary-table tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
+      /* TABLES */
+      thead {
+        display: table-row-group;
+      }
+      .summary-table,
+      .items-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 10px;
+        font-size: 11px;
+      }
 
-        .items-table tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
+      table tr {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
 
-        .amount-cell {
-            text-align: right;
-            font-weight: bold;
-        }
+      .summary-table th,
+      .items-table th {
+        background-color: #ffffff;      /* Light gray background */
+        color: rgb(0, 0, 0);
+        padding: 8px;
+        text-align: left;
+        border: 1px solid #000;
+        font-weight: 800;              /* Bolder title headers */
+        font-size: 13px;               /* Bigger title size */
+      }
 
-        .qty-cell {
-            text-align: center;
-        }
+      .summary-table td,
+      .items-table td {
+        padding: 6px 8px;
+        border: 1px solid #000;
+      }
 
-        .rate-cell {
-            text-align: right;
-        }
+      .summary-table tr:nth-child(even),
+      .items-table tr:nth-child(even) {
+        background-color: transparent;  /* Clean table, no zebra stripes */
+      }
 
-        .summary-total-row {
-            background-color: #ecf0f1;
-            font-weight: bold;
-        }
+      .amount-cell {
+        text-align: right;
+        font-weight: bold;
+      }
 
-        .summary-total-row td {
-            padding: 8px;
-            border: 2px solid #000;
-        }
+      .qty-cell {
+        text-align: center;
+      }
 
-        .gst-row {
-            background-color: #fff3cd;
-        }
+      .rate-cell {
+        text-align: right;
+      }
 
-        .grand-total-row {
-            background-color: #d4edda;
-            font-weight: bold;
-            font-size: 12px;
-        }
+      .summary-total-row {
+        background-color: #ffffff;
+        font-weight: bold;
+      }
 
-        /* TERMS */
-        .terms-section {
-            margin-top: 20px;
-            border: 1px solid #000;
-            padding: 10px;
-        }
+      .summary-total-row td {
+        padding: 8px;
+        border: 2px solid #000;
+      }
 
-        .terms-section h3 {
-            margin: 0 0 10px 0;
-            font-size: 12px;
-            font-weight: bold;
-            border-bottom: 1px solid #ccc;
-            padding-bottom: 5px;
-        }
+      .gst-row {
+        background-color: #ffffff;
+      }
 
-        .terms-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
+      .grand-total-row {
+        background-color: #ffffff;
+        font-weight: bold;
+        font-size: 12px;
+      }
 
-        .terms-list li {
-            margin-bottom: 5px;
-            padding-left: 15px;
-            text-align: justify;
-            font-size: 10px;
-            line-height: 1.3;
-        }
+      /* TERMS */
+      .terms-section {
+        margin-top: 20px;
+        border: 1px solid #000;
+        padding: 10px;
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
 
-        .terms-list li:before {
-            content: "•";
-            margin-left: -10px;
-            margin-right: 8px;
-        }
+      .terms-section h3 {
+        margin: 0 0 10px 0;
+        font-size: 12px;
+        font-weight: bold;
+        border-bottom: 1px solid #ccc;
+        padding-bottom: 5px;
+      }
 
-        /* FOOTER */
-        .footer-section {
-            margin-top: 20px;
-            border-top: 2px solid #000;
-            padding-top: 15px;
-            display: flex;
-            justify-content: space-between;
-            font-size: 11px;
-        }
+      .terms-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
 
-        .footer-left, .footer-right {
-            flex: 1;
-        }
+      .terms-list li {
+        margin-bottom: 5px;
+        padding-left: 15px;
+        text-align: justify;
+        font-size: 10px;
+        line-height: 1.3;
+      }
 
-        .footer-right {
-            text-align: right;
-        }
+      .terms-list li:before {
+        content: "•";
+        margin-left: -10px;
+        margin-right: 8px;
+      }
 
-        .signature-box {
-            margin-top: 40px;
-            border-top: 1px solid #000;
-            padding-top: 5px;
-            text-align: center;
-            font-size: 10px;
-        }
+      /* FOOTER */
+      .footer-section {
+        margin-top: 20px;
+        border-top: 2px solid #000;
+        padding-top: 15px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+      }
 
-        /* SUBTOTAL ROWS */
-        .subtotal-row {
-            background-color: #f0f0f0;
-            font-weight: bold;
-        }
+      .footer-left,
+      .footer-right {
+        flex: 1;
+      }
 
-        .subtotal-row td {
-            padding: 8px;
-        }
+      .footer-right {
+        text-align: right;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        align-items: flex-end;
+      }
 
-        @page {
-            size: A4;
-            margin: 15px;
-        }
+      .stamp-box {
+        width: 200px;
+        height: 80px;
+        border: 1px solid #000;
+        margin-top: 10px;
+        margin-bottom: 5px;
+        border-radius: 5px;
+      }
 
-        .page-break {
-            page-break-after: always;
-        }
+      .signature-text {
+        font-size: 10px;
+        text-align: center;
+        width: 200px;
+        font-weight: bold;
+      }
+
+      /* SUBTOTAL ROWS */
+      .subtotal-row {
+        background-color: #ffffff;
+        font-weight: bold;
+      }
+
+      .subtotal-row td {
+        padding: 8px;
+      }
+      
+      .Address {
+        font-weight: bold;
+      }
+
+      @page {
+        size: A4;
+        margin: 20px;
+        border: 1px solid #000; /* draws a solid border around every page */
+        padding: 15px;          /* creates a gap inside the border on every single page */
+      }
+
+      .page-break {
+        page-break-after: always;
+      }
     </style>
-</head>
+  </head>
 
-<body>
+  <body>
     <div class="page-border">
-        <!-- COMPANY HEADER -->
-        <div class="company-header">
-            <img src="file:///app/static/images/ka-logo.png" alt="Logo" />
-            <div class="header-text">
-                <h1>QUOTATION</h1>
-                <p>Supply, Installation, Testing & Commissioning</p>
-            </div>
+      <!-- COMPANY HEADER -->
+      <div class="company-header">
+        <img src="file:///app/static/images/ka-logo.png" alt="Logo" />
+        <div class="header-contact">
+          <p class="Address">Address:-</p>
+          <p>Krishna Airconditioning</p>
+          <p>Shop No. 1, 2 & 3, Sai Plaza, Opp. Shreeji Petrol Pump,</p>
+          <p>Near Sahakar Nagar, Nashik - 422007</p>
+          <p>Contact: +91 98220 12345 | Email:</p>
         </div>
+      </div>
 
-        <!-- TOP INFO -->
-        <div class="top-info">
-            <div class="top-info-left">
-                <div class="info-row"><span class="info-label">Ref. No:</span> {{ quotation_no }}</div>
-                <div class="info-row"><span class="info-label">Date:</span> {{ quotation_date|date:"d/m/Y" }}</div>
-                <div class="info-row"><span class="info-label">To:</span> {{ customer_name }}</div>
-                <div class="info-row"><span class="info-label">Site:</span> {{ site_name }}</div>
-            </div>
-            <div class="top-info-right">
-                <div class="info-row"><span class="info-label">Subject:</span> {{ subject }}</div>
-                <div class="info-row"><span class="info-label">Version:</span> {{ version.version_no }}</div>
-            </div>
+      <div class="header-text">
+        <h1>QUOTATION</h1>
+        <p>Supply, Installation, Testing & Commissioning</p>
+      </div>
+
+      <!-- TOP INFO -->
+      <div class="top-info">
+        <div class="top-info-left">
+          <div class="info-row">
+            <span class="info-label">Date:</span> {{ quotation_date|date:"d/m/Y"}}
+          </div>
+          <div class="info-row">
+            <span class="info-label">To:</span> {{ customer_name }}
+          </div>
+          <div class="info-row">
+            <span class="info-label">Site:</span> {{ site_name }}
+          </div>
         </div>
-
-        <!-- INTRODUCTION -->
-        <p style="text-align: justify; font-size: 10px; margin: 10px 0;">
-            Dear Sir/Madam,<br>
-            Thank you for your valued enquiry. Based on our discussion with your good self, we provide below our quotation for Supply, Installation, Testing and Commissioning of Air Conditioning system.
-        </p>
-
-        <!-- ANNEXURE I: SUMMARY -->
-        <div class="section-title">ANNEXURE I: SUMMARY OF PROPOSAL</div>
-        <table class="summary-table">
-            <thead>
-                <tr>
-                    <th>S.N.</th>
-                    <th>Description</th>
-                    <th class="amount-cell">Amount (Rs.)</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for section in summary_sections %}
-                    <tr>
-                        <td colspan="3" style="background-color: #ecf0f1; font-weight: bold;">{{ section.title }}</td>
-                    </tr>
-                    {% for item in section.items %}
-                        <tr>
-                            <td>{{ forloop.counter }}</td>
-                            <td>{{ item.description }}</td>
-                            <td class="amount-cell">{{ item.amount|floatformat:2|intcomma }}</td>
-                        </tr>
-                    {% endfor %}
-                    <tr class="subtotal-row">
-                        <td colspan="2" style="text-align: right;">Subtotal ({{ section.title }}):</td>
-                        <td class="amount-cell">{{ section.subtotal|floatformat:2|intcomma }}</td>
-                    </tr>
-                {% endfor %}
-                <tr class="summary-total-row">
-                    <td colspan="2">GRAND SUBTOTAL:</td>
-                    <td class="amount-cell">{{ subtotal|floatformat:2|intcomma }}</td>
-                </tr>
-                <tr class="gst-row">
-                    <td colspan="2">GST @ {{ gst_percentage|floatformat:0 }}%:</td>
-                    <td class="amount-cell">{{ gst_amount|floatformat:2|intcomma }}</td>
-                </tr>
-                <tr class="grand-total-row">
-                    <td colspan="2">GRAND TOTAL (INCLUDING GST):</td>
-                    <td class="amount-cell">Rs. {{ grand_total|floatformat:2|intcomma }}</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <!-- ANNEXURE II: BILL OF QUANTITIES -->
-        <div class="section-title">ANNEXURE II: BILL OF QUANTITIES</div>
-        <table class="items-table">
-            <thead>
-                <tr>
-                    <th>S.N.</th>
-                    <th>Description / Item Code</th>
-                    <th class="qty-cell">Qty</th>
-                    <th>Unit</th>
-                    <th class="rate-cell">Rate (Rs.)</th>
-                    <th class="amount-cell">Amount (Rs.)</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in quotation_items %}
-                <tr>
-                    <td>{{ forloop.counter }}</td>
-                    <td>
-                        {% if item.item %}
-                            <strong>{{ item.item.item_code }}</strong><br>
-                            {{ item.description }}
-                        {% elif item.product_variant %}
-                            <strong>{{ item.product_variant.sku }}</strong><br>
-                            {{ item.description }}
-                        {% endif %}
-                    </td>
-                    <td class="qty-cell">{{ item.quantity|floatformat:2 }}</td>
-                    <td>{{ item.unit }}</td>
-                    <td class="rate-cell">{{ item.rate|floatformat:2 }}</td>
-                    <td class="amount-cell">{{ item.amount|floatformat:2|intcomma }}</td>
-                </tr>
-                {% endfor %}
-                <tr class="summary-total-row">
-                    <td colspan="2"></td>
-                    <td class="qty-cell"><strong>{{ total_quantity|floatformat:2 }}</strong></td>
-                    <td></td>
-                    <td></td>
-                    <td class="amount-cell"><strong>{{ subtotal|floatformat:2|intcomma }}</strong></td>
-                </tr>
-            </tbody>
-        </table>
-
-        <!-- ANNEXURE III: TERMS & CONDITIONS -->
-        <div class="section-title">ANNEXURE III: TERMS & CONDITIONS</div>
-        <div class="terms-section">
-            <h3>Payment Terms:</h3>
-            <ul class="terms-list">
-                <li><strong>Equipment Supply:</strong> 100% advance along with PO against Proforma Invoice</li>
-                <li><strong>Installation Work:</strong> 50% advance, 30% on material delivery, 10% on installation, 10% on completion & commissioning</li>
-            </ul>
-
-            <h3>Validity of Rates:</h3>
-            <ul class="terms-list">
-                <li>Equipment rates valid for 7 days from quotation date</li>
-                <li>Installation rates valid for 30 days from quotation date</li>
-            </ul>
-
-            <h3>Warranty & Service:</h3>
-            <ul class="terms-list">
-                <li>15 months compressor warranty from delivery or 12 months from commissioning (whichever is earlier)</li>
-                <li>3 free warranty services within 12 months of installation (if supply & installation by Krishna Air)</li>
-            </ul>
-
-            <h3>Important Notes:</h3>
-            <ul class="terms-list">
-                <li>Electrical power cables and socket arrangements are customer's scope</li>
-                <li>Local transportation/Mathadi charges extra at actual</li>
-                <li>Costing estimated; final billing based on actual installed quantities</li>
-                <li>Lifting/shifting arrangements to be provided by customer</li>
-                <li>Scaffolding for installation above 3m height to be provided by customer</li>
-                <li>Material storage arrangements to be made by customer</li>
-            </ul>
-
-            <h3>Exclusions:</h3>
-            <ul class="terms-list">
-                <li>Carpentry, civil finishing, and other fabrication work</li>
-                <li>Protected storage of materials</li>
-                <li>Any item not specifically mentioned in BOQ</li>
-            </ul>
+        
+        <div class="top-info-right">
+          <div class="info-row">
+            <span class="info-label">Version:</span> {{ version.version_no }}
+          </div>
+          <div class="info-row">
+            <span class="info-label">Ref. No:</span> {{ quotation_no }}
+          </div>
         </div>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Subject:</span> {{ subject }}
+      </div>
 
-        <!-- FOOTER -->
-        <div class="footer-section">
-            <div class="footer-left">
-                <strong>Declaration:</strong><br>
-                We declare that this quotation shows the actual price for the services.
-                <div class="signature-box">
-                    Customer's Seal & Signature
-                </div>
-            </div>
-            <div class="footer-right">
-                <strong>For Krishna Airconditioning</strong><br><br><br>
-                <div class="signature-box">
-                    Authorized Signatory
-                </div>
-            </div>
+      <!-- INTRODUCTION -->
+      <p style="text-align: justify; font-size: 10px; margin: 10px 0">
+        Dear Sir/Madam,<br />
+        Thank you for your valued enquiry. Based on our discussion with your
+        good self, we provide below our quotation for Supply, Installation,
+        Testing and Commissioning of Air Conditioning system.
+      </p>
+
+      <!-- ANNEXURE I: SUMMARY OF PROPOSAL -->
+      <div class="section-title">ANNEXURE I: SUMMARY OF PROPOSAL</div>
+      <table class="summary-table" style="border: 1px solid #000; margin-top: 10px; width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr style="border-bottom: 1px solid #000;">
+            <th style="width: 8%; text-align: center; border: 1px solid #000; padding: 6px 8px;">S.N.</th>
+            <th style="width: 67%; border: 1px solid #000; padding: 6px 8px;">Description</th>
+            <th style="width: 25%; text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 15px;">Amount (Rs.)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for section in summary_sections %}
+          <tr>
+            <td colspan="3" style="background-color: #f2f2f2; font-weight: bold; border: 1px solid #000; padding: 5px 8px;">
+              {{ section.title }}
+            </td>
+          </tr>
+          {% for item in section.items %}
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">{{ forloop.counter }}</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">{{ item.description }}</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">{{ item.amount|floatformat:2|intcomma }}</td>
+          </tr>
+          {% endfor %}
+          <tr class="subtotal-row" style="font-weight: bold;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">Subtotal ({{ section.title }}):</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">{{ section.subtotal|floatformat:2|intcomma }}</td>
+          </tr>
+          {% endfor %}
+
+          <tr class="summary-total-row" style="font-weight: bold;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">GRAND SUBTOTAL:</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">{{ subtotal|floatformat:2|intcomma }}</td>
+          </tr>
+          <tr class="gst-row" style="font-weight: bold;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">GST @ {{ gst_percentage|floatformat:0 }}%:</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">{{ gst_amount|floatformat:2|intcomma }}</td>
+          </tr>
+          <tr class="grand-total-row" style="font-weight: bold; background-color: rgba(255, 255, 4, 0.571);">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px; font-size: 12px;">GRAND TOTAL (INCLUDING GST):</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px; font-size: 12px;">Rs. {{ grand_total|floatformat:2|intcomma }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- ANNEXURE II: BILL OF QUANTITIES -->
+      <div class="section-title">ANNEXURE II: BILL OF QUANTITIES (High Side Air Conditioning Equipment)</div>
+
+      <table class="items-table" style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
+        <thead>
+          <tr style="border-bottom: 1px solid #000;">
+            <th style="width: 8%; text-align: center; border: 1px solid #000; padding: 6px 8px;">Sr. No.</th>
+            <th style="width: 50%; border: 1px solid #000; padding: 6px 8px;">Description</th>
+            <th style="width: 8%; text-align: center; border: 1px solid #000; padding: 6px 8px;">Qty.</th>
+            <th style="width: 10%; text-align: center; border: 1px solid #000; padding: 6px 8px;">Unit</th>
+            <th style="width: 12%; text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 10px;">Rate in Rs.</th>
+            <th style="width: 12%; text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 15px;">Amount in Rs.</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for group in high_side_groups %}
+          <!-- PART HEADER ROW -->
+          <tr>
+            <td colspan="6" style="border: 1px solid #000; padding: 6px 8px; font-weight: bold; background-color: #f2f2f2; text-align: left;">
+              Part - A{{ forloop.counter }} : High Side Equipment - {{ group.ac_type }}
+            </td>
+          </tr>
+          
+          {% for item in group.items %}
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">{{ forloop.counter }}</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">
+              <strong>{{ item.sku }}</strong><br/>
+              {{ item.description }}
+            </td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">{{ item.quantity|floatformat:0 }}</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">{{ item.unit }}</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">{{ item.rate|floatformat:2|intcomma }}</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">{{ item.amount|floatformat:2|intcomma }}</td>
+          </tr>
+          {% endfor %}
+          
+          <!-- SUB TOTAL ROW -->
+          <tr style="font-weight: bold">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">(A{{ forloop.counter }}) Sub Total of High Side Equipment ({{ group.ac_type }}) :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">{{ group.subtotal|floatformat:2|intcomma }}</td>
+          </tr>
+          <!-- GST ROW -->
+          <tr style="font-weight: bold;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">GST @ 18 % :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">Extra</td>
+          </tr>
+          <!-- TOTAL VRF EQUIPMENT ROW -->
+          <tr style="font-weight: bold; background-color: #d4edda; color: #155724;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px; font-size: 12px; font-weight: bold;">Total of {{ group.ac_type }} Equipment :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px; font-size: 12px; font-weight: bold;">{{ group.subtotal|floatformat:2|intcomma }}</td>
+          </tr>
+          {% endfor %}
+          <!-- GRAND TOTAL OF ALL HIGH SIDE EQUIPMENT -->
+          <tr style="font-weight: bold; background-color: #c3e6cb; color: #155724; border-top: 2px solid #000;">
+            <td style="border: 1px solid #000; padding: 6px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 10px; font-size: 13px; font-weight: bold;">Grand Total of High Side Equipment :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 15px; font-size: 13px; font-weight: bold;">{{ high_side_total|floatformat:2|intcomma }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- ANNEXURE III: BILL OF QUANTITIES (LOW SIDE INSTALLATION WORK) -->
+      {% if low_side_groups %}
+      <div class="section-title">ANNEXURE III: BILL OF QUANTITIES (LOW SIDE INSTALLATION WORK)</div>
+      
+      <table class="items-table" style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
+        <thead>
+          <tr style="border-bottom: 1px solid #000;">
+            <th style="width: 8%; text-align: center; border: 1px solid #000; padding: 6px 8px;">Sr. No.</th>
+            <th style="width: 50%; border: 1px solid #000; padding: 6px 8px;">Description</th>
+            <th style="width: 8%; text-align: center; border: 1px solid #000; padding: 6px 8px;">Qty.</th>
+            <th style="width: 10%; text-align: center; border: 1px solid #000; padding: 6px 8px;">Unit</th>
+            <th style="width: 12%; text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 10px;">Rate in Rs.</th>
+            <th style="width: 12%; text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 15px;">Amount in Rs.</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for group in low_side_groups %}
+          <!-- PART HEADER ROW -->
+          <tr>
+            <td colspan="6" style="border: 1px solid #000; padding: 6px 8px; font-weight: bold; background-color: #f2f2f2; text-align: left;">
+              Part - B{{ forloop.counter }} : Low Side Installation Work - {{ group.ac_type }}
+            </td>
+          </tr>
+          
+          {% for item in group.items %}
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">{{ forloop.counter }}</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">{{ item.description }}</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">{{ item.quantity|floatformat:0 }}</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">{{ item.unit }}</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">{{ item.rate|floatformat:2|intcomma }}</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">{{ item.amount|floatformat:2|intcomma }}</td>
+          </tr>
+          {% endfor %}
+
+          <!-- SUB TOTAL ROW -->
+          <tr style="font-weight: bold;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">(B{{ forloop.counter }}) Sub Total of Low Side Installation Work ({{ group.ac_type }}) :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">{{ group.subtotal|floatformat:2|intcomma }}</td>
+          </tr>
+          <!-- GST ROW -->
+          <tr style="font-weight: bold;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">GST @ 18 % :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">Extra</td>
+          </tr>
+          <!-- TOTAL LOW SIDE ROW -->
+          <tr style="font-weight: bold; background-color: #d4edda; color: #155724;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px; font-size: 12px; font-weight: bold;">Total of Low Side Installation Work ({{ group.ac_type }}) :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px; font-size: 12px; font-weight: bold;">{{ group.subtotal|floatformat:2|intcomma }}</td>
+          </tr>
+          {% endfor %}
+          <!-- GRAND TOTAL OF ALL LOW SIDE INSTALLATION WORK -->
+          <tr style="font-weight: bold; background-color: #c3e6cb; color: #155724; border-top: 2px solid #000;">
+            <td style="border: 1px solid #000; padding: 6px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 10px; font-size: 13px; font-weight: bold;">Grand Total of Low Side Installation Work :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 15px; font-size: 13px; font-weight: bold;">{{ low_side_total|floatformat:2|intcomma }}</td>
+          </tr>
+        </tbody>
+      </table>
+      {% endif %}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      <!-- ANNEXURE IV: TERMS & CONDITIONS -->
+      <div class="section-title">ANNEXURE IV: TERMS & CONDITIONS</div>
+      {% if payment_terms %}
+      <div class="terms-section">
+        <h3>Payment Terms:</h3>
+        <ul class="terms-list">
+          {% for term in payment_terms %}
+          <li>{{ term }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      {% if validity_terms %}
+      <div class="terms-section">
+        <h3>Validity of Rates:</h3>
+        <ul class="terms-list">
+          {% for term in validity_terms %}
+          <li>{{ term }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      {% if warranty_terms %}
+      <div class="terms-section">
+        <h3>Warranty & Service:</h3>
+        <ul class="terms-list">
+          {% for term in warranty_terms %}
+          <li>{{ term }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      {% if other_terms %}
+      <div class="terms-section">
+        <h3>Other Terms / Notes:</h3>
+        <ul class="terms-list">
+          {% for term in other_terms %}
+          <li>{{ term }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      <!-- FOOTER -->
+      <div class="footer-section">
+        <div class="footer-left">
+          <strong>Declaration:</strong><br />
+          {{ declaration|default:"We declare that this quotation shows the actual price for the services."|linebreaksbr }}
+          <br /><br />
+          <strong>For Krishna Airconditioning</strong>
+          <div class="stamp-box"></div>
+          <div class="signature-text">Stamp & Signature</div>
         </div>
-
-        <!-- BANK DETAILS -->
-        <div style="margin-top: 15px; padding: 10px; border: 1px solid #ccc; font-size: 9px;">
-            <strong>Bank Details for Payment:</strong><br>
-            Account Name: Krisna Airconditioning | Account No: 051330110000016<br>
-            Bank: Bank of India, Sahakar Nagar Branch | IFSC: BKID0000513 | GST: 27AITPP8825B2ZS
+        <div class="footer-right">
+          <div class="stamp-box"></div>
+          <div class="signature-text">Customer's Seal & Signature</div>
         </div>
+      </div>
 
-        <p style="text-align: center; margin-top: 10px; font-size: 9px;">
-            This is a computer-generated quotation
-        </p>
+      <!-- BANK DETAILS -->
+      <div
+        style="
+          margin-top: 15px;
+          padding: 10px;
+          border: 1px solid #ccc;
+          font-size: 9px;
+        "
+      >
+        <strong>Bank Details for Payment:</strong><br />
+        Account Name: Krisna Airconditioning | Account No: 051330110000016<br />
+        Bank: Bank of India, Sahakar Nagar Branch | IFSC: BKID0000513 | GST:
+        27AITPP8825B2ZS
+      </div>
+
+      <p style="text-align: center; margin-top: 10px; font-size: 9px">
+        This is a computer-generated quotation
+      </p>
     </div>
-</body>
+  </body>
 </html>

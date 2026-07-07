@@ -24,7 +24,7 @@ from .models import (
     QuotationLowSideItem,
 )
 from .serializers import QuotationSerializer
-from .utils.pdf_generator import generate_quotation_pdf as build_quotation_pdf, generate_quotation_print_pdf
+from .utils.pdf_generator import generate_quotation_pdf as build_quotation_pdf
 
 from .models import ServiceMaster, QuotationServiceItem
 from .serializers import (
@@ -207,67 +207,6 @@ class QuotationViewSet(viewsets.ModelViewSet):
                 f"Error generating PDF: {str(e)}",
                 status=500
             )
-
-    @action(detail=True, methods=['get'], url_path='print-pdf')
-    def download_print_pdf(self, request, pk=None):
-        """New WeasyPrint quotation PDF (invoice-style, dummy table for design stage)."""
-        try:
-            quotation = self.get_object()
-            version = QuotationVersion.objects.filter(
-                quotation=quotation,
-                is_active=True
-            ).first()
-
-            if not version:
-                return HttpResponse("No active version found", status=404)
-
-            pdf_content = generate_quotation_print_pdf(
-                quotation,
-                version,
-                base_url=request.build_absolute_uri('/'),
-            )
-
-            response = HttpResponse(pdf_content, content_type='application/pdf')
-            filename = f"quotation_{quotation.quotation_no}_v{version.version_no}_print.pdf"
-            if request.GET.get('download'):
-                response['Content-Disposition'] = f'attachment; filename="{filename}"'
-            else:
-                response['Content-Disposition'] = f'inline; filename="{filename}"'
-            return response
-
-        except Exception as e:
-            logger.error(f"Print PDF generation error: {str(e)}")
-            return HttpResponse(f"Error generating PDF: {str(e)}", status=500)
-
-    @action(detail=True, methods=['get'], url_path='version/(?P<version_id>[^/.]+)/print-pdf')
-    def download_version_print_pdf(self, request, pk=None, version_id=None):
-        """New WeasyPrint PDF for a specific quotation version."""
-        try:
-            quotation = self.get_object()
-            version = get_object_or_404(
-                QuotationVersion,
-                pk=version_id,
-                quotation=quotation,
-            )
-
-            pdf_content = generate_quotation_print_pdf(
-                quotation,
-                version,
-                base_url=request.build_absolute_uri('/'),
-            )
-
-            response = HttpResponse(pdf_content, content_type='application/pdf')
-            filename = f"quotation_{quotation.quotation_no}_v{version.version_no}_print.pdf"
-            if request.GET.get('download'):
-                response['Content-Disposition'] = f'attachment; filename="{filename}"'
-            else:
-                response['Content-Disposition'] = f'inline; filename="{filename}"'
-            return response
-
-        except Exception as e:
-            logger.error(f"Version print PDF error: {str(e)}")
-            return HttpResponse(f"Error generating PDF: {str(e)}", status=500)
-
 
     @action(detail=True, methods=["delete"], url_path="version/(?P<version_id>[^/.]+)/delete")
     def delete_version(self, request, pk=None, version_id=None):

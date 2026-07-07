@@ -1,0 +1,749 @@
+ 
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        font-size: 11px;
+        margin: 0;
+        padding: 0;
+        line-height: 1.4;
+      }
+
+      .page-border {
+        padding: 0;
+        min-height: 1000px;
+        position: relative;
+      }
+
+      /* HEADER */
+      .company-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #000;
+        padding-bottom: 10px;
+      }
+
+      .company-header img {
+        width: 100px;
+        height: auto;
+        padding: 0 20px 0 20px;
+      }
+
+      .header-text {
+        text-align: center;
+      }
+
+      .header-text h1 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: bold;
+      }
+
+      .header-text p {
+        margin: 4px 0 0;
+        font-size: 10px;
+      }
+
+      .company-header {
+        margin-top: 15px;
+        padding: 0 20px 5px 20px;
+      }
+
+      .company-header h1 {
+        margin: 5px 0 5px 0;
+        font-size: 18px;
+        font-weight: bold;
+      }
+
+      .company-header p {
+        margin: 1px 0;
+        font-size: 10px;
+      }
+
+      /* TOP INFO */
+      .top-info {
+        margin-bottom: 15px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+      }
+
+      .top-info-left,
+      .top-info-right {
+        flex: 1;
+      }
+
+      .top-info-right {
+        text-align: right;
+      }
+
+      .info-row {
+        margin: 3px 0;
+      }
+
+      .info-label {
+        font-weight: bold;
+      }
+
+      /* SECTION TITLES */
+      .section-title {
+        background-color: #cecece;     /* Light gray background block */
+        padding: 6px 10px;             /* Padding around the text */
+        margin-top: 20px;
+        margin-bottom: 10px;
+        font-weight: bold;
+        font-size: 13px;               /* Bolder and bigger main headings */
+        text-transform: uppercase;     /* Capitalized letters */
+        border-left: 5px solid #012ca2;        /* Clean border matching the tables */
+        break-after: avoid;
+        page-break-after: avoid;
+      }
+
+      /* TABLES */
+      thead {
+        display: table-row-group;
+      }
+      .summary-table,
+      .items-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 10px;
+        font-size: 11px;
+      }
+
+      table tr {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+
+      .summary-table th,
+      .items-table th {
+        background-color: #ffffff;      /* Light gray background */
+        color: rgb(0, 0, 0);
+        padding: 8px;
+        text-align: left;
+        border: 1px solid #000;
+        font-weight: 800;              /* Bolder title headers */
+        font-size: 13px;               /* Bigger title size */
+      }
+
+      .summary-table td,
+      .items-table td {
+        padding: 6px 8px;
+        border: 1px solid #000;
+      }
+
+      .summary-table tr:nth-child(even),
+      .items-table tr:nth-child(even) {
+        background-color: transparent;  /* Clean table, no zebra stripes */
+      }
+
+      .amount-cell {
+        text-align: right;
+        font-weight: bold;
+      }
+
+      .qty-cell {
+        text-align: center;
+      }
+
+      .rate-cell {
+        text-align: right;
+      }
+
+      .summary-total-row {
+        background-color: #ffffff;
+        font-weight: bold;
+      }
+
+      .summary-total-row td {
+        padding: 8px;
+        border: 2px solid #000;
+      }
+
+      .gst-row {
+        background-color: #ffffff;
+      }
+
+      .grand-total-row {
+        background-color: #ffffff;
+        font-weight: bold;
+        font-size: 12px;
+      }
+
+      /* TERMS */
+      .terms-section {
+        margin-top: 20px;
+        border: 1px solid #000;
+        padding: 10px;
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+
+      .terms-section h3 {
+        margin: 0 0 10px 0;
+        font-size: 12px;
+        font-weight: bold;
+        border-bottom: 1px solid #ccc;
+        padding-bottom: 5px;
+      }
+
+      .terms-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      .terms-list li {
+        margin-bottom: 5px;
+        padding-left: 15px;
+        text-align: justify;
+        font-size: 10px;
+        line-height: 1.3;
+      }
+
+      .terms-list li:before {
+        content: "•";
+        margin-left: -10px;
+        margin-right: 8px;
+      }
+
+      /* FOOTER */
+      .footer-section {
+        margin-top: 20px;
+        border-top: 2px solid #000;
+        padding-top: 15px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+      }
+
+      .footer-left,
+      .footer-right {
+        flex: 1;
+      }
+
+      .footer-right {
+        text-align: right;
+      }
+
+      .signature-box {
+        margin-top: 40px;
+        border-top: 1px solid #000;
+        padding-top: 5px;
+        text-align: center;
+        font-size: 10px;
+      }
+
+      /* SUBTOTAL ROWS */
+      .subtotal-row {
+        background-color: #ffffff;
+        font-weight: bold;
+      }
+
+      .subtotal-row td {
+        padding: 8px;
+      }
+      
+      .Address {
+        font-weight: bold;
+      }
+
+      @page {
+        size: A4;
+        margin: 20px;
+        border: 1px solid #000; /* draws a solid border around every page */
+        padding: 15px;          /* creates a gap inside the border on every single page */
+      }
+
+      .page-break {
+        page-break-after: always;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="page-border">
+      <!-- COMPANY HEADER -->
+      <div class="company-header">
+        <img src="file:///app/static/images/ka-logo.png" alt="Logo" />
+        <div class="header-contact">
+          <p class="Address">Address:-</p>
+          <p>Krishna Airconditioning</p>
+          <p>Shop No. 1, 2 & 3, Sai Plaza, Opp. Shreeji Petrol Pump,</p>
+          <p>Near Sahakar Nagar, Nashik - 422007</p>
+          <p>Contact: +91 98220 12345 | Email:</p>
+        </div>
+      </div>
+
+      <div class="header-text">
+        <h1>QUOTATION</h1>
+        <p>Supply, Installation, Testing & Commissioning</p>
+      </div>
+
+      <!-- TOP INFO -->
+      <div class="top-info">
+        <div class="top-info-left">
+          <div class="info-row">
+            <span class="info-label">Date:</span> 07/07/2026
+          </div>
+          <div class="info-row">
+            <span class="info-label">To:</span> raj
+          </div>
+          <div class="info-row">
+            <span class="info-label">Site:</span> Suyog Shrivastav
+          </div>
+        </div>
+        
+        <div class="top-info-right">
+          <div class="info-row">
+            <span class="info-label">Version:</span> KA/SPL/26/073-R8
+          </div>
+          <div class="info-row">
+            <span class="info-label">Ref. No:</span> KA/SPL/26/073
+          </div>
+        </div>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Subject:</span> Anything
+      </div>
+
+      <!-- INTRODUCTION -->
+      <p style="text-align: justify; font-size: 10px; margin: 10px 0">
+        Dear Sir/Madam,<br />
+        Thank you for your valued enquiry. Based on our discussion with your
+        good self, we provide below our quotation for Supply, Installation,
+        Testing and Commissioning of Air Conditioning system.
+      </p>
+
+      <!-- ANNEXURE I: SUMMARY OF PROPOSAL -->
+      <div class="section-title">ANNEXURE I: SUMMARY OF PROPOSAL</div>
+      <table class="summary-table" style="border: 1px solid #000; margin-top: 10px; width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr style="border-bottom: 1px solid #000;">
+            <th style="width: 8%; text-align: center; border: 1px solid #000; padding: 6px 8px;">S.N.</th>
+            <th style="width: 67%; border: 1px solid #000; padding: 6px 8px;">Description</th>
+            <th style="width: 25%; text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 15px;">Amount (Rs.)</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+          <tr>
+            <td colspan="3" style="background-color: #f2f2f2; font-weight: bold; border: 1px solid #000; padding: 5px 8px;">
+              Part A: High Side Air Conditioning Equipment
+            </td>
+          </tr>
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">1</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Split AC 1.0 TR 3 Star Inverter</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">170,000.00</td>
+          </tr>
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">2</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Window AC 2liter TR 1 Star Inverter</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">30,000.00</td>
+          </tr>
+          
+          <tr class="subtotal-row" style="font-weight: bold;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">Subtotal (Part A: High Side Air Conditioning Equipment):</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">200,000.00</td>
+          </tr>
+          
+          <tr>
+            <td colspan="3" style="background-color: #f2f2f2; font-weight: bold; border: 1px solid #000; padding: 5px 8px;">
+              Part B: Low Side Installation Work
+            </td>
+          </tr>
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">1</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Copper Pipe Soft 3/4 mm</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">20.00</td>
+          </tr>
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">2</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Gas Refregerent Gas</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">5,382.00</td>
+          </tr>
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">3</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Insullation Transprent Tape</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">240.00</td>
+          </tr>
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">4</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Gas Refregerent Gas</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">9,000.00</td>
+          </tr>
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">5</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Conduit Pipe 25 mt</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">40.00</td>
+          </tr>
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">6</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Copper Pipe Soft 3/8 mt</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">480.00</td>
+          </tr>
+          
+          <tr class="subtotal-row" style="font-weight: bold;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">Subtotal (Part B: Low Side Installation Work):</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">15,162.00</td>
+          </tr>
+          
+
+          <tr class="summary-total-row" style="font-weight: bold;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">GRAND SUBTOTAL:</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">215,162.00</td>
+          </tr>
+          <tr class="gst-row" style="font-weight: bold;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">GST @ 17%:</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">36,440.26</td>
+          </tr>
+          <tr class="grand-total-row" style="font-weight: bold; background-color: rgba(255, 255, 4, 0.571);">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px; font-size: 12px;">GRAND TOTAL (INCLUDING GST):</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px; font-size: 12px;">Rs. 251,602.26</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- ANNEXURE II: BILL OF QUANTITIES -->
+      <div class="section-title">ANNEXURE II: BILL OF QUANTITIES (High Side Air Conditioning Equipment)</div>
+
+      <table class="items-table" style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
+        <thead>
+          <tr style="border-bottom: 1px solid #000;">
+            <th style="width: 8%; text-align: center; border: 1px solid #000; padding: 6px 8px;">Sr. No.</th>
+            <th style="width: 50%; border: 1px solid #000; padding: 6px 8px;">Description</th>
+            <th style="width: 8%; text-align: center; border: 1px solid #000; padding: 6px 8px;">Qty.</th>
+            <th style="width: 10%; text-align: center; border: 1px solid #000; padding: 6px 8px;">Unit</th>
+            <th style="width: 12%; text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 10px;">Rate in Rs.</th>
+            <th style="width: 12%; text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 15px;">Amount in Rs.</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+          <!-- PART HEADER ROW -->
+          <tr>
+            <td colspan="6" style="border: 1px solid #000; padding: 6px 8px; font-weight: bold; background-color: #f2f2f2; text-align: left;">
+              Part - A1 : High Side Equipment - Split AC
+            </td>
+          </tr>
+          
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">1</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">
+              <strong>HIT-TOUSH-10TR-3-2BD1</strong><br/>
+              Split AC 1.0 TR 3 Star Inverter
+            </td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">1</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">Nos</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">170,000.00</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">170,000.00</td>
+          </tr>
+          
+          
+          <!-- SUB TOTAL ROW -->
+          <tr style="font-weight: bold">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">(A1) Sub Total of High Side Equipment (Split AC) :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">170,000.00</td>
+          </tr>
+          <!-- GST ROW -->
+          <tr style="font-weight: bold;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">GST @ 18 % :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">Extra</td>
+          </tr>
+          <!-- TOTAL VRF EQUIPMENT ROW -->
+          <tr style="font-weight: bold; background-color: #d4edda; color: #155724;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px; font-size: 12px; font-weight: bold;">Total of Split AC Equipment :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px; font-size: 12px; font-weight: bold;">170,000.00</td>
+          </tr>
+          
+          <!-- PART HEADER ROW -->
+          <tr>
+            <td colspan="6" style="border: 1px solid #000; padding: 6px 8px; font-weight: bold; background-color: #f2f2f2; text-align: left;">
+              Part - A2 : High Side Equipment - Window AC
+            </td>
+          </tr>
+          
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">1</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">
+              <strong>VOL-25413-2liter-1-274F</strong><br/>
+              Window AC 2liter TR 1 Star Inverter
+            </td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">1</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">Nos</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">30,000.00</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">30,000.00</td>
+          </tr>
+          
+          
+          <!-- SUB TOTAL ROW -->
+          <tr style="font-weight: bold">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">(A2) Sub Total of High Side Equipment (Window AC) :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">30,000.00</td>
+          </tr>
+          <!-- GST ROW -->
+          <tr style="font-weight: bold;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">GST @ 18 % :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">Extra</td>
+          </tr>
+          <!-- TOTAL VRF EQUIPMENT ROW -->
+          <tr style="font-weight: bold; background-color: #d4edda; color: #155724;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px; font-size: 12px; font-weight: bold;">Total of Window AC Equipment :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px; font-size: 12px; font-weight: bold;">30,000.00</td>
+          </tr>
+          
+          <!-- GRAND TOTAL OF ALL HIGH SIDE EQUIPMENT -->
+          <tr style="font-weight: bold; background-color: #c3e6cb; color: #155724; border-top: 2px solid #000;">
+            <td style="border: 1px solid #000; padding: 6px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 10px; font-size: 13px; font-weight: bold;">Grand Total of High Side Equipment :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 15px; font-size: 13px; font-weight: bold;">200,000.00</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- ANNEXURE III: BILL OF QUANTITIES (LOW SIDE INSTALLATION WORK) -->
+      
+      <div class="section-title">ANNEXURE III: BILL OF QUANTITIES (LOW SIDE INSTALLATION WORK)</div>
+      
+      <table class="items-table" style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
+        <thead>
+          <tr style="border-bottom: 1px solid #000;">
+            <th style="width: 8%; text-align: center; border: 1px solid #000; padding: 6px 8px;">Sr. No.</th>
+            <th style="width: 50%; border: 1px solid #000; padding: 6px 8px;">Description</th>
+            <th style="width: 8%; text-align: center; border: 1px solid #000; padding: 6px 8px;">Qty.</th>
+            <th style="width: 10%; text-align: center; border: 1px solid #000; padding: 6px 8px;">Unit</th>
+            <th style="width: 12%; text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 10px;">Rate in Rs.</th>
+            <th style="width: 12%; text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 15px;">Amount in Rs.</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+          <!-- PART HEADER ROW -->
+          <tr>
+            <td colspan="6" style="border: 1px solid #000; padding: 6px 8px; font-weight: bold; background-color: #f2f2f2; text-align: left;">
+              Part - B1 : Low Side Installation Work - Split AC
+            </td>
+          </tr>
+          
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">1</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Copper Pipe Soft 3/4 mm</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">1</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">Nos</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">20.00</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">20.00</td>
+          </tr>
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">2</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Gas Refregerent Gas</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">23</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">Nos</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">234.00</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">5,382.00</td>
+          </tr>
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">3</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Insullation Transprent Tape</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">12</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">Nos</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">20.00</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">240.00</td>
+          </tr>
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">4</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Gas Refregerent Gas</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">3</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">Nos</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">3,000.00</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">9,000.00</td>
+          </tr>
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">5</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Conduit Pipe 25 mt</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">2</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">Nos</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">20.00</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">40.00</td>
+          </tr>
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">6</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Copper Pipe Soft 3/8 mt</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">2</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">Nos</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">240.00</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">480.00</td>
+          </tr>
+          
+
+          <!-- SUB TOTAL ROW -->
+          <tr style="font-weight: bold;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">(B1) Sub Total of Low Side Installation Work (Split AC) :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">15,162.00</td>
+          </tr>
+          <!-- GST ROW -->
+          <tr style="font-weight: bold;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">GST @ 18 % :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">Extra</td>
+          </tr>
+          <!-- TOTAL LOW SIDE ROW -->
+          <tr style="font-weight: bold; background-color: #d4edda; color: #155724;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px; font-size: 12px; font-weight: bold;">Total of Low Side Installation Work (Split AC) :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px; font-size: 12px; font-weight: bold;">15,162.00</td>
+          </tr>
+          
+          <!-- GRAND TOTAL OF ALL LOW SIDE INSTALLATION WORK -->
+          <tr style="font-weight: bold; background-color: #c3e6cb; color: #155724; border-top: 2px solid #000;">
+            <td style="border: 1px solid #000; padding: 6px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 10px; font-size: 13px; font-weight: bold;">Grand Total of Low Side Installation Work :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 15px; font-size: 13px; font-weight: bold;">15,162.00</td>
+          </tr>
+        </tbody>
+      </table>
+      
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      <!-- ANNEXURE IV: TERMS & CONDITIONS -->
+      <div class="section-title">ANNEXURE IV: TERMS & CONDITIONS</div>
+      
+      <div class="terms-section">
+        <h3>Payment Terms:</h3>
+        <ul class="terms-list">
+          
+          <li>For  HVAC Equipment 100 % advance along with PO against Proforma Invoice.                                           Purchase Order and Cheque shall be made in the name of KRISNA AIRCONDITIONING  Pune. Bank of India, Account Number: 051330110000016, IFSC Code : BKID0000513.  GSTN: 27AITPP8825B2ZS.</li>
+          
+          <li>For Low Side Installation charges of  HVAC Equipments -50% advance along with order, 30% against delivery of material at site on prorata basis, 10% against installation of material at site on prorata basis, and balance 10% against completion of installation testing and commissioning of HVAC equipments.                                                                                                                                                  Purchase Order and Cheque shall be made in the name of KRISNA AIRCONDITIONING  Pune. Bank of India, Account Number: 051330110000016, IFSC Code : BKID0000513.  GSTN: 27AITPP8825B2ZS.</li>
+          
+        </ul>
+      </div>
+      
+
+      
+      <div class="terms-section">
+        <h3>Validity of Rates:</h3>
+        <ul class="terms-list">
+          
+          <li>Rates for AC units are valid up to 7 days and Low Side Installation rates are valid up to 30 days from the date of this offer.</li>
+          
+        </ul>
+      </div>
+      
+
+      
+      <div class="terms-section">
+        <h3>Warranty & Service:</h3>
+        <ul class="terms-list">
+          
+          <li>1) VRF AC &amp; Ductable AC Equipments will have Fifteen ( 15 ) months Compressor warranty from the date of  delivery at site or Twelve (12) months from date of commissioning of AC, which ever is earlier.</li>
+          
+        </ul>
+      </div>
+      
+
+      
+      <div class="terms-section">
+        <h3>Other Terms / Notes:</h3>
+        <ul class="terms-list">
+          
+          <li>Electrical Power Cables &amp; Pin top/Socket arrangement up to all HVAC equipment will be in the scope of customer.</li>
+          
+          <li>Local Mathadi Charges will be extra at actual and will be paid by customer.</li>
+          
+          <li>Above costing are estimated and will be firm upon detailed interior layout.</li>
+          
+          <li>Final billing and payment will be based on actual installed quantities.</li>
+          
+        </ul>
+      </div>
+      
+
+      <!-- FOOTER -->
+      <div class="footer-section">
+        <div class="footer-left">
+          <strong>Declaration:</strong><br />
+          Thankyouuuuu.
+          <div class="signature-box">Customer's Seal & Signature</div>
+        </div>
+        <div class="footer-right">
+          <strong>For Krishna Airconditioning</strong><br /><br /><br />
+          <div class="signature-box">Authorized Signatory</div>
+        </div>
+      </div>
+
+      <!-- BANK DETAILS -->
+      <div
+        style="
+          margin-top: 15px;
+          padding: 10px;
+          border: 1px solid #ccc;
+          font-size: 9px;
+        "
+      >
+        <strong>Bank Details for Payment:</strong><br />
+        Account Name: Krisna Airconditioning | Account No: 051330110000016<br />
+        Bank: Bank of India, Sahakar Nagar Branch | IFSC: BKID0000513 | GST:
+        27AITPP8825B2ZS
+      </div>
+
+      <p style="text-align: center; margin-top: 10px; font-size: 9px">
+        This is a computer-generated quotation
+      </p>
+    </div>
+  </body>
+</html>
