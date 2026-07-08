@@ -66,6 +66,7 @@ class ServiceManagementMaterialSerializer(serializers.ModelSerializer):
 
 class ServiceManagementRecordSerializer(serializers.ModelSerializer):
     materials = ServiceManagementMaterialSerializer(many=True, read_only=True)
+    assigned_technicians = serializers.SerializerMethodField()
     
     class Meta:
         model = ServiceManagementRecord
@@ -76,9 +77,23 @@ class ServiceManagementRecordSerializer(serializers.ModelSerializer):
             'state', 'city', 'pincode', 'address',
             'apply_gst', 'gst_percentage', 'total_price_without_gst', 
             'gst_amount', 'total_price_with_gst', 'materials',
+            'assigned_technicians',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['gst_amount', 'total_price_with_gst', 'created_at', 'updated_at']
+
+    def get_assigned_technicians(self, obj):
+        records = obj.technician_work_records.select_related('technician').all()
+        return [
+            {
+                'id': r.technician.id,
+                'name': f"{r.technician.first_name or ''} {r.technician.last_name or ''}".strip() or r.technician.email,
+                'email': r.technician.email,
+                'work_date': r.work_date.isoformat() if r.work_date else None,
+                'work_description': r.work_description,
+            }
+            for r in records
+        ]
     
     def create(self, validated_data):
         record = ServiceManagementRecord.objects.create(**validated_data)
@@ -171,6 +186,9 @@ class TechnicianWorkRecordSerializer(serializers.ModelSerializer):
     service_customer_name = serializers.CharField(
         source='service_record.customer_name', read_only=True
     )
+    service_end_date = serializers.DateField(
+        source='service_record.service_end_date', read_only=True
+    )
 
     class Meta:
         model = TechnicianWorkRecord
@@ -180,10 +198,12 @@ class TechnicianWorkRecordSerializer(serializers.ModelSerializer):
             'technician_name',
             'service_record',
             'service_customer_name',
+            'service_end_date',
             'customer_name',
             'customer_phone',
             'customer_address',
             'payment_amount',
+            'payment_status',
             'gps_location',
             'work_description',
             'work_date',
@@ -195,7 +215,6 @@ class TechnicianWorkRecordSerializer(serializers.ModelSerializer):
             'customer_name',
             'customer_phone',
             'customer_address',
-            'payment_amount',
             'created_by',
             'created_at',
             'updated_at',
@@ -218,7 +237,8 @@ class TechnicianWorkRecordSerializer(serializers.ModelSerializer):
         validated_data['customer_name'] = service_record.customer_name or ''
         validated_data['customer_phone'] = service_record.customer_contact or ''
         validated_data['customer_address'] = service_record.address or ''
-        validated_data['payment_amount'] = service_record.total_price_with_gst or 0
+        if 'payment_amount' not in validated_data:
+            validated_data['payment_amount'] = service_record.total_price_with_gst or 0
         return validated_data
 
     def create(self, validated_data):

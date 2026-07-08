@@ -357,7 +357,7 @@ class TechnicianWorkRecord(models.Model):
     """Technician work entry with customer details auto-filled from service records."""
     technician = models.ForeignKey(
         CustomUser,
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
         related_name='technician_work_records'
     )
     service_record = models.ForeignKey(
@@ -370,6 +370,11 @@ class TechnicianWorkRecord(models.Model):
     customer_phone = models.CharField(max_length=15)
     customer_address = models.TextField()
     payment_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    payment_status = models.CharField(
+        max_length=20,
+        choices=[('pending', 'Pending'), ('completed', 'Completed')],
+        default='pending'
+    )
 
     gps_location = models.CharField(max_length=255, blank=True, default='')
     work_description = models.TextField(blank=True, default='')

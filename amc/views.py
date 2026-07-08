@@ -96,6 +96,11 @@ class ServiceManagementRecordViewSet(viewsets.ModelViewSet):
             'work_description': request.data.get('work_description', ''),
             'work_date': request.data.get('work_date') or timezone.now().date(),
         }
+        if 'payment_amount' in request.data:
+            payload['payment_amount'] = request.data.get('payment_amount')
+        if 'payment_status' in request.data:
+            payload['payment_status'] = request.data.get('payment_status')
+
         serializer = TechnicianWorkRecordSerializer(
             data=payload,
             context={'request': request}
