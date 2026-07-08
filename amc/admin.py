@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import AMCContract, AMCRenewal
+from .models import AMCContract, AMCRenewal, TechnicianWorkRecord
 
 
 @admin.register(AMCContract)
@@ -14,3 +14,10 @@ class AMCContractAdmin(admin.ModelAdmin):
 class AMCRenewalAdmin(admin.ModelAdmin):
     list_display = ['previous_contract', 'renewal_date', 'status']
     list_filter = ['status']
+
+
+@admin.register(TechnicianWorkRecord)
+class TechnicianWorkRecordAdmin(admin.ModelAdmin):
+    list_display = ['work_date', 'technician', 'customer_name', 'customer_phone', 'payment_amount']
+    list_filter = ['work_date', 'technician']
+    search_fields = ['customer_name', 'customer_phone', 'work_description']

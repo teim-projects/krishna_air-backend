@@ -12,12 +12,15 @@ from .models import Customer
 from .serializers import CustomerSearchSerializer
 
 
-from .models import AMCContract, AMCRenewal, AMCSparePart
+from .models import AMCContract, AMCRenewal, AMCSparePart, TechnicianWorkRecord
 
 from .serializers import (
     AMCContractSerializer,
     AMCRenewalSerializer,
     AMCSparePartSerializer,
+    TechnicianWorkRecordSerializer,
+    TechnicianUserSerializer,
+    TechnicianAllocationDraftSerializer,
 )
 
 from .models import ServiceManagementRecord, ServiceManagementMaterial
@@ -31,6 +34,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from inventory.models import InventoryItem
 from quotation.models import Quotation, QuotationVersion
 from .serializers import QuotationSerializer
+from api.models import CustomUser
 
 class CustomerViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Customer.objects.all()
@@ -70,6 +74,38 @@ class ServiceManagementRecordViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=['get'], url_path='technician-allocation-draft')
+    def technician_allocation_draft(self, request, pk=None):
+        """Return auto-filled customer/payment data for technician allocation button."""
+        record = self.get_object()
+        serializer = TechnicianAllocationDraftSerializer(record)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='allocate-work-to-technician')
+    def allocate_work_to_technician(self, request, pk=None):
+        """
+        Create a technician work record from this exact service management row.
+        Expected body: technician, gps_location?, work_description?, work_date?
+        """
+        record = self.get_object()
+        payload = {
+            'technician': request.data.get('technician'),
+            'service_record': record.id,
+            'gps_location': request.data.get('gps_location', ''),
+            'work_description': request.data.get('work_description', ''),
+            'work_date': request.data.get('work_date') or timezone.now().date(),
+        }
+        serializer = TechnicianWorkRecordSerializer(
+            data=payload,
+            context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+        work_record = serializer.save()
+        return Response(
+            TechnicianWorkRecordSerializer(work_record).data,
+            status=status.HTTP_201_CREATED
+        )
     
     @action(detail=True, methods=['post'])
     def add_material(self, request, pk=None):
@@ -322,3 +358,22 @@ class AMCRenewalViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['status']
+
+
+class TechnicianWorkRecordViewSet(viewsets.ModelViewSet):
+    queryset = TechnicianWorkRecord.objects.select_related(
+        'technician', 'service_record'
+    ).all()
+    serializer_class = TechnicianWorkRecordSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['technician', 'service_record', 'work_date']
+    search_fields = ['customer_name', 'customer_phone', 'work_description']
+
+    @action(detail=False, methods=['get'], url_path='technicians')
+    def technicians(self, request):
+        technicians = CustomUser.objects.select_related('role').filter(
+            role__name__iexact='technician',
+            is_active=True,
+        ).order_by('first_name', 'last_name', 'email')
+        return Response(TechnicianUserSerializer(technicians, many=True).data)

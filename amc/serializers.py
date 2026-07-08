@@ -1,9 +1,10 @@
 from rest_framework import serializers
 from .models import (
-    AMCContract, AMCRenewal, AMCSparePart,
+    AMCContract, AMCRenewal, AMCSparePart, TechnicianWorkRecord,
     ServiceManagementRecord, ServiceManagementMaterial
 )
 from lead_management.models import Customer
+from api.models import CustomUser
 
 # Import Quotation serializers from quotation app
 from quotation.serializers import (
@@ -149,3 +150,107 @@ class AMCRenewalSerializer(serializers.ModelSerializer):
     class Meta:
         model = AMCRenewal
         fields = '__all__'
+
+
+class TechnicianUserSerializer(serializers.ModelSerializer):
+    display_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CustomUser
+        fields = ['id', 'display_name', 'email', 'mobile_no']
+
+    def get_display_name(self, obj):
+        full_name = f"{obj.first_name or ''} {obj.last_name or ''}".strip()
+        if full_name:
+            return full_name
+        return obj.email or obj.mobile_no or f"User {obj.id}"
+
+
+class TechnicianWorkRecordSerializer(serializers.ModelSerializer):
+    technician_name = serializers.SerializerMethodField(read_only=True)
+    service_customer_name = serializers.CharField(
+        source='service_record.customer_name', read_only=True
+    )
+
+    class Meta:
+        model = TechnicianWorkRecord
+        fields = [
+            'id',
+            'technician',
+            'technician_name',
+            'service_record',
+            'service_customer_name',
+            'customer_name',
+            'customer_phone',
+            'customer_address',
+            'payment_amount',
+            'gps_location',
+            'work_description',
+            'work_date',
+            'created_by',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = [
+            'customer_name',
+            'customer_phone',
+            'customer_address',
+            'payment_amount',
+            'created_by',
+            'created_at',
+            'updated_at',
+        ]
+
+    def get_technician_name(self, obj):
+        full_name = f"{obj.technician.first_name or ''} {obj.technician.last_name or ''}".strip()
+        if full_name:
+            return full_name
+        return obj.technician.email or obj.technician.mobile_no or f"User {obj.technician_id}"
+
+    def validate_technician(self, value):
+        role_name = (value.role.name if value.role else '').strip().lower()
+        if role_name != 'technician':
+            raise serializers.ValidationError("Selected user is not a technician.")
+        return value
+
+    def _autofill_customer_fields(self, validated_data):
+        service_record = validated_data['service_record']
+        validated_data['customer_name'] = service_record.customer_name or ''
+        validated_data['customer_phone'] = service_record.customer_contact or ''
+        validated_data['customer_address'] = service_record.address or ''
+        validated_data['payment_amount'] = service_record.total_price_with_gst or 0
+        return validated_data
+
+    def create(self, validated_data):
+        validated_data = self._autofill_customer_fields(validated_data)
+        request = self.context.get('request')
+        if request and request.user and request.user.is_authenticated:
+            validated_data['created_by'] = request.user
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        if 'service_record' in validated_data:
+            validated_data = self._autofill_customer_fields(validated_data)
+        return super().update(instance, validated_data)
+
+
+class TechnicianAllocationDraftSerializer(serializers.ModelSerializer):
+    payment_amount = serializers.DecimalField(
+        source='total_price_with_gst',
+        max_digits=12,
+        decimal_places=2,
+        read_only=True
+    )
+    customer_phone = serializers.CharField(source='customer_contact', read_only=True)
+    customer_address = serializers.CharField(source='address', read_only=True)
+
+    class Meta:
+        model = ServiceManagementRecord
+        fields = [
+            'id',
+            'customer',
+            'customer_name',
+            'customer_phone',
+            'customer_address',
+            'payment_amount',
+        ]

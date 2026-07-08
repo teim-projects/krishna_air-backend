@@ -351,3 +351,42 @@ class AMCRenewal(models.Model):
     
     def __str__(self):
         return f"Renewal - {self.previous_contract.contract_number}"
+
+
+class TechnicianWorkRecord(models.Model):
+    """Technician work entry with customer details auto-filled from service records."""
+    technician = models.ForeignKey(
+        CustomUser,
+        on_delete=models.PROTECT,
+        related_name='technician_work_records'
+    )
+    service_record = models.ForeignKey(
+        ServiceManagementRecord,
+        on_delete=models.PROTECT,
+        related_name='technician_work_records'
+    )
+
+    customer_name = models.CharField(max_length=255)
+    customer_phone = models.CharField(max_length=15)
+    customer_address = models.TextField()
+    payment_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    gps_location = models.CharField(max_length=255, blank=True, default='')
+    work_description = models.TextField(blank=True, default='')
+    work_date = models.DateField(default=timezone.now)
+
+    created_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_technician_work_records'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-work_date', '-created_at']
+
+    def __str__(self):
+        return f"{self.customer_name} - {self.technician}"

@@ -5,7 +5,8 @@ from .views import (
     AMCRenewalViewSet,
     ServiceManagementRecordViewSet,
     ServiceManagementMaterialViewSet,
-    CustomerViewSet
+    CustomerViewSet,
+    TechnicianWorkRecordViewSet,
 )
 
 router = DefaultRouter()
@@ -14,6 +15,7 @@ router.register(r'renewals', AMCRenewalViewSet, basename='amc-renewal')
 router.register(r'service-records', ServiceManagementRecordViewSet, basename='service-record')
 router.register(r'service-materials', ServiceManagementMaterialViewSet, basename='service-material')
 router.register(r'customers', CustomerViewSet, basename='customer')
+router.register(r'technician-work-records', TechnicianWorkRecordViewSet, basename='technician-work-record')
 
 
 urlpatterns = [
