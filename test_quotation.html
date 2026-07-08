@@ -1,4 +1,4 @@
-{% load static %} {% load humanize %}
+ 
 <!doctype html>
 <html>
   <head>
@@ -306,29 +306,29 @@
       <div class="top-info">
         <div class="top-info-left " style="font-size: 12px;">
           <div class="info-row">
-            <span class="info-label">Date:</span> {{ quotation_date|date:"d/m/Y"}}
+            <span class="info-label">Date:</span> 07/07/2026
           </div>
           <div class="info-row">
-            <span class="info-label">To:</span> {{ customer_name }}
+            <span class="info-label">To:</span> raj
           </div>
           <div class="info-row">
-            <span class="info-label">Site:</span> {{ site_name }}
+            <span class="info-label">Site:</span> Suyog Shrivastav
           </div>
         </div>
         
         <div class="top-info-right">
           <div style="text-align: left; display: inline-block; font-size: 12px;">
             <div class="info-row">
-              <span class="info-label">Version:</span> {{ version.version_no }}
+              <span class="info-label">Version:</span> KA/SPL/26/073-R8
             </div>
             <div class="info-row">
-              <span class="info-label">Ref. No:</span> {{ quotation_no }}
+              <span class="info-label">Ref. No:</span> KA/SPL/26/073
             </div>
           </div>
         </div>
       </div>
       <div class="info-row" style="font-size: 12px;">
-        <span class="info-label">Subject:</span> {{ subject }}
+        <span class="info-label">Subject:</span> Anything
       </div>
 
       <!-- INTRODUCTION -->
@@ -350,40 +350,94 @@
           </tr>
         </thead>
         <tbody>
-          {% for section in summary_sections %}
+          
           <tr>
             <td colspan="3" style="background-color: #f2f2f2; font-weight: bold; border: 1px solid #000; padding: 5px 8px;">
-              {{ section.title }}
+              Part A: High Side Air Conditioning Equipment
             </td>
           </tr>
-          {% for item in section.items %}
+          
           <tr>
-            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">{{ forloop.counter }}</td>
-            <td style="border: 1px solid #000; padding: 5px 8px;">{{ item.description }}</td>
-            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">{{ item.amount|floatformat:2|intcomma }}</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">1</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Split AC 1.0 TR 3 Star Inverter</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">170,000.00</td>
           </tr>
-          {% endfor %}
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">2</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Window AC 2liter TR 1 Star Inverter</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">30,000.00</td>
+          </tr>
+          
           <tr class="subtotal-row" style="font-weight: bold;">
             <td style="border: 1px solid #000; padding: 5px 8px;"></td>
-            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">Subtotal ({{ section.title }}):</td>
-            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">{{ section.subtotal|floatformat:2|intcomma }}</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">Subtotal (Part A: High Side Air Conditioning Equipment):</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">200,000.00</td>
           </tr>
-          {% endfor %}
+          
+          <tr>
+            <td colspan="3" style="background-color: #f2f2f2; font-weight: bold; border: 1px solid #000; padding: 5px 8px;">
+              Part B: Low Side Installation Work
+            </td>
+          </tr>
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">1</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Copper Pipe Soft 3/4 mm</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">20.00</td>
+          </tr>
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">2</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Gas Refregerent Gas</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">5,382.00</td>
+          </tr>
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">3</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Insullation Transprent Tape</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">240.00</td>
+          </tr>
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">4</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Gas Refregerent Gas</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">9,000.00</td>
+          </tr>
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">5</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Conduit Pipe 25 mt</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">40.00</td>
+          </tr>
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">6</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Copper Pipe Soft 3/8 mt</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">480.00</td>
+          </tr>
+          
+          <tr class="subtotal-row" style="font-weight: bold;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">Subtotal (Part B: Low Side Installation Work):</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">15,162.00</td>
+          </tr>
+          
 
           <tr class="summary-total-row" style="font-weight: bold;">
             <td style="border: 1px solid #000; padding: 5px 8px;"></td>
             <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">GRAND SUBTOTAL:</td>
-            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">{{ subtotal|floatformat:2|intcomma }}</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">215,162.00</td>
           </tr>
           <tr class="gst-row" style="font-weight: bold;">
             <td style="border: 1px solid #000; padding: 5px 8px;"></td>
-            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">GST @ {{ gst_percentage|floatformat:0 }}%:</td>
-            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">{{ gst_amount|floatformat:2|intcomma }}</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">GST @ 17%:</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">36,440.26</td>
           </tr>
           <tr class="grand-total-row" style="font-weight: bold; background-color: rgba(255, 255, 4, 0.571);">
             <td style="border: 1px solid #000; padding: 5px 8px;"></td>
             <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px; font-size: 12px;">GRAND TOTAL (INCLUDING GST):</td>
-            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px; font-size: 12px;">Rs. {{ grand_total|floatformat:2|intcomma }}</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px; font-size: 12px;">Rs. 251,602.26</td>
           </tr>
         </tbody>
       </table>
@@ -403,58 +457,98 @@
           </tr>
         </thead>
         <tbody>
-          {% for group in high_side_groups %}
+          
           <!-- PART HEADER ROW -->
           <tr>
             <td colspan="6" style="border: 1px solid #000; padding: 6px 8px; font-weight: bold; background-color: #f2f2f2; text-align: left;">
-              Part - A{{ forloop.counter }} : High Side Equipment - {{ group.ac_type }}
+              Part - A1 : High Side Equipment - Split AC
             </td>
           </tr>
           
-          {% for item in group.items %}
+          
           <tr>
-            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">{{ forloop.counter }}</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">1</td>
             <td style="border: 1px solid #000; padding: 5px 8px;">
-              <strong>{{ item.sku }}</strong><br/>
-              {{ item.description }}
+              <strong>HIT-TOUSH-10TR-3-2BD1</strong><br/>
+              Split AC 1.0 TR 3 Star Inverter
             </td>
-            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">{{ item.quantity|floatformat:0 }}</td>
-            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">{{ item.unit }}</td>
-            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">{{ item.rate|floatformat:2|intcomma }}</td>
-            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">{{ item.amount|floatformat:2|intcomma }}</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">1</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">Nos</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">170,000.00</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">170,000.00</td>
           </tr>
-          {% endfor %}
+          
           
           <!-- SUB TOTAL ROW -->
           <tr style="font-weight: bold">
             <td style="border: 1px solid #000; padding: 5px 8px;"></td>
-            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">(A{{ forloop.counter }}) Sub Total of High Side Equipment ({{ group.ac_type }}) :</td>
-            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">{{ group.subtotal|floatformat:2|intcomma }}</td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">(A1) Sub Total of High Side Equipment (Split AC) :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">170,000.00</td>
           </tr>
           <!-- GST ROW -->
           <tr style="font-weight: bold;">
             <td style="border: 1px solid #000; padding: 5px 8px;"></td>
             <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">GST @ 18 % :</td>
-            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">{{ group.gst_total|floatformat:2|intcomma }}</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">30,600.00</td>
           </tr>
           <!-- TOTAL VRF EQUIPMENT ROW -->
           <tr style="font-weight: bold; background-color: #d4edda; color: #155724;">
             <td style="border: 1px solid #000; padding: 5px 8px;"></td>
-            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px; font-size: 12px; font-weight: bold;">Total of {{ group.ac_type }} Equipment (including GST) :</td>
-            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px; font-size: 12px; font-weight: bold;">{{ group.total_with_gst|floatformat:2|intcomma }}</td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px; font-size: 12px; font-weight: bold;">Total of Split AC Equipment (including GST) :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px; font-size: 12px; font-weight: bold;">200,600.00</td>
           </tr>
-          {% endfor %}
+          
+          <!-- PART HEADER ROW -->
+          <tr>
+            <td colspan="6" style="border: 1px solid #000; padding: 6px 8px; font-weight: bold; background-color: #f2f2f2; text-align: left;">
+              Part - A2 : High Side Equipment - Window AC
+            </td>
+          </tr>
+          
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">1</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">
+              <strong>VOL-25413-2liter-1-274F</strong><br/>
+              Window AC 2liter TR 1 Star Inverter
+            </td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">1</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">Nos</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">30,000.00</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">30,000.00</td>
+          </tr>
+          
+          
+          <!-- SUB TOTAL ROW -->
+          <tr style="font-weight: bold">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">(A2) Sub Total of High Side Equipment (Window AC) :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">30,000.00</td>
+          </tr>
+          <!-- GST ROW -->
+          <tr style="font-weight: bold;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">GST @ 18 % :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">5,400.00</td>
+          </tr>
+          <!-- TOTAL VRF EQUIPMENT ROW -->
+          <tr style="font-weight: bold; background-color: #d4edda; color: #155724;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px; font-size: 12px; font-weight: bold;">Total of Window AC Equipment (including GST) :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px; font-size: 12px; font-weight: bold;">35,400.00</td>
+          </tr>
+          
           <!-- GRAND TOTAL OF ALL HIGH SIDE EQUIPMENT -->
           <tr style="font-weight: bold; background-color: #c3e6cb; color: #155724; border-top: 2px solid #000;">
             <td style="border: 1px solid #000; padding: 6px 8px;"></td>
             <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 10px; font-size: 13px; font-weight: bold;">Grand Total of High Side Equipment (including GST) :</td>
-            <td style="text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 15px; font-size: 13px; font-weight: bold;">{{ high_side_grand_total|floatformat:2|intcomma }}</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 15px; font-size: 13px; font-weight: bold;">236,000.00</td>
           </tr>
         </tbody>
       </table>
 
       <!-- ANNEXURE III: BILL OF QUANTITIES (LOW SIDE INSTALLATION WORK) -->
-      {% if low_side_groups %}
+      
       <div class="section-title">ANNEXURE III: BILL OF QUANTITIES (LOW SIDE INSTALLATION WORK)</div>
       
       <table class="items-table" style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
@@ -469,99 +563,152 @@
           </tr>
         </thead>
         <tbody>
-          {% for group in low_side_groups %}
+          
           <!-- PART HEADER ROW -->
           <tr>
             <td colspan="6" style="border: 1px solid #000; padding: 6px 8px; font-weight: bold; background-color: #f2f2f2; text-align: left;">
-              Part - B{{ forloop.counter }} : Low Side Installation Work - {{ group.ac_type }}
+              Part - B1 : Low Side Installation Work - Split AC
             </td>
           </tr>
           
-          {% for item in group.items %}
+          
           <tr>
-            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">{{ forloop.counter }}</td>
-            <td style="border: 1px solid #000; padding: 5px 8px;">{{ item.description }}</td>
-            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">{{ item.quantity|floatformat:0 }}</td>
-            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">{{ item.unit }}</td>
-            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">{{ item.rate|floatformat:2|intcomma }}</td>
-            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">{{ item.amount|floatformat:2|intcomma }}</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">1</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Copper Pipe Soft 3/4 mm</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">1</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">Nos</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">20.00</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">20.00</td>
           </tr>
-          {% endfor %}
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">2</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Gas Refregerent Gas</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">23</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">Nos</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">234.00</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">5,382.00</td>
+          </tr>
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">3</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Insullation Transprent Tape</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">12</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">Nos</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">20.00</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">240.00</td>
+          </tr>
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">4</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Gas Refregerent Gas</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">3</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">Nos</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">3,000.00</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">9,000.00</td>
+          </tr>
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">5</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Conduit Pipe 25 mt</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">2</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">Nos</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">20.00</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">40.00</td>
+          </tr>
+          
+          <tr>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">6</td>
+            <td style="border: 1px solid #000; padding: 5px 8px;">Copper Pipe Soft 3/8 mt</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">2</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">Nos</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">240.00</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">480.00</td>
+          </tr>
+          
 
           <!-- SUB TOTAL ROW -->
           <tr style="font-weight: bold;">
             <td style="border: 1px solid #000; padding: 5px 8px;"></td>
-            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">(B{{ forloop.counter }}) Sub Total of Low Side Installation Work ({{ group.ac_type }}) :</td>
-            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">{{ group.subtotal|floatformat:2|intcomma }}</td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">(B1) Sub Total of Low Side Installation Work (Split AC) :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">15,162.00</td>
           </tr>
           <!-- GST ROW -->
           <tr style="font-weight: bold;">
             <td style="border: 1px solid #000; padding: 5px 8px;"></td>
             <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">GST @ 18 % :</td>
-            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">{{ group.gst_total|floatformat:2|intcomma }}</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">440.26</td>
           </tr>
           <!-- TOTAL LOW SIDE ROW -->
           <tr style="font-weight: bold; background-color: #d4edda; color: #155724;">
             <td style="border: 1px solid #000; padding: 5px 8px;"></td>
-            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px; font-size: 12px; font-weight: bold;">Total of Low Side Installation Work ({{ group.ac_type }}) (including GST) :</td>
-            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px; font-size: 12px; font-weight: bold;">{{ group.total_with_gst|floatformat:2|intcomma }}</td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px; font-size: 12px; font-weight: bold;">Total of Low Side Installation Work (Split AC) (including GST) :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px; font-size: 12px; font-weight: bold;">15,602.26</td>
           </tr>
-          {% endfor %}
+          
           <!-- GRAND TOTAL OF ALL LOW SIDE INSTALLATION WORK -->
           <tr style="font-weight: bold; background-color: #c3e6cb; color: #155724; border-top: 2px solid #000;">
             <td style="border: 1px solid #000; padding: 6px 8px;"></td>
             <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 10px; font-size: 13px; font-weight: bold;">Grand Total of Low Side Installation Work (including GST) :</td>
-            <td style="text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 15px; font-size: 13px; font-weight: bold;">{{ low_side_grand_total|floatformat:2|intcomma }}</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 15px; font-size: 13px; font-weight: bold;">15,602.26</td>
           </tr>
         </tbody>
       </table>
-      {% endif %}
+      
 
       <!-- ANNEXURE IV: TERMS & CONDITIONS -->
       <div class="section-title">ANNEXURE IV: TERMS & CONDITIONS</div>
       <div class="terms-section">
-        {% if payment_terms %}
+        
         <h3>Payment Terms:</h3>
         <ul class="terms-list">
-          {% for term in payment_terms %}
-          <li>{{ term }}</li>
-          {% endfor %}
+          
+          <li>For  HVAC Equipment 100 % advance along with PO against Proforma Invoice.                                           Purchase Order and Cheque shall be made in the name of KRISNA AIRCONDITIONING  Pune. Bank of India, Account Number: 051330110000016, IFSC Code : BKID0000513.  GSTN: 27AITPP8825B2ZS.</li>
+          
+          <li>For Low Side Installation charges of  HVAC Equipments -50% advance along with order, 30% against delivery of material at site on prorata basis, 10% against installation of material at site on prorata basis, and balance 10% against completion of installation testing and commissioning of HVAC equipments.                                                                                                                                                  Purchase Order and Cheque shall be made in the name of KRISNA AIRCONDITIONING  Pune. Bank of India, Account Number: 051330110000016, IFSC Code : BKID0000513.  GSTN: 27AITPP8825B2ZS.</li>
+          
         </ul>
-        {% endif %}
+        
 
-        {% if validity_terms %}
+        
         <h3>Validity of Rates:</h3>
         <ul class="terms-list">
-          {% for term in validity_terms %}
-          <li>{{ term }}</li>
-          {% endfor %}
+          
+          <li>Rates for AC units are valid up to 7 days and Low Side Installation rates are valid up to 30 days from the date of this offer.</li>
+          
         </ul>
-        {% endif %}
+        
 
-        {% if warranty_terms %}
+        
         <h3>Warranty & Service:</h3>
         <ul class="terms-list">
-          {% for term in warranty_terms %}
-          <li>{{ term }}</li>
-          {% endfor %}
+          
+          <li>1) VRF AC &amp; Ductable AC Equipments will have Fifteen ( 15 ) months Compressor warranty from the date of  delivery at site or Twelve (12) months from date of commissioning of AC, which ever is earlier.</li>
+          
         </ul>
-        {% endif %}
+        
 
-        {% if other_terms %}
+        
         <h3>Other Terms / Notes:</h3>
         <ul class="terms-list">
-          {% for term in other_terms %}
-          <li>{{ term }}</li>
-          {% endfor %}
+          
+          <li>Electrical Power Cables &amp; Pin top/Socket arrangement up to all HVAC equipment will be in the scope of customer.</li>
+          
+          <li>Local Mathadi Charges will be extra at actual and will be paid by customer.</li>
+          
+          <li>Above costing are estimated and will be firm upon detailed interior layout.</li>
+          
+          <li>Final billing and payment will be based on actual installed quantities.</li>
+          
         </ul>
-        {% endif %}
+        
       </div>
 
       <!-- FOOTER -->
       <div class="footer-section">
         <div class="footer-left">
           <strong>Declaration:</strong><br />
-          {{ declaration|default:"We declare that this quotation shows the actual price for the services."|linebreaksbr }}
+          Thankyouuuuu.
           <br /><br />
           <strong>For Krishna Airconditioning</strong>
           <div class="stamp-box"></div>
@@ -579,7 +726,7 @@
           margin-top: 15px;
           padding: 10px;
           border: 1px solid #000;
-          font-size: 10.5px;
+          font-size: 12px;
         "
       >
         <strong>Bank Details for Payment:</strong><br />
