@@ -409,15 +409,20 @@ def _build_quotation_pdf_context(quotation, version):
             'unit': item.unit,
             'rate': item.unit_price,
             'amount': _item_base_amount(item),
+            'gst_amount': getattr(item, 'gst_amount', 0) or 0,
             'sku': getattr(item.product_variant, 'sku', '')
         })
 
     high_side_groups = []
     for t_name, items in high_side_by_type.items():
+        sub_total_val = sum(i['amount'] for i in items)
+        gst_total_val = sum(i['gst_amount'] for i in items)
         high_side_groups.append({
             'ac_type': t_name,
             'items': items,
-            'subtotal': sum(i['amount'] for i in items),
+            'subtotal': sub_total_val,
+            'gst_total': gst_total_val,
+            'total_with_gst': sub_total_val + gst_total_val,
         })
 
     # Group Low Side Items by AC Type using AcMaterials
@@ -452,14 +457,19 @@ def _build_quotation_pdf_context(quotation, version):
             'unit': item.unit,
             'rate': item.unit_price,
             'amount': _item_base_amount(item),
+            'gst_amount': getattr(item, 'gst_amount', 0) or 0,
         })
 
     low_side_groups = []
     for t_name, items in low_side_by_type.items():
+        sub_total_val = sum(i['amount'] for i in items)
+        gst_total_val = sum(i['gst_amount'] for i in items)
         low_side_groups.append({
             'ac_type': t_name,
             'items': items,
-            'subtotal': sum(i['amount'] for i in items),
+            'subtotal': sub_total_val,
+            'gst_total': gst_total_val,
+            'total_with_gst': sub_total_val + gst_total_val,
         })
 
     # Group terms & conditions by category type
@@ -469,6 +479,9 @@ def _build_quotation_pdf_context(quotation, version):
         if t_type not in terms_by_type:
             terms_by_type[t_type] = []
         terms_by_type[t_type].append(term.terms)
+
+    high_side_grand_total = sum((i.total_with_gst for i in high_side_items), Decimal('0'))
+    low_side_grand_total = sum((i.total_with_gst for i in low_side_items), Decimal('0'))
 
     return {
         'high_side_groups': high_side_groups,
@@ -491,6 +504,8 @@ def _build_quotation_pdf_context(quotation, version):
         'service_summary': service_summary,
         'high_side_total': high_side_total,
         'low_side_total': low_side_total,
+        'high_side_grand_total': high_side_grand_total,
+        'low_side_grand_total': low_side_grand_total,
         'service_total': service_total,
         'grand_total_without_gst': high_side_total + low_side_total + service_total,
         'ac_type_name': ac_type_name,
