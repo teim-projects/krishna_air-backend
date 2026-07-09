@@ -19,6 +19,7 @@ from .serializers import (
     AMCRenewalSerializer,
     AMCSparePartSerializer,
     TechnicianWorkRecordSerializer,
+    TechnicianWorkRecordUpdateSerializer,
     TechnicianUserSerializer,
     TechnicianAllocationDraftSerializer,
 )
@@ -35,6 +36,43 @@ from inventory.models import InventoryItem
 from quotation.models import Quotation, QuotationVersion
 from .serializers import QuotationSerializer
 from api.models import CustomUser
+
+
+def _create_technician_work_record(request, service_record, data):
+    payload = {
+        'technician': data.get('technician'),
+        'service_record': service_record.id,
+        'gps_location': data.get('gps_location', ''),
+        'work_description': data.get('work_description', ''),
+        'work_date': data.get('work_date') or timezone.now().date(),
+    }
+    serializer = TechnicianWorkRecordSerializer(
+        data=payload,
+        context={'request': request},
+    )
+    serializer.is_valid(raise_exception=True)
+    return serializer.save()
+
+
+def _get_service_record_for_amc_contract(contract):
+    customer = contract.customer
+    if not customer:
+        return None
+
+    qs = ServiceManagementRecord.objects.filter(
+        contract_type='amc',
+        contract_status='active',
+    ).filter(
+        Q(customer_id=customer.id) | Q(customer_name__iexact=customer.name)
+    )
+
+    if contract.amc_type:
+        typed = qs.filter(amc_service_type=contract.amc_type)
+        if typed.exists():
+            qs = typed
+
+    return qs.order_by('-created_at').first()
+
 
 class CustomerViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Customer.objects.all()
@@ -80,7 +118,9 @@ class ServiceManagementRecordViewSet(viewsets.ModelViewSet):
         """Return auto-filled customer/payment data for technician allocation button."""
         record = self.get_object()
         serializer = TechnicianAllocationDraftSerializer(record)
-        return Response(serializer.data)
+        data = serializer.data
+        data['service_record'] = record.id
+        return Response(data)
 
     @action(detail=True, methods=['post'], url_path='allocate-work-to-technician')
     def allocate_work_to_technician(self, request, pk=None):
@@ -89,6 +129,7 @@ class ServiceManagementRecordViewSet(viewsets.ModelViewSet):
         Expected body: technician, gps_location?, work_description?, work_date?
         """
         record = self.get_object()
+<<<<<<< HEAD
         payload = {
             'technician': request.data.get('technician'),
             'service_record': record.id,
@@ -107,6 +148,9 @@ class ServiceManagementRecordViewSet(viewsets.ModelViewSet):
         )
         serializer.is_valid(raise_exception=True)
         work_record = serializer.save()
+=======
+        work_record = _create_technician_work_record(request, record, request.data)
+>>>>>>> origin/main
         return Response(
             TechnicianWorkRecordSerializer(work_record).data,
             status=status.HTTP_201_CREATED
@@ -356,6 +400,56 @@ class AMCContractViewSet(viewsets.ModelViewSet):
 
         return Response({'updated': updated})
 
+    @action(detail=True, methods=['get'], url_path='technician-allocation-draft')
+    def technician_allocation_draft(self, request, pk=None):
+        """Return auto-filled customer/payment data for technician allocation."""
+        contract = self.get_object()
+        service_record = _get_service_record_for_amc_contract(contract)
+
+        if service_record:
+            serializer = TechnicianAllocationDraftSerializer(service_record)
+            data = serializer.data
+            data['service_record'] = service_record.id
+            return Response(data)
+
+        customer = contract.customer
+        address_parts = [
+            customer.address,
+            customer.city,
+            customer.state,
+            customer.pin_code,
+        ]
+        return Response({
+            'service_record': None,
+            'customer': customer.id,
+            'customer_name': customer.name,
+            'customer_phone': customer.contact_number or '',
+            'customer_address': ', '.join(part for part in address_parts if part),
+            'payment_amount': contract.amc_cost,
+        })
+
+    @action(detail=True, methods=['post'], url_path='allocate-work-to-technician')
+    def allocate_work_to_technician(self, request, pk=None):
+        """Create a technician work record for this AMC contract."""
+        contract = self.get_object()
+        service_record = _get_service_record_for_amc_contract(contract)
+        if not service_record:
+            return Response(
+                {
+                    'detail': (
+                        'No active AMC service management record found for this customer. '
+                        'Please create one in Service Management first.'
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        work_record = _create_technician_work_record(request, service_record, request.data)
+        return Response(
+            TechnicianWorkRecordSerializer(work_record).data,
+            status=status.HTTP_201_CREATED,
+        )
+
 
 class AMCRenewalViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AMCRenewal.objects.all()
@@ -374,6 +468,24 @@ class TechnicianWorkRecordViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['technician', 'service_record', 'work_date']
     search_fields = ['customer_name', 'customer_phone', 'work_description']
+
+    def get_serializer_class(self):
+        if self.action in ('update', 'partial_update'):
+            return TechnicianWorkRecordUpdateSerializer
+        return TechnicianWorkRecordSerializer
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        instance.refresh_from_db()
+        return Response(TechnicianWorkRecordSerializer(instance).data)
+
+    def partial_update(self, request, *args, **kwargs):
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
 
     @action(detail=False, methods=['get'], url_path='technicians')
     def technicians(self, request):

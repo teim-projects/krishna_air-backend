@@ -254,6 +254,28 @@ class TechnicianWorkRecordSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
+class TechnicianWorkRecordUpdateSerializer(serializers.ModelSerializer):
+    """Edit form: technician and visit date only."""
+    visit_date = serializers.DateField(source='work_date', required=False)
+
+    class Meta:
+        model = TechnicianWorkRecord
+        fields = ['technician', 'work_date', 'visit_date']
+
+    def validate_technician(self, value):
+        role_name = (value.role.name if value.role else '').strip().lower()
+        if role_name != 'technician':
+            raise serializers.ValidationError("Selected user is not a technician.")
+        return value
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError(
+                "Provide at least one field to update: technician or visit_date."
+            )
+        return attrs
+
+
 class TechnicianAllocationDraftSerializer(serializers.ModelSerializer):
     payment_amount = serializers.DecimalField(
         source='total_price_with_gst',
