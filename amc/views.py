@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from datetime import timedelta
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 from rest_framework import filters
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from .models import Customer
@@ -39,6 +39,17 @@ from api.models import CustomUser
 
 
 def _create_technician_work_record(request, service_record, data):
+    # Sync edited customer details back to parent ServiceManagementRecord
+    updated = False
+    if 'customer_name' in data and data['customer_name']:
+        service_record.customer_name = data['customer_name']
+        updated = True
+    if 'customer_phone' in data and data['customer_phone']:
+        service_record.customer_contact = data['customer_phone']
+        updated = True
+    if updated:
+        service_record.save()
+
     payload = {
         'technician': data.get('technician'),
         'service_record': service_record.id,
@@ -46,6 +57,17 @@ def _create_technician_work_record(request, service_record, data):
         'work_description': data.get('work_description', ''),
         'work_date': data.get('work_date') or timezone.now().date(),
     }
+    if 'payment_amount' in data:
+        payload['payment_amount'] = data.get('payment_amount')
+    if 'payment_status' in data:
+        payload['payment_status'] = data.get('payment_status')
+    if 'customer_name' in data:
+        payload['customer_name'] = data.get('customer_name')
+    if 'customer_phone' in data:
+        payload['customer_phone'] = data.get('customer_phone')
+    if 'customer_address' in data:
+        payload['customer_address'] = data.get('customer_address')
+
     serializer = TechnicianWorkRecordSerializer(
         data=payload,
         context={'request': request},
@@ -129,28 +151,7 @@ class ServiceManagementRecordViewSet(viewsets.ModelViewSet):
         Expected body: technician, gps_location?, work_description?, work_date?
         """
         record = self.get_object()
-<<<<<<< HEAD
-        payload = {
-            'technician': request.data.get('technician'),
-            'service_record': record.id,
-            'gps_location': request.data.get('gps_location', ''),
-            'work_description': request.data.get('work_description', ''),
-            'work_date': request.data.get('work_date') or timezone.now().date(),
-        }
-        if 'payment_amount' in request.data:
-            payload['payment_amount'] = request.data.get('payment_amount')
-        if 'payment_status' in request.data:
-            payload['payment_status'] = request.data.get('payment_status')
-
-        serializer = TechnicianWorkRecordSerializer(
-            data=payload,
-            context={'request': request}
-        )
-        serializer.is_valid(raise_exception=True)
-        work_record = serializer.save()
-=======
         work_record = _create_technician_work_record(request, record, request.data)
->>>>>>> origin/main
         return Response(
             TechnicianWorkRecordSerializer(work_record).data,
             status=status.HTTP_201_CREATED

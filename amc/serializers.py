@@ -145,6 +145,8 @@ class AMCContractSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product_variant.product_model.model_no', read_only=True)
     spare_parts_count = serializers.SerializerMethodField()
     uninvoiced_spare_parts_count = serializers.SerializerMethodField()
+    customer_phone = serializers.CharField(source='customer.contact_number', read_only=True)
+    service_record_id = serializers.SerializerMethodField()
 
     class Meta:
         model = AMCContract
@@ -156,6 +158,28 @@ class AMCContractSerializer(serializers.ModelSerializer):
 
     def get_uninvoiced_spare_parts_count(self, obj):
         return obj.spare_parts.filter(invoice__isnull=True).count()
+
+    def get_service_record_id(self, obj):
+        from django.db.models import Q
+        from .models import ServiceManagementRecord
+        customer = obj.customer
+        if not customer:
+            return None
+
+        qs = ServiceManagementRecord.objects.filter(
+            contract_type='amc',
+            contract_status='active',
+        ).filter(
+            Q(customer_id=customer.id) | Q(customer_name__iexact=customer.name)
+        )
+
+        if obj.amc_type:
+            typed = qs.filter(amc_service_type=obj.amc_type)
+            if typed.exists():
+                qs = typed
+
+        rec = qs.order_by('-created_at').first()
+        return rec.id if rec else None
 
 
 class AMCRenewalSerializer(serializers.ModelSerializer):
@@ -212,13 +236,15 @@ class TechnicianWorkRecordSerializer(serializers.ModelSerializer):
             'updated_at',
         ]
         read_only_fields = [
-            'customer_name',
-            'customer_phone',
-            'customer_address',
             'created_by',
             'created_at',
             'updated_at',
         ]
+        extra_kwargs = {
+            'customer_name': {'required': False},
+            'customer_phone': {'required': False},
+            'customer_address': {'required': False},
+        }
 
     def get_technician_name(self, obj):
         full_name = f"{obj.technician.first_name or ''} {obj.technician.last_name or ''}".strip()
@@ -234,9 +260,12 @@ class TechnicianWorkRecordSerializer(serializers.ModelSerializer):
 
     def _autofill_customer_fields(self, validated_data):
         service_record = validated_data['service_record']
-        validated_data['customer_name'] = service_record.customer_name or ''
-        validated_data['customer_phone'] = service_record.customer_contact or ''
-        validated_data['customer_address'] = service_record.address or ''
+        if 'customer_name' not in validated_data or not validated_data['customer_name']:
+            validated_data['customer_name'] = service_record.customer_name or ''
+        if 'customer_phone' not in validated_data or not validated_data['customer_phone']:
+            validated_data['customer_phone'] = service_record.customer_contact or ''
+        if 'customer_address' not in validated_data or not validated_data['customer_address']:
+            validated_data['customer_address'] = service_record.address or ''
         if 'payment_amount' not in validated_data:
             validated_data['payment_amount'] = service_record.total_price_with_gst or 0
         return validated_data
@@ -255,12 +284,12 @@ class TechnicianWorkRecordSerializer(serializers.ModelSerializer):
 
 
 class TechnicianWorkRecordUpdateSerializer(serializers.ModelSerializer):
-    """Edit form: technician and visit date only."""
+    """Edit form: technician, visit date, and remark (work_description)."""
     visit_date = serializers.DateField(source='work_date', required=False)
 
     class Meta:
         model = TechnicianWorkRecord
-        fields = ['technician', 'work_date', 'visit_date']
+        fields = ['technician', 'work_date', 'visit_date', 'work_description']
 
     def validate_technician(self, value):
         role_name = (value.role.name if value.role else '').strip().lower()
@@ -271,7 +300,7 @@ class TechnicianWorkRecordUpdateSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         if not attrs:
             raise serializers.ValidationError(
-                "Provide at least one field to update: technician or visit_date."
+                "Provide at least one field to update: technician, visit_date, or work_description."
             )
         return attrs
 
