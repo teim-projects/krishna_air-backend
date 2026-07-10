@@ -628,6 +628,11 @@ class DeliveryChallan(models.Model):
         ("delivered", "Delivered"),
     )
 
+    DESTINATION_TYPE_CHOICES = (
+        ("branch", "Branch"),
+        ("site", "Site"),
+    )
+
     material_issue = models.ForeignKey(
         MaterialIssue,
         on_delete=models.PROTECT,
@@ -642,6 +647,33 @@ class DeliveryChallan(models.Model):
 
     dispatch_date = models.DateField()
 
+    destination_type = models.CharField(
+        max_length=20,
+        choices=DESTINATION_TYPE_CHOICES,
+        blank=True,
+        null=True,
+    )
+    branch = models.ForeignKey(
+        BranchManagement,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="delivery_challans",
+    )
+    site = models.ForeignKey(
+        SiteManagement,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="delivery_challans",
+    )
+
+    delivery_partner_name = models.CharField(max_length=255, blank=True, null=True)
+    delivery_person_name = models.CharField(max_length=255, blank=True, null=True)
+    delivery_person_phone = models.CharField(max_length=20, blank=True, null=True)
+    delivery_remark = models.TextField(blank=True, null=True)
+
+    # Legacy fields (kept for old records)
     transporter_name = models.CharField(
         max_length=255,
         blank=True,

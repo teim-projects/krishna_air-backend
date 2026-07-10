@@ -242,10 +242,10 @@ html, body {
         </table>
 
         <div class="client-section">
-            <div class="client-field"><strong>To</strong> <div class="line">{{ dc.transporter_name }}</div></div>
+            <div class="client-field"><strong>To</strong> <div class="line">{{ delivery_partner_name|default:dc.transporter_name }}</div></div>
             <div class="client-field"><strong>Contact Person</strong> <div class="line">{{ contact_person }}</div></div>
             <div class="client-field"><strong>Contact No</strong> <div class="line">{{ contact_no }}</div></div>
-            <div class="client-field"><strong>Site</strong> <div class="line">{{ dc.material_issue.site }}</div></div>
+            <div class="client-field"><strong>Site</strong> <div class="line">{{ destination_name }}</div></div>
         </div>
 
         <table class="items">
@@ -261,11 +261,11 @@ html, body {
             <tbody>
                 {% for item in items %}
                 <tr>
-                    <td class="col-qty">{{ item.quantity }}</td>
+                    <td class="col-qty">{{ item.quantity|floatformat:2 }}</td>
                     <td class="col-part">{{ item.product_name }}</td>
                     <td class="col-rate">{{ item.rate|floatformat:2 }}</td>
                     <td class="col-amount">{{ item.amount|floatformat:2 }}</td>
-                    <td class="col-per">-</td>
+                    <td class="col-per">{{ item.uom|default:"-" }}</td>
                 </tr>
                 {% empty %}
                 <tr>
