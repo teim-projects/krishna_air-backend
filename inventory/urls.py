@@ -14,12 +14,25 @@ router.register(r"inventory", InventoryViewSet, basename="inventory")
 router.register(r"material-issue", MaterialIssueViewSet, basename="material-issue")
 router.register(r"material-returns", MaterialReturnViewSet, basename="material-return")
 
+router.register(
+    r"delivery-challan",
+    DeliveryChallanViewSet,
+    basename="delivery-challan"
+)
+
 
 urlpatterns = [
     path("", include(router.urls)),
+
     path(
         "purchase-order/<int:pk>/pdf/",
         views.purchase_order_pdf,
-        name="purchase_order_pdf"
-)
+        name="purchase_order_pdf",
+    ),
+
+    path(
+        "delivery-challan/<int:pk>/pdf/",
+        delivery_challan_pdf,
+        name="delivery_challan_pdf",
+    ),
 ]

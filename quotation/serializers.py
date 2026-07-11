@@ -13,6 +13,7 @@ from .models import (
     QuotationLowSideItem,
 )
 
+from .models import ServiceMaster, QuotationServiceItem
 
 # =====================================================
 # HIGH SIDE SERIALIZER
@@ -364,3 +365,78 @@ class QuotationSerializer(serializers.ModelSerializer):
         self.calculate_totals(new_version, high_items, low_items)
 
         return instance
+
+
+class ServiceMasterSerializer(serializers.ModelSerializer):
+    # ✅ Add this to include linked items
+    items = serializers.SerializerMethodField()
+    item_code = serializers.SerializerMethodField()
+    item_name = serializers.SerializerMethodField()
+    item_description = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = ServiceMaster
+        fields = '__all__'
+    
+    # ✅ Add this method to return items data
+    def get_items(self, obj):
+        from product_management.serializers import ItemSerializer
+        return ItemSerializer(obj.items.all(), many=True).data
+    
+    def get_item_code(self, obj):
+        return ", ".join([i.item_code for i in obj.items.all()])
+        
+    def get_item_name(self, obj):
+        return ", ".join([i.item_code for i in obj.items.all()])
+    
+    def get_item_description(self, obj):
+        descriptions = []
+        for item in obj.items.all():
+            parts = []
+            if hasattr(item, 'material_type_id') and item.material_type_id:
+                parts.append(str(item.material_type_id))
+            if hasattr(item, 'item_type_id') and item.item_type_id:
+                parts.append(str(item.item_type_id))
+            if hasattr(item, 'feature_type_id') and item.feature_type_id:
+                parts.append(str(item.feature_type_id))
+            if hasattr(item, 'size') and item.size:
+                size_str = f"{item.size}{item.size_unit or ''}"
+                parts.append(size_str)
+            if hasattr(item, 'brand') and item.brand:
+                parts.append(str(item.brand))
+            desc = ' - '.join(parts) if parts else item.item_code
+            descriptions.append(desc)
+        return ", ".join(descriptions) if descriptions else None
+
+class QuotationServiceItemSerializer(serializers.ModelSerializer):
+    service_name = serializers.CharField(source='service.name', read_only=True)
+    service_type = serializers.CharField(source='service.service_type', read_only=True)
+    category_name = serializers.CharField(source='service.category', read_only=True)
+    subcategory_name = serializers.CharField(source='service.subcategory', read_only=True)
+    item_code = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = QuotationServiceItem
+        fields = '__all__'
+        read_only_fields = ['base_amount', 'gst_amount', 'total_with_gst']
+        
+    def get_item_code(self, obj):
+        if obj.service and obj.service.items.exists():
+            return ", ".join([i.item_code for i in obj.service.items.all()])
+        return ""
+
+class QuotationServiceItemCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QuotationServiceItem
+        fields = ['quotation_version', 'service', 'quantity', 'unit_price', 'description', 'gst_percentage', 'mathadi_charges', 'transportation_charges']
+    
+    def create(self, validated_data):
+        # Auto-set unit from service
+        service = validated_data['service']
+        validated_data['unit'] = service.unit
+        
+        # Auto-set unit_price if not provided
+        if not validated_data.get('unit_price'):
+            validated_data['unit_price'] = service.total_rate
+            
+        return super().create(validated_data)

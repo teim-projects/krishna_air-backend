@@ -1,4 +1,6 @@
 from rest_framework import viewsets, filters
+from django_filters.rest_framework import DjangoFilterBackend
+from .filters import InvoiceFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
@@ -27,7 +29,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
-    filter_backends = [filters.SearchFilter]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_class = InvoiceFilter
 
     search_fields = [
         "invoice_no",

@@ -50,7 +50,7 @@ urlpatterns = [
     path('product/', include('product_management.urls')),
     path('quotation/', include('quotation.urls')),
     path('inventory/', include("inventory.urls")),
-    
+    path('amc/', include('amc.urls')),
 ]
 
 if settings.DEBUG:

@@ -340,11 +340,11 @@ class LeadSerializer(serializers.ModelSerializer):
             "service_type",
             "followups",
             "products",
-            "product_details",   
-             
-         
+            "product_details",
+            "is_qualified",
+            "qualifying_answers",
         ]
-        read_only_fields = ("id","creatd_by","date") 
+        read_only_fields = ("id", "creatd_by", "date")
 
 
        

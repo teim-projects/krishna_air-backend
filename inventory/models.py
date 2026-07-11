@@ -90,8 +90,8 @@ class PurchaseOrder(models.Model):
         BranchManagement,
         on_delete=models.PROTECT,
         related_name="purchase_orders",
-        null= True,
-        blank= True
+        null=False,  # Make branch required
+        blank=False  # Make branch required
     )
 
     terms_conditions = models.ManyToManyField(
@@ -382,6 +382,8 @@ class InventoryItem(models.Model):
     )
 
     quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total_in_quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # Total received via GRN
+    total_out_quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # Total issued
     uom = models.CharField(max_length=20, blank=True, null=True)
 
     updated_at = models.DateTimeField(auto_now=True)
@@ -427,13 +429,16 @@ def update_inventory_from_grn(grn):
             item=item_obj,
             defaults={
                 "quantity": 0,
+                "total_in_quantity": 0,
+                "total_out_quantity": 0,
                 "uom": grn_product.purchase_order_product.uom if grn_product.purchase_order_product else ""
             }
         )
 
-        # Update inventory quantity
+        # Update inventory quantity and total_in_quantity
         InventoryItem.objects.filter(id=inventory.id).update(
-            quantity=F('quantity') + accepted_qty
+            quantity=F('quantity') + accepted_qty,
+            total_in_quantity=F('total_in_quantity') + accepted_qty
         )    
 
 
@@ -600,13 +605,159 @@ def update_inventory_from_return(material_return):
         # 🔥 Lock inventory row (important)
         inventory = InventoryItem.objects.select_for_update().get(id=inventory.id)
 
-        # 🔥 Increase stock
+        # 🔥 Increase stock and total_in_quantity
         InventoryItem.objects.filter(id=inventory.id).update(
-            quantity=F("quantity") + item.quantity
+            quantity=F("quantity") + item.quantity,
+            total_in_quantity=F("total_in_quantity") + item.quantity
         )
         
 def complete_return(material_return):
     with transaction.atomic():
         update_inventory_from_return(material_return)
         
-        
+
+# ==========================================================
+# DELIVERY CHALLAN
+# ==========================================================
+
+class DeliveryChallan(models.Model):
+
+    STATUS_CHOICES = (
+        ("pending", "Pending"),
+        ("in_transit", "In Transit"),
+        ("delivered", "Delivered"),
+    )
+
+    DESTINATION_TYPE_CHOICES = (
+        ("branch", "Branch"),
+        ("site", "Site"),
+    )
+
+    material_issue = models.ForeignKey(
+        MaterialIssue,
+        on_delete=models.PROTECT,
+        related_name="delivery_challans"
+    )
+
+    dc_number = models.CharField(
+        max_length=50,
+        unique=True,
+        blank=True
+    )
+
+    dispatch_date = models.DateField()
+
+    destination_type = models.CharField(
+        max_length=20,
+        choices=DESTINATION_TYPE_CHOICES,
+        blank=True,
+        null=True,
+    )
+    branch = models.ForeignKey(
+        BranchManagement,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="delivery_challans",
+    )
+    site = models.ForeignKey(
+        SiteManagement,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="delivery_challans",
+    )
+
+    delivery_partner_name = models.CharField(max_length=255, blank=True, null=True)
+    delivery_person_name = models.CharField(max_length=255, blank=True, null=True)
+    delivery_person_phone = models.CharField(max_length=20, blank=True, null=True)
+    delivery_remark = models.TextField(blank=True, null=True)
+
+    # Legacy fields (kept for old records)
+    transporter_name = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True
+    )
+
+    vehicle_number = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True
+    )
+
+    delivery_date = models.DateField(
+        blank=True,
+        null=True
+    )
+
+    receiver_name = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True
+    )
+
+    receiver_mobile = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True
+    )
+
+    delivery_proof = models.FileField(
+        upload_to="delivery_proofs/",
+        blank=True,
+        null=True
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="pending"
+    )
+
+    created_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+
+        is_new = self.pk is None
+
+        super().save(*args, **kwargs)
+
+        if is_new and not self.dc_number:
+            self.dc_number = f"DC-{str(self.id).zfill(5)}"
+            super().save(update_fields=["dc_number"])
+
+    def __str__(self):
+        return self.dc_number
+
+
+class DeliveryChallanItem(models.Model):
+
+    delivery_challan = models.ForeignKey(
+        DeliveryChallan,
+        on_delete=models.CASCADE,
+        related_name="items"
+    )
+
+    material_issue_item = models.ForeignKey(
+        MaterialIssueItem,
+        on_delete=models.PROTECT
+    )
+
+    quantity = models.DecimalField(
+        max_digits=10,
+        decimal_places=2
+    )
+
+    def __str__(self):
+        return (
+            f"{self.delivery_challan.dc_number} "
+            f"- {self.material_issue_item.id}"
+        )        

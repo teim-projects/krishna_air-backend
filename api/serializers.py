@@ -208,8 +208,16 @@ class AddStaffSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomUser
-        fields = ('id', 'email', 'mobile_no', 'first_name', 'last_name', 'role', 'password')
+        fields = (
+            'id', 'email', 'mobile_no', 'first_name', 'last_name', 'role', 'password',
+            'address', 'city', 'state', 'pincode', 'date_of_joining',
+        )
         read_only_fields = ('id',)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance is not None:
+            self.fields['password'].required = False
 
     def validate(self, attrs):
         # strip whitespace from mobile if present
@@ -232,6 +240,16 @@ class AddStaffSerializer(serializers.ModelSerializer):
         if mobile:
             if not re.match(PHONE_10_DIGIT_RE, mobile):
                 raise serializers.ValidationError({"mobile_no": "Mobile number must be exactly 10 digits."})
+
+        pincode = attrs.get('pincode')
+        if pincode is not None:
+            pincode = str(pincode).strip()
+            if pincode == '':
+                attrs['pincode'] = ''
+            elif not re.match(r'^\d{6}$', pincode):
+                raise serializers.ValidationError({"pincode": "Pincode must be exactly 6 digits."})
+            else:
+                attrs['pincode'] = pincode
 
         return attrs
 

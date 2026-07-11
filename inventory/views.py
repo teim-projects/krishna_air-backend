@@ -123,6 +123,7 @@ from django.contrib.staticfiles import finders
 from weasyprint import HTML
 from decimal import Decimal
 from .models import PurchaseOrder
+from .utils import format_amount_in_words
 
 
 def purchase_order_pdf(request, pk):
@@ -132,6 +133,9 @@ def purchase_order_pdf(request, pk):
 
     gst_amount = (po.subtotal * po.gst_percentage) / Decimal("100")
 
+    # Convert total amount to words
+    total_in_words = format_amount_in_words(po.grand_total)
+
     # logo_path = finders.find("images/ka-logo.png")
 
     html_string = render_to_string(
@@ -140,6 +144,7 @@ def purchase_order_pdf(request, pk):
             "po": po,
             "products": products,
             "gst_amount": gst_amount,
+            "total_in_words": total_in_words,  # Add total in words
             # "logo_path": logo_path,
         }
     )
@@ -163,10 +168,22 @@ def purchase_order_pdf(request, pk):
 
 
 class GRNViewSet(ModelViewSet):
-    queryset = GRN.objects.all()
+    queryset = GRN.objects.all().select_related(
+        "purchase_order__vendor"
+    ).order_by("-id")
     serializer_class = GRNSerializer
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
+
+    # ── search & ordering ────────────────────────────────────────────────────────
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = [
+        "grn_no",
+        "purchase_order__purchase_order_no",   # search by PO number
+        "purchase_order__vendor__name",         # search by vendor name
+    ]
+    ordering_fields = ["grn_date", "id"]
+    ordering = ["-id"]
 
     def create(self, request, *args, **kwargs):
         """
@@ -246,10 +263,30 @@ class InventoryViewSet(ModelViewSet):
         "product_variant__name",
         "item__name"
     ]
-    
+
+    @action(detail=False, methods=['get'])
+    def all(self, request):
+        """Return all inventory items without pagination (for dropdown selects)"""
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def low_side(self, request):
+        """Return only low-side material items (exclude high-side ACs) without pagination"""
+        queryset = self.get_queryset().filter(
+            item__isnull=False,
+            product_variant__isnull=True
+        )
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
     
 class MaterialIssueViewSet(ModelViewSet):
-    queryset = MaterialIssue.objects.all().prefetch_related("items")
+    queryset = MaterialIssue.objects.all().prefetch_related(
+        "items__inventory_item__product_variant__product_model__brand_id",
+        "items__inventory_item__item__material_type_id",
+        "items__inventory_item__item__item_type_id",
+    )
     serializer_class = MaterialIssueSerializer
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
@@ -322,3 +359,187 @@ class MaterialReturnViewSet(ModelViewSet):
             queryset = queryset.filter(material_issue_id=issue_id)
 
         return queryset.order_by("-id")
+    
+    
+class DeliveryChallanViewSet(ModelViewSet):
+
+    queryset = DeliveryChallan.objects.all().select_related(
+        "material_issue", "branch", "site"
+    ).prefetch_related(
+        "items__material_issue_item__inventory_item"
+    )
+
+    serializer_class = DeliveryChallanSerializer
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.SearchFilter
+    ]
+
+    filterset_fields = [
+        "status",
+        "material_issue"
+    ]
+
+    search_fields = [
+        "dc_number",
+        "material_issue__issue_number",
+        "delivery_partner_name",
+        "delivery_person_name",
+        "delivery_person_phone",
+        "branch__name",
+        "site__name",
+    ]
+
+    @action(detail=True, methods=["post"])
+    def mark_in_transit(self, request, pk=None):
+
+        dc = self.get_object()
+
+        dc.status = "in_transit"
+        dc.save(update_fields=["status"])
+
+        return Response(
+            {"message": "Marked In Transit"}
+        )
+
+    @action(detail=True, methods=["post"])
+    def mark_delivered(self, request, pk=None):
+
+        dc = self.get_object()
+
+        dc.status = "delivered"
+        dc.delivery_date = request.data.get(
+            "delivery_date"
+        )
+
+        dc.receiver_name = request.data.get(
+            "receiver_name"
+        )
+
+        dc.receiver_mobile = request.data.get(
+            "receiver_mobile"
+        )
+
+        if request.FILES.get("delivery_proof"):
+            dc.delivery_proof = request.FILES.get(
+                "delivery_proof"
+            )
+
+        dc.save()
+
+        return Response(
+            {"message": "Delivery Completed"}
+        )
+
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+from weasyprint import HTML
+
+from .models import DeliveryChallan, PurchaseOrderProduct
+
+
+def delivery_challan_pdf(request, pk):
+
+    dc = DeliveryChallan.objects.select_related(
+        "material_issue",
+        "material_issue__site",
+        "material_issue__branch",
+        "branch",
+        "site",
+    ).prefetch_related(
+        "items__material_issue_item__inventory_item__product_variant__product_model__brand_id",
+        "items__material_issue_item__inventory_item__product_variant__product_model__ac_sub_type_id__ac_type_id",
+        "items__material_issue_item__inventory_item__item__material_type_id",
+        "items__material_issue_item__inventory_item__item__item_type_id",
+    ).get(pk=pk)
+
+    items = dc.items.all()
+
+    grand_total = 0
+    contact_person = dc.delivery_person_name or ""
+    contact_no = dc.delivery_person_phone or ""
+
+    if dc.destination_type == "branch" and dc.branch_id:
+        destination_name = dc.branch.name
+    elif dc.destination_type == "site" and dc.site_id:
+        destination_name = dc.site.name
+    elif dc.material_issue and dc.material_issue.site_id:
+        destination_name = dc.material_issue.site.name
+    else:
+        destination_name = ""
+
+    for dc_item in items:
+        inventory_item = dc_item.material_issue_item.inventory_item
+
+        # Same display name as DC form / Material Issue view
+        dc_item.product_name = get_inventory_item_display_name(inventory_item)
+        dc_item.uom = (
+            dc_item.material_issue_item.uom
+            or (inventory_item.uom if inventory_item else None)
+            or "Nos"
+        )
+
+        # Rate: latest PO rate, else variant DP/MRP (same helper as form)
+        rate = get_inventory_item_rate(inventory_item)
+        dc_item.rate = rate or 0
+        dc_item.amount = (dc_item.quantity or 0) * (dc_item.rate or 0)
+
+        # Fallback contact from PO if delivery person not set
+        if not contact_person or not contact_no:
+            po_product = None
+            if inventory_item and inventory_item.product_variant_id:
+                po_product = PurchaseOrderProduct.objects.filter(
+                    product_variant=inventory_item.product_variant,
+                    is_section=False,
+                ).order_by("-id").first()
+            elif inventory_item and inventory_item.item_id:
+                po_product = PurchaseOrderProduct.objects.filter(
+                    item=inventory_item.item,
+                    is_section=False,
+                ).order_by("-id").first()
+
+            if po_product and po_product.purchase_order:
+                if not contact_person:
+                    contact_person = po_product.purchase_order.contact_name or ""
+                if not contact_no:
+                    contact_no = po_product.purchase_order.contact_no or ""
+
+        grand_total += dc_item.amount
+
+    html_string = render_to_string(
+        "pdf/delivery_challan.html",
+        {
+            "dc": dc,
+            "items": items,
+            "grand_total": grand_total,
+            "contact_person": contact_person,
+            "contact_no": contact_no,
+            "destination_name": destination_name,
+            "delivery_partner_name": dc.delivery_partner_name or "",
+        }
+    )
+
+    pdf = HTML(
+        string=html_string,
+        base_url=request.build_absolute_uri("/")
+    ).write_pdf()
+
+    response = HttpResponse(
+        pdf,
+        content_type="application/pdf"
+    )
+
+    if request.GET.get("download"):
+        response["Content-Disposition"] = (
+            f'attachment; filename="DC-{dc.dc_number}.pdf"'
+        )
+    else:
+        response["Content-Disposition"] = (
+            f'inline; filename="DC-{dc.dc_number}.pdf"'
+        )
+
+    return response

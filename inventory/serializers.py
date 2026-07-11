@@ -4,6 +4,65 @@ from .service import create_new_po_version
 from django.db import transaction
 from django.db.models import Sum, F
 import uuid
+from product_management.models import get_display_name_for_pdf
+
+
+def get_inventory_item_display_name(inv):
+    """Readable name for high-side (product variant) or low-side (item) inventory."""
+    if not inv:
+        return "Unknown"
+
+    if inv.product_variant_id:
+        pv = inv.product_variant
+        try:
+            name = get_display_name_for_pdf(pv)
+            if name:
+                return name
+        except Exception:
+            pass
+        if pv.product_model_id:
+            brand = getattr(getattr(pv.product_model, "brand_id", None), "name", "") or ""
+            model_no = getattr(pv.product_model, "model_no", "") or ""
+            parts = [p for p in [brand, model_no, pv.sku] if p]
+            if parts:
+                return " - ".join(parts)
+        return pv.sku or f"Variant #{pv.id}"
+
+    if inv.item_id:
+        it = inv.item
+        material_name = getattr(getattr(it, "material_type_id", None), "name", None) or ""
+        item_type_name = getattr(getattr(it, "item_type_id", None), "name", None) or ""
+        name_parts = [p for p in [material_name, item_type_name] if p]
+        display = " ".join(name_parts) if name_parts else (it.item_code or "")
+        if it.size:
+            display = f"{display} - {it.size}{it.size_unit or ''}".strip(" -")
+        if it.thickness:
+            display = f"{display} x {it.thickness}{it.thickness_unit or ''}"
+        return display or it.item_code or f"Item #{it.id}"
+
+    return "Unknown"
+
+
+def get_inventory_item_rate(inv):
+    """Best available rate: latest PO rate, else variant DP/MRP."""
+    if not inv:
+        return 0
+
+    po_qs = PurchaseOrderProduct.objects.all().order_by("-id")
+    if inv.product_variant_id:
+        po = po_qs.filter(product_variant_id=inv.product_variant_id).first()
+        if po and po.rate is not None:
+            return po.rate
+        pv = inv.product_variant
+        return pv.dp or pv.mrp or 0
+
+    if inv.item_id:
+        po = po_qs.filter(item_id=inv.item_id).first()
+        if po and po.rate is not None:
+            return po.rate
+
+    return 0
+
 
 class VendorSerializer(serializers.ModelSerializer):
     class Meta:
@@ -350,18 +409,15 @@ class InventorySerializer(serializers.ModelSerializer):
             "display_name",
 
             "quantity",
+            "total_in_quantity",
+            "total_out_quantity",
             "uom",
             "updated_at",
         ]
         read_only_fields = ["updated_at"]
 
-    # 🔥 ADD THIS METHOD
     def get_display_name(self, obj):
-        if obj.product_variant:
-            return obj.product_variant.sku
-        if obj.item:
-            return obj.item.item_code
-        return None
+        return get_inventory_item_display_name(obj)
 
     def validate(self, data):
         product_variant = data.get("product_variant")
@@ -392,7 +448,27 @@ class MaterialIssueItemSerializer(serializers.Serializer):
     quantity = serializers.DecimalField(max_digits=10, decimal_places=2)
     uom = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
-    product_name = serializers.CharField(read_only=True)
+    product_name = serializers.SerializerMethodField()
+    item_code = serializers.SerializerMethodField()
+    
+    def get_product_name(self, obj):
+        """Get product name from inventory item"""
+        if obj.inventory_item:
+            # Try different name fields
+            if hasattr(obj.inventory_item, 'item') and obj.inventory_item.item:
+                return obj.inventory_item.item.material_type_name or obj.inventory_item.item.item_code
+            elif hasattr(obj.inventory_item, 'product_variant') and obj.inventory_item.product_variant:
+                return obj.inventory_item.product_variant.product_model.model_no
+        return "Unknown"
+    
+    def get_item_code(self, obj):
+        """Get item code from inventory item"""
+        if obj.inventory_item:
+            if hasattr(obj.inventory_item, 'item') and obj.inventory_item.item:
+                return obj.inventory_item.item.item_code
+            elif hasattr(obj.inventory_item, 'product_variant') and obj.inventory_item.product_variant:
+                return obj.inventory_item.product_variant.sku
+        return "Unknown"
 
     def validate(self, data):
         if data["quantity"] <= 0:
@@ -482,7 +558,8 @@ class MaterialIssueSerializer(serializers.Serializer):
                     )
 
                 InventoryItem.objects.filter(id=inventory.id).update(
-                    quantity=F("quantity") - qty
+                    quantity=F("quantity") - qty,
+                    total_out_quantity=F("total_out_quantity") + qty
                 )
 
                 MaterialIssueItem.objects.create(
@@ -497,28 +574,44 @@ class MaterialIssueSerializer(serializers.Serializer):
 
     
     def to_representation(self, instance):
+        items = []
+        for item in instance.items.select_related(
+            "inventory_item__product_variant__product_model__brand_id",
+            "inventory_item__product_variant__product_model__ac_sub_type_id__ac_type_id",
+            "inventory_item__item__material_type_id",
+            "inventory_item__item__item_type_id",
+        ).all():
+            inv = item.inventory_item
+            display_name = get_inventory_item_display_name(inv)
+            rate = get_inventory_item_rate(inv)
+            items.append({
+                "id": item.id,
+                "inventory_item": inv.id if inv else None,
+                "inventory_item_name": display_name,
+                "display_name": display_name,
+                "product_name": display_name,
+                "quantity": item.quantity,
+                "rate": rate,
+                "uom": item.uom or (inv.uom if inv else None) or "Nos",
+                "is_high_side": bool(inv and inv.product_variant_id),
+                "is_low_side": bool(inv and inv.item_id),
+            })
+
         return {
             "id": instance.id,
             "issue_number": instance.issue_number,
             "issue_type": instance.issue_type,
-            "branch": instance.branch.id,
+            "branch": instance.branch.id if instance.branch else None,
             "branch_name": instance.branch.name if instance.branch else None,
             "site": instance.site.id if instance.site else None,
             "site_name": instance.site.name if instance.site else None,
             "technician": instance.technician.id if instance.technician else None,
-            "technician_name": f"{instance.technician.first_name} {instance.technician.last_name}" if instance.technician else None,
+            "technician_name": (
+                f"{instance.technician.first_name} {instance.technician.last_name}".strip()
+                if instance.technician else None
+            ),
             "issue_date": instance.issue_date,
-            "items": [
-                {
-                    "id": item.id,
-                    "inventory_item": item.inventory_item.id,
-                    "inventory_item_name": str(item.inventory_item),
-                    "display_name": str(item.inventory_item),
-                    "quantity": item.quantity,
-                    "uom": item.uom,
-                }
-                for item in instance.items.all()
-            ]
+            "items": items,
         }   
         
         
@@ -630,4 +723,133 @@ class MaterialReturnSerializer(serializers.ModelSerializer):
 
         return material_return 
     
-    
+
+class DeliveryChallanItemSerializer(serializers.ModelSerializer):
+    inventory_item_name = serializers.SerializerMethodField()
+    issued_quantity = serializers.DecimalField(
+        source="material_issue_item.quantity",
+        max_digits=10,
+        decimal_places=2,
+        read_only=True
+    )
+
+    class Meta:
+        model = DeliveryChallanItem
+        fields = (
+            "id",
+            "material_issue_item",
+            "inventory_item_name",
+            "issued_quantity",
+            "quantity",
+        )
+
+    def get_inventory_item_name(self, obj):
+        inv = getattr(obj.material_issue_item, "inventory_item", None)
+        return get_inventory_item_display_name(inv)
+
+    def validate(self, data):
+        issue_item = data["material_issue_item"]
+        issued_qty = issue_item.quantity
+
+        dispatched_qty = DeliveryChallanItem.objects.filter(
+            material_issue_item=issue_item
+        ).aggregate(
+            total=Sum("quantity")
+        )["total"] or 0
+
+        remaining = issued_qty - dispatched_qty
+
+        if data["quantity"] > remaining:
+            raise serializers.ValidationError(
+                f"Only {remaining} quantity remaining"
+            )
+
+        return data
+
+class DeliveryChallanSerializer(serializers.ModelSerializer):
+    items = DeliveryChallanItemSerializer(many=True)
+    issue_number = serializers.CharField(
+        source="material_issue.issue_number",
+        read_only=True
+    )
+    branch_name = serializers.CharField(source="branch.name", read_only=True, allow_null=True)
+    site_name = serializers.CharField(source="site.name", read_only=True, allow_null=True)
+    delivery_destination_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DeliveryChallan
+        fields = "__all__"
+        read_only_fields = (
+            "dc_number",
+            "created_by",
+            "issue_number",
+            "branch_name",
+            "site_name",
+            "delivery_destination_name",
+        )
+
+    def get_delivery_destination_name(self, obj):
+        if obj.destination_type == "branch" and obj.branch_id:
+            return obj.branch.name
+        if obj.destination_type == "site" and obj.site_id:
+            return obj.site.name
+        return None
+
+    def validate(self, data):
+        destination_type = data.get("destination_type") or getattr(self.instance, "destination_type", None)
+        branch = data.get("branch", getattr(self.instance, "branch", None) if self.instance else None)
+        site = data.get("site", getattr(self.instance, "site", None) if self.instance else None)
+
+        if destination_type == "branch":
+            if not branch:
+                raise serializers.ValidationError({"branch": "Please select a branch as delivery destination."})
+            data["site"] = None
+        elif destination_type == "site":
+            if not site:
+                raise serializers.ValidationError({"site": "Please select a site as delivery destination."})
+            data["branch"] = None
+
+        return data
+
+    def create(self, validated_data):
+        items_data = validated_data.pop("items")
+        
+        dc = DeliveryChallan.objects.create(
+            **validated_data,
+            created_by=self.context["request"].user
+        )
+
+        for item_data in items_data:
+            DeliveryChallanItem.objects.create(
+                delivery_challan=dc,
+                **item_data
+            )
+
+        return dc
+
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop("items", None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        if items_data is not None:
+            instance.items.all().delete()
+            for item_data in items_data:
+                DeliveryChallanItem.objects.create(
+                    delivery_challan=instance,
+                    **item_data
+                )
+
+        return instance
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["issue_number"] = (
+            instance.material_issue.issue_number
+            if instance.material_issue
+            else None
+        )
+        data["delivery_destination_name"] = self.get_delivery_destination_name(instance)
+        return data

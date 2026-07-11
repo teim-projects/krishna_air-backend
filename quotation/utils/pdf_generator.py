@@ -1,808 +1,574 @@
 # quotation/utils/pdf_generator.py
-# Updated: 2026-03-10 - Match exact format from screenshots
-
-import io
-import logging
-import os
-from datetime import datetime
+from django.template.loader import render_to_string
+from weasyprint import HTML
 from decimal import Decimal
-from PIL.Image import item
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import mm
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
-from django.http import HttpResponse
 from django.conf import settings
-from collections import defaultdict
-from reportlab.platypus import KeepTogether
-
-
-
-
-
+import logging
 
 logger = logging.getLogger(__name__)
 
 
-class QuotationPDFGenerator:
-    def __init__(self, quotation, version):
-        self.quotation = quotation
-        self.version = version
-        self.buffer = io.BytesIO()
-        self.doc = SimpleDocTemplate(
-            self.buffer,
-            pagesize=A4,
-            rightMargin=15*mm,
-            leftMargin=15*mm,
-            topMargin=30*mm,
-            bottomMargin=15*mm,
-            showBoundary=1
-        )
-        self.styles = getSampleStyleSheet()
-        self.elements = []
-        self.setup_styles()
+def _format_capacity(product_variant):
+    capacity = getattr(product_variant, 'capacity', None)
+    if capacity in (None, ''):
+        return ''
 
-    def setup_styles(self):
-        """Setup custom styles for the PDF"""
-        # Company name in blue
-        self.styles.add(ParagraphStyle(
-            name='CompanyName',
-            parent=self.styles['Normal'],
-            fontSize=16,
-            textColor=colors.HexColor('#0066CC'),
-            alignment=TA_LEFT,
-            spaceAfter=2,
-            fontName='Helvetica-Bold'
-        ))
+    capacity_text = str(capacity).strip()
+    
+    # Strip any duplicate unit suffix entered in the capacity field (e.g. "1.0TR" -> "1.0")
+    for suffix in ['TR', 'TON', 'T']:
+        if capacity_text.upper().endswith(suffix):
+            idx = capacity_text.upper().rfind(suffix)
+            capacity_text = capacity_text[:idx].strip()
+            break
+
+    unit = (getattr(product_variant, 'unit', '') or '').strip().upper()
+    unit_label_map = {
+        'TR': 'TR',
+        'TON': 'Ton',
+        'T': 'TR',
+    }
+    unit_label = unit_label_map.get(unit, 'TR')  # Default to 'TR'
+
+    return f"{capacity_text} {unit_label}".strip()
+
+
+def _high_side_description(item):
+    product_variant = getattr(item, 'product_variant', None)
+    if not product_variant:
+        return 'High Side Equipment'
+
+    product_model = getattr(product_variant, 'product_model', None)
+    ac_sub_type = getattr(product_model, 'ac_sub_type_id', None) if product_model else None
+    ac_type = getattr(ac_sub_type, 'ac_type_id', None) if ac_sub_type else None
+
+    parts = []
+
+    # 1. AC Type (e.g. Split AC)
+    ac_type_name = getattr(ac_type, 'name', None)
+    if ac_type_name:
+        parts.append(ac_type_name)
+
+    # 2. Capacity (e.g. 1.0 TR / 2.2 TR)
+    capacity_text = _format_capacity(product_variant)
+    if capacity_text:
+        parts.append(capacity_text)
+
+    # 3. Star Rating (e.g. 3 Star / 4 Star)
+    star_rating = getattr(product_variant, 'star_rating', None)
+    if star_rating:
+        parts.append(f"{star_rating} Star")
+
+    # 4. Inverter Status (Inverter / Non-Inverter)
+    inverter = getattr(product_model, 'inverter', None) if product_model else None
+    if inverter is True:
+        parts.append('Inverter')
+    elif inverter is False:
+        parts.append('Non-Inverter')
+
+    return ' '.join(parts) if parts else 'High Side Equipment'
+
+
+def _low_side_description(item):
+    if item.description and item.description.strip():
+        return item.description.strip()
+
+    low_item = getattr(item, 'item', None)
+    if not low_item:
+        return 'Low Side Item'
+
+    parts = []
+    
+    material = getattr(low_item, 'material_type_id', None)
+    if material and getattr(material, 'name', None):
+        parts.append(material.name.strip())
+
+    item_type_obj = getattr(low_item, 'item_type_id', None)
+    if item_type_obj and getattr(item_type_obj, 'name', None):
+        parts.append(item_type_obj.name.strip())
+
+    feature = getattr(low_item, 'feature_type_id', None)
+    if feature and getattr(feature, 'name', None):
+        parts.append(feature.name.strip())
+
+    item_class_obj = getattr(low_item, 'item_class_id', None)
+    if item_class_obj and getattr(item_class_obj, 'name', None):
+        parts.append(item_class_obj.name.strip())
+
+    if getattr(low_item, 'size', None):
+        size_str = f"{low_item.size} {low_item.size_unit or ''}".strip()
+        parts.append(size_str)
+
+    if getattr(low_item, 'thickness', None):
+        thick_str = f"{low_item.thickness} {low_item.thickness_unit or ''}".strip()
+        parts.append(thick_str)
+
+    return " ".join(parts) if parts else getattr(low_item, 'item_code', 'Low Side Item')
+
+
+def _item_line_amount(item):
+    """Return line total including GST and extra charges where stored on the model."""
+    total = getattr(item, 'total_with_gst', None)
+    if total is not None and total > 0:
+        return Decimal(total)
+
+    qty = Decimal(getattr(item, 'quantity', 0) or 0)
+    rate = Decimal(getattr(item, 'unit_price', 0) or 0)
+    base = qty * rate
+    gst = Decimal(getattr(item, 'gst_amount', 0) or 0)
+    mathadi = Decimal(getattr(item, 'mathadi_charges', 0) or 0)
+    transport = Decimal(getattr(item, 'transportation_charges', 0) or 0)
+    return base + gst + mathadi + transport
+
+
+def _item_base_amount(item):
+    base = getattr(item, 'base_amount', None)
+    if base is not None and base > 0:
+        return Decimal(base)
+    qty = Decimal(getattr(item, 'quantity', 0) or 0)
+    rate = Decimal(getattr(item, 'unit_price', 0) or 0)
+    return qty * rate
+
+
+def _classify_high_side_item(item):
+    variant = getattr(item, 'product_variant', None)
+    if not variant:
+        return 'ACCESSORIES'
+
+    model = getattr(variant, 'product_model', None)
+    if not model:
+        return 'ACCESSORIES'
+
+    sub_type = getattr(model, 'ac_sub_type_id', None)
+    sub_type_name = getattr(sub_type, 'name', '').upper() if sub_type else ''
+    model_name = getattr(model, 'name', '').upper()
+    sku = getattr(variant, 'sku', '').upper()
+
+    # 1. Outdoor/Condensing Units
+    if getattr(model, 'model_no_odu', None) or 'ODU' in sku or 'ODU' in sub_type_name or 'CONDENSING' in model_name or 'OUTDOOR' in model_name:
+        return 'ODU'
+
+    # 2. Indoor Units
+    if getattr(model, 'model_no_idu', None) or 'IDU' in sku or 'IDU' in sub_type_name or 'INDOOR' in model_name or 'CASSETTE' in model_name or 'HI-WALL' in model_name:
+        return 'IDU'
+
+    # 3. Controllers
+    if 'REMOTE' in sku or 'CONTROLLER' in sku or 'REMOTE' in model_name or 'CONTROLLER' in model_name or 'REMOTE' in sub_type_name:
+        return 'CONTROLLER'
+
+    # 4. Refnet Joints / Piping joints
+    if 'JOINT' in sku or 'REFNET' in sku or 'JOINT' in model_name or 'REFNET' in model_name:
+        return 'JOINT'
+
+    return 'ACCESSORIES'
+
+
+def _build_quotation_pdf_context(quotation, version):
+    high_side_items = list(
+        version.high_side_items.select_related('product_variant__product_model').all()
+    )
+    low_side_items = list(
+        version.low_side_items.select_related(
+            'item__material_type_id',
+            'item__item_type_id',
+            'item__feature_type_id',
+            'item__brand',
+        ).all()
+    )
+    service_items = list(version.service_items.select_related('service').all())
+
+    high_side_total = sum((_item_base_amount(i) for i in high_side_items), Decimal('0'))
+    low_side_total = sum((_item_base_amount(i) for i in low_side_items), Decimal('0'))
+    service_total = sum((_item_base_amount(i) for i in service_items), Decimal('0'))
+
+    # Group High Side Items by AC Type for proposal summary
+    high_side_groups = {}
+    for item in high_side_items:
+        product_variant = getattr(item, 'product_variant', None)
+        product_model = getattr(product_variant, 'product_model', None) if product_variant else None
+        ac_sub_type = getattr(product_model, 'ac_sub_type_id', None) if product_model else None
+        ac_type = getattr(ac_sub_type, 'ac_type_id', None) if ac_sub_type else None
+        ac_type_name = getattr(ac_type, 'name', None) if ac_type else None
         
-        # Contact details in blue
-        self.styles.add(ParagraphStyle(
-            name='ContactInfo',
-            parent=self.styles['Normal'],
-            fontSize=9,
-            textColor=colors.HexColor('#0066CC'),
-            alignment=TA_LEFT,
-            leading=11
-        ))
+        if not ac_type_name:
+            ac_type_name = "AC Equipment"
         
-        self.styles.add(ParagraphStyle(
-            name='QuotationTitle',
-            parent=self.styles['Normal'],
-            fontSize=18,
-            textColor=colors.black,
-            alignment=TA_CENTER,
-            spaceAfter=10,
-            fontName='Helvetica-Bold'
-        ))
+        ac_type_name = ac_type_name.strip().upper()
+        amount = _item_base_amount(item)
+        high_side_groups[ac_type_name] = high_side_groups.get(ac_type_name, Decimal('0')) + amount
 
-        self.styles.add(ParagraphStyle(
-            name='Address',
-            parent=self.styles['Normal'],
-            fontSize=9,
-            textColor=colors.black,
-            alignment=TA_LEFT,
-            leading=12
-        ))
+    high_side_summary = [
+        {'description': name, 'amount': amount}
+        for name, amount in high_side_groups.items()
+    ]
 
-        self.styles.add(ParagraphStyle(
-            name='SectionHeader',
-            parent=self.styles['Normal'],
-            fontSize=11,
-            textColor=colors.black,
-            fontName='Helvetica-Bold',
-            alignment=TA_CENTER,
-            spaceBefore=10,
-            spaceAfter=5
-        ))
-
-        self.styles.add(ParagraphStyle(
-            name='SubHeader',
-            parent=self.styles['Normal'],
-            fontSize=10,
-            textColor=colors.black,
-            fontName='Helvetica-Bold',
-            alignment=TA_LEFT,   # ✅ CHANGE THIS
-            spaceBefore=2,
-            spaceAfter=1 
-        ))
-
-        self.styles.add(ParagraphStyle(
-            name='Label',
-            parent=self.styles['Normal'],
-            fontSize=9,
-            textColor=colors.black,
-            fontName='Helvetica-Bold'
-        ))
-
-        self.styles.add(ParagraphStyle(
-            name='Value',
-            parent=self.styles['Normal'],
-            fontSize=10,
-            textColor=colors.black,
-            leading=12
-        ))
+    # Group Low Side Items by Item Type for proposal summary
+    low_side_groups = {}
+    for item in low_side_items:
+        item_obj = getattr(item, 'item', None)
+        item_type = getattr(item_obj, 'item_type_id', None) if item_obj else None
+        item_type_name = getattr(item_type, 'name', None) if item_type else None
         
-        # Underlined label style
-        self.styles.add(ParagraphStyle(
-            name='UnderlinedLabel',
-            parent=self.styles['Normal'],
-            fontSize=9,
-            textColor=colors.black,
-            fontName='Helvetica-Bold',
-            leading=14
-        ))
-        
-    def draw_company_header(self, canvas, doc, quotation):
-        canvas.saveState()
+        if not item_type_name:
+            item_type_name = "MISCELLANEOUS WORK"
+            
+        item_type_name = item_type_name.strip().upper()
+        amount = _item_base_amount(item)
+        low_side_groups[item_type_name] = low_side_groups.get(item_type_name, Decimal('0')) + amount
 
-        # Logo
-        logo_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'ka-logo.png')
-        if os.path.exists(logo_path):
-            canvas.drawImage(
-                logo_path,
-                40,
-                780,
-                width=60,
-                height=40,
-                mask='auto'   # 👈 IMPORTANT
-                )
+    low_side_summary = [
+        {'description': name, 'amount': amount}
+        for name, amount in low_side_groups.items()
+    ]
 
-        # Company details
-        if quotation.branch:
-            branch = quotation.branch
-            company_name = branch.name
-            address = f"{branch.address}, {branch.city}, {branch.state} - {branch.pincode}"
-            email = branch.email
+    # Group Service Items by Category for proposal summary
+    service_groups = {}
+    for item in service_items:
+        service_obj = getattr(item, 'service', None)
+        category_name = getattr(service_obj, 'category', None) if service_obj else 'SERVICES'
+        category_name = str(category_name).strip().upper()
+        amount = _item_base_amount(item)
+        service_groups[category_name] = service_groups.get(category_name, Decimal('0')) + amount
+
+    service_summary = [
+        {'description': name, 'amount': amount}
+        for name, amount in service_groups.items()
+    ]
+
+    # Classify and group high side items for BOQ
+    odus = []
+    idus = []
+    controllers = []
+    joints = []
+    accessories = []
+
+    for item in high_side_items:
+        category = _classify_high_side_item(item)
+        variant = item.product_variant
+        ac_type_name_val = None
+        if variant and variant.product_model and variant.product_model.ac_sub_type_id and variant.product_model.ac_sub_type_id.ac_type_id:
+            ac_type_name_val = variant.product_model.ac_sub_type_id.ac_type_id.name
+            
+        item_data = {
+            'description': _high_side_description(item),
+            'product_variant': item.product_variant,
+            'quantity': item.quantity,
+            'unit': item.unit,
+            'rate': item.unit_price,
+            'amount': _item_base_amount(item),
+            'sku': getattr(item.product_variant, 'sku', ''),
+            'ac_type': ac_type_name_val or "AC Equipment"
+        }
+        if category == 'ODU':
+            odus.append(item_data)
+        elif category == 'IDU':
+            sub_type = getattr(item.product_variant.product_model, 'ac_sub_type_id', None)
+            item_data['sub_type_name'] = getattr(sub_type, 'name', 'Indoor Unit')
+            idus.append(item_data)
+        elif category == 'CONTROLLER':
+            controllers.append(item_data)
+        elif category == 'JOINT':
+            joints.append(item_data)
         else:
-            company_name = "KRISNA AIR CONDITIONING"
-            address = "309/B, Patil Plaza, Pune - 411009"
-            email = "sales@krisnatech.com"
+            accessories.append(item_data)
 
-        # Right side text
-        canvas.setFont("Helvetica-Bold", 11)
-        canvas.drawRightString(550, 800, company_name)
-
-        canvas.setFont("Helvetica", 8)
-        canvas.drawRightString(550, 785, address)
-        canvas.drawRightString(550, 770, f"Email: {email}")
-
-        canvas.restoreState()
-     
-    def add_quotation_title(self): 
-        # Get site information
-        site_info = ""
-        if self.quotation.site:
-            site_info = f"{self.quotation.site.name} - {self.quotation.site.address}, {self.quotation.site.city}"
-        elif self.quotation.site_name:
-            site_info = self.quotation.site_name
-        
-        # To, Subject section
-        customer = self.quotation.customer
-
-        customer_name = customer.name if customer else ""
-        customer_contact = customer.contact_number if customer else ""
-        customer_email = getattr(customer, "email", "")
-        
-        customer_address = ""
-        if hasattr(customer, "address") and customer.address:
-            customer_address = customer.address
-        
-        # Format date
-        quotation_date = self.quotation.created_at.strftime("%d-%m-%Y") if self.quotation.created_at else datetime.now().strftime("%d-%m-%Y")
-        quotation_no = self.version.version_no or self.quotation.quotation_no
-        # data = [
-        #     [
-        #         Paragraph(f'<u><b>To,</b></u> <br /> <b>{customer_name}</b>', self.styles['Value']),
-        #         Paragraph(f'<b>Date:</b> {quotation_date}', self.styles['Value'])
-        #     ],
-        #     [
-        #         Paragraph(f'{customer_address}', self.styles['Value']),
-        #         Paragraph(f'<b>Quotation No:</b> {quotation_no}', self.styles['Value'])
-        #     ],
-        #     [
-        #         Paragraph(f'Contact: {customer_contact}', self.styles['Value']),
-        #         ''
-        #     ],
-        #     [
-        #         Paragraph(f'Email: {customer_email}', self.styles['Value']),
-        #         ''
-        #     ],
-        #     [
-        #         Paragraph(f'<u><b>Subject:</b></u> {self.quotation.subject}', self.styles['UnderlinedLabel']),
-        #         ''
-        #     ],
-        # ]
-        # LEFT SIDE (To, Customer Info)
-        left_data = [
-            [Paragraph(f'<u><b>To,</b></u>', self.styles['Value'])],
-            [Paragraph(f'<b>{customer_name}</b>', self.styles['Value'])],
-            [Paragraph(customer_address, self.styles['Value'])],
-            [Paragraph(f'Contact: {customer_contact}', self.styles['Value'])],
-            [Paragraph(f'Email: {customer_email}', self.styles['Value'])],
-            [Paragraph(f'<u><b>Subject:</b></u> {self.quotation.subject}', self.styles['UnderlinedLabel'])],
-        ]
-
-        left_table = Table(left_data, colWidths=[self.doc.width * 0.7])
-        left_table.setStyle(TableStyle([
-            ('LEFTPADDING', (0, 0), (-1, -1), 0),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-            ('TOPPADDING', (0, 0), (-1, -1), 2),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-        ]))
-
-        # RIGHT SIDE (Date + Quotation No)
-        right_data = [
-            [Paragraph(f'<b>Date:</b> {quotation_date}', self.styles['Value'])],
-            [Paragraph(f'<b>Quotation No:</b> {quotation_no}', self.styles['Value'])],
-        ]
-
-        right_table = Table(right_data, colWidths=[self.doc.width * 0.3])
-        right_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 5),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-            ('TOPPADDING', (0, 0), (-1, -1), 2),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-        ]))
-
-        # 🔥 MAIN WRAPPER TABLE
-        main_table = Table(
-            [[left_table, right_table]],
-            colWidths=[self.doc.width * 0.7, self.doc.width * 0.3]
-        )
-
-        main_table.setStyle(TableStyle([   
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ]))
-
-        self.elements.append(main_table)
-        self.elements.append(Spacer(1, 5))
-        
-        # table = Table(data, colWidths=[self.doc.width * 0.7, self.doc.width * 0.3])
-        # table = Table(data, colWidths=[self.doc.width, 0])
-        # table.setStyle(TableStyle([
-        #     ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        #     ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        #     ('TOPPADDING', (0, 0), (-1, -1), 2),
-        #     ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-        # ]))
-        
-        # self.elements.append(table)
-        # self.elements.append(Spacer(1, 5))
-        
-        # Site Name section (if site information exists)
-        if site_info:
-            self.elements.append(Paragraph(f'<u><b>Site Name:</b></u> {site_info}', self.styles['UnderlinedLabel']))
-            self.elements.append(Spacer(1, 5))
-        
-        # Greeting
-        self.elements.append(Paragraph('Dear Sir/Madam,', self.styles['Value']))
-        self.elements.append(Spacer(1, 5))
-        
-        # Introduction text - only use thank_you_note if available
-        if self.quotation.thank_you_note:
-            intro_text = self.quotation.thank_you_note
-            self.elements.append(Paragraph(intro_text, self.styles['Value']))
-            self.elements.append(Spacer(1, 2))
-
-    def add_high_side_items(self):
-        """Add high side items grouped by product"""
-        try:
-            high_items = self.version.high_side_items.all()
-            if not high_items:
-                return
+    # Group IDUs by sub_type_name
+    idu_groups = []
+    from collections import defaultdict
+    grouped_idus = defaultdict(list)
+    for item in idus:
+        grouped_idus[item['sub_type_name']].append(item)
     
-            from collections import defaultdict
-            grouped_items = defaultdict(list)
-    
-            # Group items by brand
-            for item in high_items:
-                variant = item.product_variant
-                model = variant.product_model if hasattr(variant, "product_model") else None
-                brand_name = model.brand_id.name if model and model.brand_id else "Unknown"
-                grouped_items[brand_name].append(item)
-    
-            # Loop brand-wise
-            for brand_name, items in grouped_items.items():
-            
-                # Header
-                header_table = Table(
-                    [[Paragraph(f"Supply of {brand_name} Airconditioners", self.styles["SubHeader"])]],
-                    colWidths=[self.doc.width - 10]
-                )
-    
-                header_table.setStyle(TableStyle([
-                    ('BOX', (0, 0), (-1, -1), 1, colors.black),
-                    ('LEFTPADDING', (0, 0), (-1, -1), self.doc.width/2 - 80),
-                    ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-                    ('TOPPADDING', (0, 0), (-1, -1), 3),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-                ]))
-    
-                self.elements.append(header_table)
-    
-                # Table Data
-                data = [['S.N', 'Description', 'Unit', 'Qty', 'Rate', 'Amount']]
-    
-                subtotal = 0
-                gst_total = 0
-                mathadi_charges = 0
-                transportation = 0
-                grand_total = 0
-                total = 0
-                
-                for idx, item in enumerate(items, 1):
-                    variant = item.product_variant
-                    model = variant.product_model
-                
-                    # Use dynamic display name from database relationships
-                    product_name = variant.get_display_name_for_pdf()
-                    
-                    # Add item description below product name if it exists
-                    if item.description and item.description.strip():
-                        full_description = f"{product_name}<br/><i><font color='grey' size='8'>{item.description}</font></i>"
-                    else:
-                        full_description = product_name
-                
-                    qty = float(item.quantity)
-                    rate = float(item.unit_price)
-                
-                    # ✅ USE DB VALUES
-                    base_amount = float(getattr(item, "base_amount", 0) or 0)
-                    gst_amount = float(getattr(item, "gst_amount", 0) or 0)
-                    total_amount = float(getattr(item, "total_with_gst", 0) or 0)
-                
-                    # ✅ accumulate
-                    subtotal += base_amount
-                    gst_total += gst_amount
-                    grand_total += total_amount
-                
-                    mathadi_charges += float(getattr(item, "mathadi_charges", 0) or 0)
-                    transportation += float(getattr(item, "transportation_charges", 0) or 0)
-                    total += float(getattr(item, "total_with_gst", 0) or 0)
-                    data.append([
-                        str(idx),
-                        Paragraph(full_description, self.styles['Value']),
-                        str(item.unit),
-                        str(item.quantity),
-                        f"{rate:,.2f}",
-                        f"{base_amount:,.2f}",   # 👈 show base amount
-                    ])
-                # Calculations - use accumulated gst_total instead of recalculating
-                # gst_total is already accumulated from item.gst_amount above
-    
-                # Format helper
-                def format_extra(value):
-                    return f"{value:,.2f}" if value > 0 else "Extra"
-    
-                # Totals rows
-                data.append(['', '', '', '', 'Sub Total :', f"{subtotal:,.2f}"])
-                data.append(['', '', '', '', 'GST :', f"{gst_total:,.2f}"])
-                data.append(['', '', '', '', 'Mathadi Charges :', format_extra(mathadi_charges)])
-                data.append(['', '', '', '', 'Transportation :', format_extra(transportation)])
-                data.append(['', '', '', '', 'Total :', f"{total:,.2f}"])
-    
-                # Column widths
-                total_width = self.doc.width
-                col_widths = [
-                    total_width * 0.05,
-                    total_width * 0.43,
-                    total_width * 0.10,
-                    total_width * 0.08,
-                    total_width * 0.16,
-                    total_width * 0.16,
-                ]
-    
-                table = Table(data, colWidths=col_widths)
-    
-                # Table Styling
-                table.setStyle(TableStyle([
-                    # Grid only for items
-                    ('GRID', (0, 0), (-1, -6), 0.5, colors.black),
-    
-                    # Horizontal lines for totals
-                    ('LINEABOVE', (0, -5), (-1, -5), 0.5, colors.black),
-                    ('LINEBELOW', (0, -5), (-1, -1), 0.5, colors.black),
-                    ('LINEBELOW', (0, -1), (-1, -1), 1, colors.black),
-    
-                    # Only one vertical divider (label | value)
-                    ('LINEBEFORE', (5, -5), (5, -1), 0.5, colors.black),
-    
-                    # Fonts & alignment
-                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                    ('ALIGN', (0, 0), (0, -1), 'CENTER'),
-                    ('ALIGN', (2, 1), (-1, -1), 'RIGHT'),
-    
-                    # Span totals
-                    ('SPAN', (0, -5), (3, -5)),
-                    ('SPAN', (0, -4), (3, -4)),
-                    ('SPAN', (0, -3), (3, -3)),
-                    ('SPAN', (0, -2), (3, -2)),
-                    ('SPAN', (0, -1), (3, -1)),
-    
-                    ('ALIGN', (4, -5), (4, -1), 'RIGHT'),
-                    ('ALIGN', (5, -5), (5, -1), 'RIGHT'),
-                    ('FONTNAME', (4, -5), (-1, -1), 'Helvetica-Bold'),
-    
-                    # Highlight total row
-                    ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor("#8bc34a")),
-                ]))
-    
-                self.elements.append(table)
-                self.elements.append(Spacer(1, 10))
-    
-        except Exception as e:
-            logger.error(f"Error in add_high_side_items: {str(e)}")    
-                
-    def add_low_side_items(self):
-        """Add low side items table"""
-        try:
-            low_items = self.version.low_side_items.all()
-            if not low_items:
-                return
+    for sub_name, items in grouped_idus.items():
+        idu_groups.append({
+            'sub_type_name': sub_name,
+            'items': items
+        })
 
-            self.elements.append(Paragraph("Low side Installation work", self.styles['SubHeader']))
+    ac_type_names = []
+    for item in high_side_items:
+        variant = getattr(item, 'product_variant', None)
+        product_model = getattr(variant, 'product_model', None) if variant else None
+        ac_sub_type = getattr(product_model, 'ac_sub_type_id', None) if product_model else None
+        ac_type = getattr(ac_sub_type, 'ac_type_id', None) if ac_sub_type else None
+        ac_type_name_val = getattr(ac_type, 'name', None) if ac_type else None
+        if ac_type_name_val:
+            ac_type_name_val = ac_type_name_val.strip()
+            if ac_type_name_val not in ac_type_names:
+                ac_type_names.append(ac_type_name_val)
+    ac_type_name = " / ".join(ac_type_names) if ac_type_names else "Air Conditioning"
 
-            # Table headers
-            headers = [
-                ['S.N', 'Description', 'Unit', 'Qty', 'Rate', 'Amount']
-            ]
+    subtotal = version.subtotal or (high_side_total + low_side_total + service_total)
+    gst_amount = version.gst_amount or Decimal('0')
+    grand_total = version.grand_total or version.total_amount or (subtotal + gst_amount)
 
-            # Table data
-            data = headers.copy()
-            for idx, item in enumerate(low_items, 1):
-                # Get item details from the related item model
-                item_obj = item.item
+    if subtotal and gst_amount:
+        gst_percentage = (gst_amount / subtotal) * Decimal('100')
+    else:
+        gst_percentage = Decimal('18')
 
-                # Use item_code as the primary identifier
-                item_code = item_obj.item_code if hasattr(item_obj, 'item_code') else 'N/A'
+    all_items = []
 
-                # Build description from available fields
-                description_parts = []
-                if hasattr(item_obj, 'material_type_id') and item_obj.material_type_id:
-                    description_parts.append(str(item_obj.material_type_id))
-                if hasattr(item_obj, 'item_type_id') and item_obj.item_type_id:
-                    description_parts.append(str(item_obj.item_type_id))
-                if hasattr(item_obj, 'feature_type_id') and item_obj.feature_type_id:
-                    description_parts.append(str(item_obj.feature_type_id))
-                if hasattr(item_obj, 'size') and item_obj.size:
-                    size_str = f"{item_obj.size}{item_obj.size_unit or ''}"
-                    description_parts.append(size_str)
-                if hasattr(item_obj, 'brand') and item_obj.brand:
-                    description_parts.append(str(item_obj.brand))
+    for item in high_side_items:
+        all_items.append({
+            'description': _high_side_description(item),
+            'product_variant': item.product_variant,
+            'quantity': item.quantity,
+            'unit': item.unit,
+            'rate': item.unit_price,
+            'amount': _item_base_amount(item),
+        })
 
-                product_info = ' - '.join(description_parts) if description_parts else 'N/A'
-                
-                # Add item description if it exists
-                if item.description and item.description.strip():
-                    full_description = f"{product_info}<br/><i><font color='grey' size='8'>{item.description}</font></i>"
-                else:
-                    full_description = product_info
+    for item in low_side_items:
+        all_items.append({
+            'description': item.description or str(item.item.item_code),
+            'item': item.item,
+            'quantity': item.quantity,
+            'unit': item.unit,
+            'rate': item.unit_price,
+            'amount': _item_base_amount(item),
+        })
 
-                # Main product row with description included in same cell
-                data.append([
-                    str(idx),
-                    Paragraph(full_description, self.styles['Value']),
-                    str(item.unit),
-                    str(item.quantity),
-                    f"{float(item.unit_price):,.2f}",
-                    f"{float(item.total_with_gst):,.2f}"
-                ])
+    for item in service_items:
+        all_items.append({
+            'description': item.description or item.service.name,
+            'quantity': item.quantity,
+            'unit': item.unit,
+            'rate': item.unit_price,
+            'amount': _item_base_amount(item),
+        })
 
-            # Add empty row between content and totals
-            data.append(['', '', '', '', '', ''])
-            
-            # Calculate subtotal (base amounts only) and GST total from stored values
-            low_subtotal = sum(float(item.base_amount) for item in low_items)
-            low_gst_total = sum(float(item.gst_amount) for item in low_items)
-            low_mathadi_total = sum(float(item.mathadi_charges) for item in low_items)
-            
-            # Summary section - Low side specific rows
-            data.append([
-                "Subtotal :", '', '', '', '', 
-                f"{low_subtotal:,.2f}"
-            ])
-            
-            # Use the actual GST amount from database instead of recalculating
-            data.append([
-                "GST :", '', '', '', '', 
-                f"{low_gst_total:,.2f}"
-            ])
-            
-            # Format mathadi charges
-            mathadi_display = f"{low_mathadi_total:,.2f}" if low_mathadi_total > 0 else "Extra"
-            data.append([
-                "Mathadi Charges :", '', '', '', '', 
-                mathadi_display
-            ])
-            
-            # Calculate total with GST from stored values
-            total_with_gst = sum(float(item.total_with_gst) for item in low_items)
-            data.append([
-                "Total :", '', '', '', '', 
-                f"{total_with_gst:,.2f}"
-            ])
+    customer = quotation.customer
+    site = quotation.site
+    site_name = (
+        getattr(site, 'name', None)
+        or getattr(site, 'site_name', None)
+        or quotation.site_name
+        or '-'
+    )
 
-            total_width = self.doc.width-20
+    summary_sections = []
 
-            col_widths = [
-                total_width * 0.05,
-                total_width * 0.45,
-                total_width * 0.10,
-                total_width * 0.08,
-                total_width * 0.16,
-                total_width * 0.16,
-            ]
-            table = Table(data, colWidths=col_widths)
-            
-            # Count data rows (excluding header)
-            data_rows = len(data) - 1
-            
-            empty_row_index = data_rows - 4  # Empty row is 5th from last
-            summary_start = data_rows - 3    # Summary rows start (Subtotal, GST, Mathadi, Total) - 4 rows total
-
-            style = [
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),  # Header bold
-                ('ALIGN', (0, 0), (0, -1), 'CENTER'),   # S.N column center
-                ('ALIGN', (1, 0), (1, -1), 'LEFT'),     # Description column left
-                ('ALIGN', (2, 0), (-1, -1), 'RIGHT'),   # Unit, Qty, Rate, Amount right
-                ('FONTSIZE', (0, 0), (-1, -1), 9),
-                ('TOPPADDING', (0, 0), (-1, -1), 6),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-
-                # Extra spacing for description column (important)
-                ('LEFTPADDING', (1, 0), (1, -1), 6),
-                ('RIGHTPADDING', (1, 0), (1, -1), 6),
-                
-                # Summary section spans - individual spans for each row to preserve horizontal lines
-                ('SPAN', (0, summary_start), (4, summary_start)),      # Subtotal row
-                ('SPAN', (0, summary_start+1), (4, summary_start+1)),  # GST row
-                ('SPAN', (0, summary_start+2), (4, summary_start+2)),  # Mathadi row
-                ('SPAN', (0, summary_start+3), (4, summary_start+3)),  # Total row
-                
-                ('ALIGN', (0, summary_start), (4, summary_start+3), 'RIGHT'),  # Labels right-aligned
-                ('ALIGN', (5, summary_start), (5, summary_start+3), 'RIGHT'),  # Amounts right-aligned
-                ('FONTNAME', (0, summary_start), (-1, summary_start+3), 'Helvetica-Bold'),
-                
-                # Light gray background for summary rows
-                ('BACKGROUND', (0, summary_start), (-1, summary_start+3), colors.HexColor('#F0F0F0')),
-                # No background for empty row
-                ('BACKGROUND', (0, empty_row_index), (-1, empty_row_index), colors.white),
-                
-                # Ensure horizontal lines between summary rows are visible
-                ('LINEBELOW', (0, summary_start), (-1, summary_start), 0.5, colors.black),
-                ('LINEBELOW', (0, summary_start+1), (-1, summary_start+1), 0.5, colors.black),
-                ('LINEBELOW', (0, summary_start+2), (-1, summary_start+2), 0.5, colors.black),
-            ]
-
-            table.setStyle(TableStyle(style))
-
-            self.elements.append(table)
-
-            # Add page break if more than 4 items
-            if len(low_items) >= 4:
-                self.elements.append(PageBreak())
-            else:
-                self.elements.append(Spacer(1, 5))
-        except Exception as e:
-            logger.error(f"Error in add_low_side_items: {str(e)}")
-            self.elements.append(Paragraph(f"Error loading low side items: {str(e)}", self.styles['Value']))
-
-
-    def add_tax_summary(self):
-        """Add tax summary section - removed as per screenshot"""
-        pass
-
-    def add_terms_and_conditions(self):
-        """Add terms and conditions from quotation data"""
-        # Always start Terms & Conditions on a new page
-        self.elements.append(PageBreak())
-        
-        self.elements.append(Paragraph("Terms & Conditions", self.styles['SectionHeader']))
-        self.elements.append(Spacer(1, 5))
-        
-        # Get terms and conditions from the quotation
-        terms_conditions = self.quotation.terms_conditions.all()
-        
-        if terms_conditions:
-            # Group terms by type
-            payment_terms = []
-            delivery_terms = []
-            other_terms = []
-            
-            for term in terms_conditions:
-                term_type_name = term.terms_condition_type.name.lower()
-                if 'payment' in term_type_name:
-                    payment_terms.append(term.terms)
-                elif 'delivery' in term_type_name:
-                    delivery_terms.append(term.terms)
-                else:
-                    other_terms.append(term.terms)
-            
-            # Add Payment Terms section
-            if payment_terms:
-                self.elements.append(Paragraph("<b>PAYMENT TERMS:</b>", self.styles['SubHeader']))
-                for idx, term in enumerate(payment_terms, 1):
-                    self.elements.append(Paragraph(f"{idx}. {term}", self.styles['Value']))
-                self.elements.append(Spacer(1, 8))
-            
-            # Add Delivery Terms section
-            if delivery_terms:
-                self.elements.append(Paragraph("<b>DELIVERY TERMS:</b>", self.styles['SubHeader']))
-                for idx, term in enumerate(delivery_terms, 1):
-                    self.elements.append(Paragraph(f"{idx}. {term}", self.styles['Value']))
-                self.elements.append(Spacer(1, 8))
-            
-            # Add Other Terms section
-            if other_terms:
-                self.elements.append(Paragraph("<b>GENERAL TERMS:</b>", self.styles['SubHeader']))
-                for idx, term in enumerate(other_terms, 1):
-                    self.elements.append(Paragraph(f"{idx}. {term}", self.styles['Value']))
-                self.elements.append(Spacer(1, 8))
-        
-        else:
-            # Fallback to default terms if no terms are set
-            self.elements.append(Paragraph("<b>TAXES:</b> GST will be extra as applicable.", self.styles['Value']))
-            self.elements.append(Spacer(1, 5))
-            
-            self.elements.append(Paragraph("<b>PAYMENT TERMS:</b>", self.styles['SubHeader']))
-            default_payment_terms = [
-                "For HVAC Equipment: 100% advance along with PO against Performa Invoice.",
-                "Purchase Order and Cheque shall be made in the name of KRISNA AIRCONDITIONING, Pune.",
-                "Bank of India, Account Number: 051520100000616, IFSC Code: BKID0000515, GSTIN: 27AITPP8825B2ZS."
-            ]
-            for idx, term in enumerate(default_payment_terms, 1):
-                self.elements.append(Paragraph(f"{idx}. {term}", self.styles['Value']))
-            self.elements.append(Spacer(1, 8))
-            
-            self.elements.append(Paragraph("<b>DELIVERY TERMS:</b>", self.styles['SubHeader']))
-            default_delivery_terms = [
-                "Delivery will be made within 15-20 working days from the date of receipt of order.",
-                "Material will be delivered at site during working hours only."
-            ]
-            for idx, term in enumerate(default_delivery_terms, 1):
-                self.elements.append(Paragraph(f"{idx}. {term}", self.styles['Value']))
-            self.elements.append(Spacer(1, 8))
-        
-        # Add standard closing text
-        closing_text = [
-            "We hope we are in line with your requirement and look forward to hear from you with interest.",
-            "",
-            "Thanking you and assuring you our best of services always."
-        ]
-        
-        for text in closing_text:
-            if text == "":
-                self.elements.append(Spacer(1, 5))
-            else:
-                self.elements.append(Paragraph(text, self.styles['Value']))
-        
-        self.elements.append(Spacer(1, 5))
-
-    def add_footer(self):
-        """Add footer with signature"""
-        data = [
-            [
-                Paragraph("<b>For Krisna Airconditioning</b>", self.styles['Value']),
-                ''
+    if high_side_items:
+        summary_sections.append({
+            'title': 'Part A: High Side Air Conditioning Equipment',
+            'items': [
+                {
+                    'description': _high_side_description(item),
+                    'amount': _item_base_amount(item),
+                }
+                for item in high_side_items
             ],
-            [
-                Paragraph("Authorised Signatory", self.styles['Label']),
-                Paragraph("(This is a Computer Generated Quotation)", self.styles['Label'])
-            ]
-        ]
-        
-        table = Table(data, colWidths=[self.doc.width/2, self.doc.width/2])
-        table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
-            ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
-            ('LINEABOVE', (0, 1), (-1, 1), 1, colors.black),
-        ]))
-        
-        self.elements.append(table)
+            'subtotal': high_side_total,
+        })
 
-    def number_to_words(self, number):
-        """Convert number to words (simplified version)"""
-        num = int(number)
-        if num < 1000:
-            return f"Rupees {num} Only"
-        elif num < 100000:
-            return f"Rupees {num/1000:.1f} Thousand Only"
-        else:
-            return f"Rupees {num/100000:.1f} Lakh Only"
-    # def generate(self):
-        
-    #     self.add_quotation_title()
-    #     self.add_customer_details()
-    
-    #     has_high = self.version.high_side_items.exists()
-    #     has_low = self.version.low_side_items.exists()
-    
-    #     if has_high:
-    #         self.add_high_side_items()
-    
-    #     # 👇 IMPORTANT LOGIC
-    #     if has_high and has_low:
-    #         self.elements.append(PageBreak())
-    
-    #     if has_low:
-    #         self.add_low_side_items()
-    
-    #     self.add_tax_summary()
-    #     self.add_terms_and_conditions()
-    #     self.add_footer()
-    #     self.doc.build(
-    #         self.elements,
-    #         onFirstPage=lambda c, d: self.draw_company_header(c, d, self.quotation),
-    #         onLaterPages=lambda c, d: self.draw_company_header(c, d, self.quotation),
-    #     )
-    
-    #     pdf = self.buffer.getvalue()
-    #     self.buffer.close()
-    #     return pdf
-    def generate(self):
-        top_elements = []
+    if low_side_items:
+        summary_sections.append({
+            'title': 'Part B: Low Side Installation Work',
+            'items': [
+                {
+                    'description': _low_side_description(item),
+                    'amount': _item_base_amount(item),
+                }
+                for item in low_side_items
+            ],
+            'subtotal': low_side_total,
+        })
 
-        # Step 1: collect top content
-        self.elements = top_elements
-        self.add_quotation_title()
+    if service_items:
+        summary_sections.append({
+            'title': 'Part C: Services',
+            'items': [
+                {
+                    'description': f"{item.service.name} ({item.service.category})",
+                    'amount': _item_base_amount(item),
+                }
+                for item in service_items
+            ],
+            'subtotal': service_total,
+        })
 
-        has_high = self.version.high_side_items.exists()
-        has_low = self.version.low_side_items.exists()
+    # Group High Side Items by AC Type for table separation
+    def _get_ac_type_name(item):
+        variant = getattr(item, 'product_variant', None)
+        product_model = getattr(variant, 'product_model', None) if variant else None
+        ac_sub_type = getattr(product_model, 'ac_sub_type_id', None) if product_model else None
+        ac_type = getattr(ac_sub_type, 'ac_type_id', None) if ac_sub_type else None
+        ac_type_name = getattr(ac_type, 'name', None) if ac_type else None
+        return ac_type_name.strip() if ac_type_name else "AC Equipment"
 
-        if has_high:
-            self.add_high_side_items()
+    high_side_by_type = {}
+    for item in high_side_items:
+        t_name = _get_ac_type_name(item)
+        if t_name not in high_side_by_type:
+            high_side_by_type[t_name] = []
+        high_side_by_type[t_name].append({
+            'description': _high_side_description(item),
+            'product_variant': item.product_variant,
+            'quantity': item.quantity,
+            'unit': item.unit,
+            'rate': item.unit_price,
+            'amount': _item_base_amount(item),
+            'gst_amount': getattr(item, 'gst_amount', 0) or 0,
+            'sku': getattr(item.product_variant, 'sku', '')
+        })
 
-        # ✅ Step 2: Create container PROPERLY
-        container = Table(
-            [[elem] for elem in top_elements],   # split rows
-            colWidths=[self.doc.width]
-        )
+    high_side_groups = []
+    for t_name, items in high_side_by_type.items():
+        sub_total_val = sum(i['amount'] for i in items)
+        gst_total_val = sum(i['gst_amount'] for i in items)
+        high_side_groups.append({
+            'ac_type': t_name,
+            'items': items,
+            'subtotal': sub_total_val,
+            'gst_total': gst_total_val,
+            'total_with_gst': sub_total_val + gst_total_val,
+        })
 
-        container.setStyle(TableStyle([
-            # ('BOX', (0, 0), (-1, -1), 1, colors.black),
+    # Group Low Side Items by AC Type using AcMaterials
+    from product_management.models import AcMaterials
+    material_to_ac_types = {}
+    for am in AcMaterials.objects.select_related('ac_type', 'material').all():
+        m_id = am.material_id
+        t_name = am.ac_type.name.strip()
+        if m_id not in material_to_ac_types:
+            material_to_ac_types[m_id] = []
+        material_to_ac_types[m_id].append(t_name)
 
-            # 🔥 reduce padding (IMPORTANT)
-            ('LEFTPADDING', (0, 0), (-1, -1), 5),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-            ('TOPPADDING', (0, 0), (-1, -1), 2),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+    low_side_by_type = {}
+    for item in low_side_items:
+        assigned_type = None
+        item_obj = item.item
+        if item_obj and item_obj.id in material_to_ac_types:
+            for t_name in material_to_ac_types[item_obj.id]:
+                if t_name in high_side_by_type:
+                    assigned_type = t_name
+                    break
+            if not assigned_type:
+                assigned_type = material_to_ac_types[item_obj.id][0]
+        if not assigned_type:
+            assigned_type = list(high_side_by_type.keys())[0] if high_side_by_type else "AC Equipment"
+            
+        if assigned_type not in low_side_by_type:
+            low_side_by_type[assigned_type] = []
+        low_side_by_type[assigned_type].append({
+            'description': _low_side_description(item),
+            'quantity': item.quantity,
+            'unit': item.unit,
+            'rate': item.unit_price,
+            'amount': _item_base_amount(item),
+            'gst_amount': getattr(item, 'gst_amount', 0) or 0,
+        })
 
-            # 🔥 REMOVE extra row spacing
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ]))
+    low_side_groups = []
+    for t_name, items in low_side_by_type.items():
+        sub_total_val = sum(i['amount'] for i in items)
+        gst_total_val = sum(i['gst_amount'] for i in items)
+        low_side_groups.append({
+            'ac_type': t_name,
+            'items': items,
+            'subtotal': sub_total_val,
+            'gst_total': gst_total_val,
+            'total_with_gst': sub_total_val + gst_total_val,
+        })
 
-        # Step 3: reset elements
-        self.elements = [container]
+    # Group terms & conditions by category type
+    terms_by_type = {}
+    for term in quotation.terms_conditions.select_related('terms_condition_type').all():
+        t_type = term.terms_condition_type.name if term.terms_condition_type else "Other"
+        if t_type not in terms_by_type:
+            terms_by_type[t_type] = []
+        terms_by_type[t_type].append(term.terms)
 
-        # Step 4: continue rest
-        if has_high and has_low:
-            self.elements.append(PageBreak())
+    high_side_grand_total = sum((i.total_with_gst for i in high_side_items), Decimal('0'))
+    low_side_grand_total = sum((i.total_with_gst for i in low_side_items), Decimal('0'))
 
-        if has_low:
-            self.add_low_side_items()
+    return {
+        'high_side_groups': high_side_groups,
+        'low_side_groups': low_side_groups,
+        'payment_terms': terms_by_type.get("Quotation Payment", []),
+        'validity_terms': terms_by_type.get("Quotation Validity", []),
+        'warranty_terms': terms_by_type.get("Quotation Warranty", []),
+        'other_terms': terms_by_type.get("Quotation Other", []),
+        'declaration': getattr(quotation, 'declaration', ''),
+        'quotation': quotation,
+        'version': version,
+        'quotation_no': quotation.quotation_no,
+        'quotation_date': version.created_at,
+        'customer_name': customer.name if customer else '-',
+        'customer_contact': getattr(customer, 'contact_number', '') or '',
+        'site_name': site_name,
+        'subject': quotation.subject or '-',
+        'high_side_summary': high_side_summary,
+        'low_side_summary': low_side_summary,
+        'service_summary': service_summary,
+        'high_side_total': high_side_total,
+        'low_side_total': low_side_total,
+        'high_side_grand_total': high_side_grand_total,
+        'low_side_grand_total': low_side_grand_total,
+        'service_total': service_total,
+        'grand_total_without_gst': high_side_total + low_side_total + service_total,
+        'ac_type_name': ac_type_name,
+        'odus': odus,
+        'idu_groups': idu_groups,
+        'controllers': controllers,
+        'joints': joints,
+        'accessories': accessories,
+        'low_side_items': [
+            {
+                'description': _low_side_description(item),
+                'quantity': item.quantity,
+                'unit': item.unit,
+                'rate': item.unit_price,
+                'amount': _item_base_amount(item),
+            }
+            for item in low_side_items
+        ],
+        'high_side_items_list': [
+            {
+                'description': _high_side_description(item),
+                'product_variant': item.product_variant,
+                'quantity': item.quantity,
+                'unit': item.unit,
+                'rate': item.unit_price,
+                'amount': _item_base_amount(item),
+                'sku': getattr(item.product_variant, 'sku', ''),
+                'ac_type': (
+                    item.product_variant.product_model.ac_sub_type_id.ac_type_id.name
+                    if (item.product_variant and
+                        item.product_variant.product_model and
+                        item.product_variant.product_model.ac_sub_type_id and
+                        item.product_variant.product_model.ac_sub_type_id.ac_type_id)
+                    else "AC Equipment"
+                )
+            }
+            for item in high_side_items
+        ],
+        'summary_sections': summary_sections,
+        'quotation_items': all_items,
+        'subtotal': subtotal,
+        'gst_amount': gst_amount,
+        'gst_percentage': gst_percentage,
+        'grand_total': grand_total,
+        'total_quantity': sum(
+            (Decimal(str(item.get('quantity', 0) or 0)) for item in all_items),
+            Decimal('0'),
+        ),
+    }
 
-        self.add_tax_summary()
-        self.add_terms_and_conditions()
-        self.add_footer()
 
-        # Step 5: build
-        self.doc.build(
-            self.elements,
-            onFirstPage=lambda c, d: self.draw_company_header(c, d, self.quotation),
-            onLaterPages=lambda c, d: self.draw_company_header(c, d, self.quotation),
-        )
-
-        pdf = self.buffer.getvalue()
-        self.buffer.close()
+def generate_quotation_pdf(quotation, version, base_url=None):
+    """
+    Generate quotation PDF using WeasyPrint with HTML template (existing design).
+    """
+    try:
+        context = _build_quotation_pdf_context(quotation, version)
+        html_string = render_to_string('pdf/quotation.html', context)
+        pdf = HTML(
+            string=html_string,
+            base_url=base_url or getattr(settings, 'ABSOLUTE_URL', '/'),
+        ).write_pdf()
         return pdf
-    
-def generate_quotation_pdf(quotation, version):
-    """Generate PDF for quotation"""
-    generator = QuotationPDFGenerator(quotation, version)
-    return generator.generate()
+    except Exception as e:
+        logger.error(f"Error generating quotation PDF: {str(e)}", exc_info=True)
+        raise

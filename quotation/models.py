@@ -40,7 +40,7 @@ class Quotation(models.Model):
     subject = models.CharField(max_length=255)
     site_name = models.CharField(max_length=255, blank=True, null=True)
     thank_you_note = models.TextField(max_length=400)
-
+    declaration = models.TextField(default="We declare that this quotation shows the actual price for the services.")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -78,8 +78,6 @@ class QuotationVersion(models.Model):
 
     gst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-
-   
 
     
     # GRAND TOTAL
@@ -160,3 +158,59 @@ class QuotationLowSideItem(models.Model):
     gst_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     gst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total_with_gst = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+class ServiceMaster(models.Model):
+    SERVICE_TYPES = [
+        ('MATERIAL', 'Material Based'),
+        ('LABOR', 'Labor Only'),
+    ]
+    
+    category = models.CharField(max_length=200)
+    subcategory = models.CharField(max_length=200, blank=True, null=True)
+    name = models.CharField(max_length=300)  # Make sure this exists
+    description = models.TextField(blank=True, null=True)
+    service_type = models.CharField(max_length=10, choices=SERVICE_TYPES, default='LABOR')
+    items = models.ManyToManyField('product_management.item', blank=True)
+    unit = models.CharField(max_length=50, blank=True, null=True)
+    labor_rate = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    sequence = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['sequence', 'name']
+    
+    def __str__(self):
+        return self.name
+
+class QuotationServiceItem(models.Model):
+    quotation_version = models.ForeignKey('QuotationVersion', on_delete=models.CASCADE, related_name='service_items')
+    service = models.ForeignKey(ServiceMaster, on_delete=models.CASCADE)
+    
+    # Quantities and pricing
+    quantity = models.DecimalField(max_digits=10, decimal_places=2)
+    unit = models.CharField(max_length=50)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    description = models.TextField(blank=True, null=True)
+    
+    # Calculated amounts (same as high/low side items)
+    base_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    gst_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=18)
+    gst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    mathadi_charges = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    transportation_charges = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_with_gst = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def save(self, *args, **kwargs):
+        # Calculate amounts (same logic as high/low side items)
+        self.base_amount = self.quantity * self.unit_price
+        self.gst_amount = (self.base_amount * self.gst_percentage) / 100
+        self.total_with_gst = self.base_amount + self.gst_amount + self.mathadi_charges + self.transportation_charges
+        super().save(*args, **kwargs)
+    
+    def __str__(self):
+        return f"{self.service.name} - {self.quantity} {self.unit}"
