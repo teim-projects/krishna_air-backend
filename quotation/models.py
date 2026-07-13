@@ -165,9 +165,9 @@ class ServiceMaster(models.Model):
         ('LABOR', 'Labor Only'),
     ]
     
-    category = models.CharField(max_length=200)
-    subcategory = models.CharField(max_length=200, blank=True, null=True)
     name = models.CharField(max_length=300)  # Make sure this exists
+    category = models.CharField(max_length=200, blank=True, null=True)
+    subcategory = models.CharField(max_length=200, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     service_type = models.CharField(max_length=10, choices=SERVICE_TYPES, default='LABOR')
     items = models.ManyToManyField('product_management.item', blank=True)

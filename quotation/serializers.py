@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.db import transaction
 import random
 from datetime import datetime
-from product_management.models import ProductVariant
+from product_management.models import ProductVariant, item as ProductItem
 from inventory.models import TermsConditions
 from inventory.serializers import TermsConditionsSerializer
 
@@ -368,43 +368,63 @@ class QuotationSerializer(serializers.ModelSerializer):
 
 
 class ServiceMasterSerializer(serializers.ModelSerializer):
-    # ✅ Add this to include linked items
-    items = serializers.SerializerMethodField()
+    # Writable on create/update (IDs); nested objects returned in to_representation
+    items = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=ProductItem.objects.all(),
+        required=False,
+        allow_empty=True,
+    )
     item_code = serializers.SerializerMethodField()
     item_name = serializers.SerializerMethodField()
     item_description = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = ServiceMaster
-        fields = '__all__'
-    
-    # ✅ Add this method to return items data
-    def get_items(self, obj):
+        fields = "__all__"
+
+    def to_representation(self, instance):
         from product_management.serializers import ItemSerializer
-        return ItemSerializer(obj.items.all(), many=True).data
-    
+
+        rep = super().to_representation(instance)
+        rep["items"] = ItemSerializer(instance.items.all(), many=True).data
+        return rep
+
+    def create(self, validated_data):
+        items = validated_data.pop("items", [])
+        instance = super().create(validated_data)
+        instance.items.set(items)
+        return instance
+
+    def update(self, instance, validated_data):
+        items = validated_data.pop("items", None)
+        instance = super().update(instance, validated_data)
+        if items is not None:
+            instance.items.set(items)
+        return instance
+
     def get_item_code(self, obj):
         return ", ".join([i.item_code for i in obj.items.all()])
-        
+
     def get_item_name(self, obj):
         return ", ".join([i.item_code for i in obj.items.all()])
-    
+
     def get_item_description(self, obj):
         descriptions = []
-        for item in obj.items.all():
+        for item_obj in obj.items.all():
             parts = []
-            if hasattr(item, 'material_type_id') and item.material_type_id:
-                parts.append(str(item.material_type_id))
-            if hasattr(item, 'item_type_id') and item.item_type_id:
-                parts.append(str(item.item_type_id))
-            if hasattr(item, 'feature_type_id') and item.feature_type_id:
-                parts.append(str(item.feature_type_id))
-            if hasattr(item, 'size') and item.size:
-                size_str = f"{item.size}{item.size_unit or ''}"
+            if getattr(item_obj, "material_type_id", None):
+                parts.append(str(item_obj.material_type_id))
+            if getattr(item_obj, "item_type_id", None):
+                parts.append(str(item_obj.item_type_id))
+            if getattr(item_obj, "feature_type_id", None):
+                parts.append(str(item_obj.feature_type_id))
+            if getattr(item_obj, "size", None):
+                size_str = f"{item_obj.size}{item_obj.size_unit or ''}"
                 parts.append(size_str)
-            if hasattr(item, 'brand') and item.brand:
-                parts.append(str(item.brand))
-            desc = ' - '.join(parts) if parts else item.item_code
+            if getattr(item_obj, "brand", None):
+                parts.append(str(item_obj.brand))
+            desc = " - ".join(parts) if parts else item_obj.item_code
             descriptions.append(desc)
         return ", ".join(descriptions) if descriptions else None
 
