@@ -29,6 +29,7 @@ class ServiceManagementRecord(models.Model):
     CONTRACT_STATUS_CHOICES = [
         ('active', 'Active'),
         ('inactive', 'Inactive'),
+        ('closed', 'Closed'),
     ]
 
     AMC_SERVICE_TYPE_CHOICES = [
@@ -183,6 +184,7 @@ class AMCContract(models.Model):
     STATUS_CHOICES = [
         ('ACTIVE', 'Active'),
         ('INACTIVE', 'Inactive'),
+        ('CLOSED', 'Closed'),
         ('EXPIRED', 'Expired'),
         ('CANCELLED', 'Cancelled'),
     ]
@@ -379,6 +381,14 @@ class TechnicianWorkRecord(models.Model):
     gps_location = models.CharField(max_length=255, blank=True, default='')
     work_description = models.TextField(blank=True, default='')
     work_date = models.DateField(default=timezone.now)
+    payment_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('pending', 'Pending'),
+            ('completed', 'Completed'),
+        ],
+        default='pending',
+    )
 
     created_by = models.ForeignKey(
         CustomUser,

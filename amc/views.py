@@ -6,6 +6,7 @@ from django.utils import timezone
 from datetime import timedelta
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Prefetch, Q
+from django.db.models import Prefetch, Q
 from rest_framework import filters
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from .models import Customer
@@ -135,6 +136,35 @@ class ServiceManagementRecordViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
 
+    def destroy(self, request, *args, **kwargs):
+        """
+        AMC service records are never hard-deleted.
+        Delete button sets status to inactive instead.
+        One Time / Warranty records can still be hard-deleted.
+        """
+        record = self.get_object()
+        if record.contract_type == 'amc':
+            if record.contract_status == 'closed':
+                return Response(
+                    {'detail': 'Closed AMC service records cannot be deleted or deactivated.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            record.contract_status = 'inactive'
+            record.save(update_fields=['contract_status', 'updated_at'])
+            return Response(
+                ServiceManagementRecordSerializer(record).data,
+                status=status.HTTP_200_OK,
+            )
+        return super().destroy(request, *args, **kwargs)
+
+    @action(detail=True, methods=['post'], url_path='mark-closed')
+    def mark_closed(self, request, pk=None):
+        """Mark service as completed/closed."""
+        record = self.get_object()
+        record.contract_status = 'closed'
+        record.save(update_fields=['contract_status', 'updated_at'])
+        return Response(ServiceManagementRecordSerializer(record).data)
+
     @action(detail=True, methods=['get'], url_path='technician-allocation-draft')
     def technician_allocation_draft(self, request, pk=None):
         """Return auto-filled customer/payment data for technician allocation button."""
@@ -212,6 +242,32 @@ class AMCContractViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['customer', 'status', 'amc_included_in_sale']
     search_fields = ['contract_number', 'customer__name', 'amc_type']
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        AMC contracts are never hard-deleted.
+        Delete button sets status to INACTIVE instead.
+        """
+        contract = self.get_object()
+        if contract.status == 'CLOSED':
+            return Response(
+                {'detail': 'Closed AMC contracts cannot be deleted or deactivated.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        contract.status = 'INACTIVE'
+        contract.save(update_fields=['status', 'updated_at'])
+        return Response(
+            AMCContractSerializer(contract).data,
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=['post'], url_path='mark-closed')
+    def mark_closed(self, request, pk=None):
+        """Mark AMC contract as completed/closed."""
+        contract = self.get_object()
+        contract.status = 'CLOSED'
+        contract.save(update_fields=['status', 'updated_at'])
+        return Response(AMCContractSerializer(contract).data)
     
     @action(detail=False, methods=['get'])
     def active_contracts(self, request):

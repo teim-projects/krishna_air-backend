@@ -239,7 +239,7 @@ class QuotationViewSet(viewsets.ModelViewSet):
         return Response({"message": "Version deleted"})
 
 class ServiceMasterViewSet(viewsets.ModelViewSet):
-    queryset = ServiceMaster.objects.all()  # ✅ REMOVE select_related
+    queryset = ServiceMaster.objects.all().prefetch_related('items')
     serializer_class = ServiceMasterSerializer
     pagination_class = None  # Disable pagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
@@ -255,7 +255,7 @@ class ServiceMasterCreateViewSet(viewsets.ModelViewSet):
 
 class QuotationServiceItemViewSet(viewsets.ModelViewSet):
     queryset = QuotationServiceItem.objects.all().select_related(
-        'service__category', 'service__subcategory', 'quotation_version'
+        'service', 'quotation_version'
     ).prefetch_related('service__items')
     serializer_class = QuotationServiceItemSerializer
     filter_backends = [DjangoFilterBackend]

@@ -228,6 +228,7 @@ class TechnicianWorkRecordSerializer(serializers.ModelSerializer):
             'customer_address',
             'payment_amount',
             'payment_status',
+            'payment_status',
             'gps_location',
             'work_description',
             'work_date',
@@ -270,17 +271,30 @@ class TechnicianWorkRecordSerializer(serializers.ModelSerializer):
             validated_data['payment_amount'] = service_record.total_price_with_gst or 0
         return validated_data
 
+    def _close_service_if_completed(self, work_record):
+        """When technician work is completed, mark linked AMC service as closed."""
+        if work_record.payment_status != 'completed':
+            return
+        service = work_record.service_record
+        if service and service.contract_type == 'amc' and service.contract_status != 'closed':
+            service.contract_status = 'closed'
+            service.save(update_fields=['contract_status', 'updated_at'])
+
     def create(self, validated_data):
         validated_data = self._autofill_customer_fields(validated_data)
         request = self.context.get('request')
         if request and request.user and request.user.is_authenticated:
             validated_data['created_by'] = request.user
-        return super().create(validated_data)
+        work_record = super().create(validated_data)
+        self._close_service_if_completed(work_record)
+        return work_record
 
     def update(self, instance, validated_data):
         if 'service_record' in validated_data:
             validated_data = self._autofill_customer_fields(validated_data)
-        return super().update(instance, validated_data)
+        work_record = super().update(instance, validated_data)
+        self._close_service_if_completed(work_record)
+        return work_record
 
 
 class TechnicianWorkRecordUpdateSerializer(serializers.ModelSerializer):
@@ -303,6 +317,15 @@ class TechnicianWorkRecordUpdateSerializer(serializers.ModelSerializer):
                 "Provide at least one field to update: technician, visit_date, or work_description."
             )
         return attrs
+
+    def update(self, instance, validated_data):
+        work_record = super().update(instance, validated_data)
+        if work_record.payment_status == 'completed':
+            service = work_record.service_record
+            if service and service.contract_type == 'amc' and service.contract_status != 'closed':
+                service.contract_status = 'closed'
+                service.save(update_fields=['contract_status', 'updated_at'])
+        return work_record
 
 
 class TechnicianAllocationDraftSerializer(serializers.ModelSerializer):

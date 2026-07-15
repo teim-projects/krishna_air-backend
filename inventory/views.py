@@ -282,7 +282,11 @@ class InventoryViewSet(ModelViewSet):
         return Response(serializer.data)
     
 class MaterialIssueViewSet(ModelViewSet):
-    queryset = MaterialIssue.objects.all().prefetch_related("items")
+    queryset = MaterialIssue.objects.all().prefetch_related(
+        "items__inventory_item__product_variant__product_model__brand_id",
+        "items__inventory_item__item__material_type_id",
+        "items__inventory_item__item__item_type_id",
+    )
     serializer_class = MaterialIssueSerializer
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
@@ -359,8 +363,10 @@ class MaterialReturnViewSet(ModelViewSet):
     
 class DeliveryChallanViewSet(ModelViewSet):
 
-    queryset = DeliveryChallan.objects.all().prefetch_related(
-        "items"
+    queryset = DeliveryChallan.objects.all().select_related(
+        "material_issue", "branch", "site"
+    ).prefetch_related(
+        "items__material_issue_item__inventory_item"
     )
 
     serializer_class = DeliveryChallanSerializer
@@ -381,8 +387,11 @@ class DeliveryChallanViewSet(ModelViewSet):
     search_fields = [
         "dc_number",
         "material_issue__issue_number",
-        "transporter_name",
-        "vehicle_number"
+        "delivery_partner_name",
+        "delivery_person_name",
+        "delivery_person_phone",
+        "branch__name",
+        "site__name",
     ]
 
     @action(detail=True, methods=["post"])
@@ -437,55 +446,67 @@ def delivery_challan_pdf(request, pk):
 
     dc = DeliveryChallan.objects.select_related(
         "material_issue",
-        "material_issue__site"
+        "material_issue__site",
+        "material_issue__branch",
+        "branch",
+        "site",
     ).prefetch_related(
-        "items__material_issue_item__inventory_item"
+        "items__material_issue_item__inventory_item__product_variant__product_model__brand_id",
+        "items__material_issue_item__inventory_item__product_variant__product_model__ac_sub_type_id__ac_type_id",
+        "items__material_issue_item__inventory_item__item__material_type_id",
+        "items__material_issue_item__inventory_item__item__item_type_id",
     ).get(pk=pk)
 
     items = dc.items.all()
 
     grand_total = 0
-    contact_person = ""
-    contact_no = ""
+    contact_person = dc.delivery_person_name or ""
+    contact_no = dc.delivery_person_phone or ""
+
+    if dc.destination_type == "branch" and dc.branch_id:
+        destination_name = dc.branch.name
+    elif dc.destination_type == "site" and dc.site_id:
+        destination_name = dc.site.name
+    elif dc.material_issue and dc.material_issue.site_id:
+        destination_name = dc.material_issue.site.name
+    else:
+        destination_name = ""
 
     for dc_item in items:
-
         inventory_item = dc_item.material_issue_item.inventory_item
 
-        po_product = None
+        # Same display name as DC form / Material Issue view
+        dc_item.product_name = get_inventory_item_display_name(inventory_item)
+        dc_item.uom = (
+            dc_item.material_issue_item.uom
+            or (inventory_item.uom if inventory_item else None)
+            or "Nos"
+        )
 
-        if inventory_item.product_variant:
-            po_product = PurchaseOrderProduct.objects.filter(
-                product_variant=inventory_item.product_variant,
-                is_section=False
-            ).order_by("-id").first()
+        # Rate: latest PO rate, else variant DP/MRP (same helper as form)
+        rate = get_inventory_item_rate(inventory_item)
+        dc_item.rate = rate or 0
+        dc_item.amount = (dc_item.quantity or 0) * (dc_item.rate or 0)
 
-            dc_item.product_name = str(inventory_item.product_variant)
+        # Fallback contact from PO if delivery person not set
+        if not contact_person or not contact_no:
+            po_product = None
+            if inventory_item and inventory_item.product_variant_id:
+                po_product = PurchaseOrderProduct.objects.filter(
+                    product_variant=inventory_item.product_variant,
+                    is_section=False,
+                ).order_by("-id").first()
+            elif inventory_item and inventory_item.item_id:
+                po_product = PurchaseOrderProduct.objects.filter(
+                    item=inventory_item.item,
+                    is_section=False,
+                ).order_by("-id").first()
 
-        elif inventory_item.item:
-            po_product = PurchaseOrderProduct.objects.filter(
-                item=inventory_item.item,
-                is_section=False
-            ).order_by("-id").first()
-
-            dc_item.product_name = str(inventory_item.item)
-
-        else:
-            dc_item.product_name = "-"
-
-        # Rate & Amount
-        dc_item.rate = po_product.rate if po_product else 0
-        dc_item.amount = dc_item.quantity * dc_item.rate
-
-        # Contact Person from PO
-        if po_product and po_product.purchase_order:
-            contact_person = (
-                po_product.purchase_order.contact_name or ""
-            )
-
-            contact_no = (
-                po_product.purchase_order.contact_no or ""
-            )
+            if po_product and po_product.purchase_order:
+                if not contact_person:
+                    contact_person = po_product.purchase_order.contact_name or ""
+                if not contact_no:
+                    contact_no = po_product.purchase_order.contact_no or ""
 
         grand_total += dc_item.amount
 
@@ -497,6 +518,8 @@ def delivery_challan_pdf(request, pk):
             "grand_total": grand_total,
             "contact_person": contact_person,
             "contact_no": contact_no,
+            "destination_name": destination_name,
+            "delivery_partner_name": dc.delivery_partner_name or "",
         }
     )
 
