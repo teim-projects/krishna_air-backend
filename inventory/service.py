@@ -43,7 +43,23 @@ def create_new_po_version(old_po, validated_data, products_data):
         new_po.terms_conditions.set(old_po.terms_conditions.all())
 
     # copy products from request (new version lines)
-    for product in products_data:
+    section_counter = 0
+    child_counter = 0
+    for idx, product in enumerate(products_data):
+        product = product.copy() if hasattr(product, 'copy') else product
+        product['sort_order'] = idx + 1
+        if product.get('is_section', False):
+            section_counter += 1
+            child_counter = 0
+            product['serial_no'] = str(section_counter)
+        else:
+            if section_counter > 0:
+                child_counter += 1
+                product['serial_no'] = f"{section_counter}.{child_counter}"
+            else:
+                child_counter += 1
+                product['serial_no'] = str(child_counter)
+
         PurchaseOrderProduct.objects.create(
             purchase_order=new_po,
             **product

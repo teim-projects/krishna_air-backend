@@ -370,7 +370,7 @@ def _build_quotation_pdf_context(quotation, version):
 
     if low_side_items:
         summary_sections.append({
-            'title': 'Part B: Low Side Installation Work',
+            'title': 'Part B: Low Side Installation Work' if service_items else 'Part B: Low Side',
             'items': [
                 {
                     'description': _low_side_description(item),
@@ -384,14 +384,20 @@ def _build_quotation_pdf_context(quotation, version):
         })
 
     if service_items:
+        grouped_items = {}
+        for item in service_items:
+            desc = f"{item.service.name} ({item.service.category})" if item.service and item.service.category else (item.service.name if item.service else "Service Work")
+            amount = _item_base_amount(item)
+            grouped_items[desc] = grouped_items.get(desc, Decimal('0')) + amount
+
         summary_sections.append({
-            'title': 'Part C: Services',
+            'title': 'Part B: Low Side Installation Work',
             'items': [
                 {
-                    'description': f"{item.service.name} ({item.service.category})",
-                    'amount': _item_base_amount(item),
+                    'description': desc,
+                    'amount': amount,
                 }
-                for item in service_items
+                for desc, amount in grouped_items.items()
             ],
             'total': service_total,
             'gst_amount': sum((getattr(i, 'gst_amount', Decimal('0')) or Decimal('0') for i in service_items), Decimal('0')),
@@ -474,6 +480,20 @@ def _build_quotation_pdf_context(quotation, version):
             'gst_percent': getattr(item, 'gst_percent', 18),
         })
 
+    for item in service_items:
+        service_name = f"{item.service.name} ({item.service.category})" if item.service and item.service.category else (item.service.name if item.service else "Service Work")
+        if service_name not in low_side_by_type:
+            low_side_by_type[service_name] = []
+        low_side_by_type[service_name].append({
+            'description': item.description or (item.service.name if item.service else "Service Work"),
+            'quantity': item.quantity,
+            'unit': item.unit,
+            'rate': item.unit_price,
+            'amount': _item_base_amount(item),
+            'gst_amount': getattr(item, 'gst_amount', 0) or 0,
+            'gst_percent': getattr(item, 'gst_percentage', 18),
+        })
+
     low_side_groups = []
     for t_name, items in low_side_by_type.items():
         sub_total_val = sum(i['amount'] for i in items)
@@ -501,6 +521,11 @@ def _build_quotation_pdf_context(quotation, version):
     return {
         'high_side_groups': high_side_groups,
         'low_side_groups': low_side_groups,
+        'low_side_title': 'Low Side Installation Work' if service_items else 'Low Side',
+        'low_side_subtotal': low_side_total if not service_items else service_total,
+        'low_side_gst_total': (low_side_grand_total - low_side_total) if not service_items else (service_grand_total - service_total),
+        'low_side_grand_total': low_side_grand_total if not service_items else service_grand_total,
+        'low_side_gst_percent': low_side_groups[0].get('gst_percent', 18) if low_side_groups else 18,
         'payment_terms': terms_by_type.get("Quotation Payment", []),
         'validity_terms': terms_by_type.get("Quotation Validity", []),
         'warranty_terms': terms_by_type.get("Quotation Warranty", []),
@@ -520,7 +545,6 @@ def _build_quotation_pdf_context(quotation, version):
         'high_side_total': high_side_total,
         'low_side_total': low_side_total,
         'high_side_grand_total': high_side_grand_total,
-        'low_side_grand_total': low_side_grand_total,
         'service_total': service_total,
         'grand_total_without_gst': high_side_total + low_side_total + service_total,
         'ac_type_name': ac_type_name,

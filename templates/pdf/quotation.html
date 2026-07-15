@@ -450,7 +450,7 @@
 
       <!-- ANNEXURE III: BILL OF QUANTITIES (LOW SIDE INSTALLATION WORK) -->
       {% if low_side_groups %}
-      <div class="section-title">ANNEXURE III: BILL OF QUANTITIES (LOW SIDE INSTALLATION WORK)</div>
+      <div class="section-title">ANNEXURE III: BILL OF QUANTITIES ({{ low_side_title|upper }})</div>
       
       <table class="items-table" style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
         <thead>
@@ -464,17 +464,25 @@
           </tr>
         </thead>
         <tbody>
-          {% for group in low_side_groups %}
-          <!-- PART HEADER ROW -->
+          <!-- PART HEADER ROW (Single, at the top) -->
           <tr>
             <td colspan="6" style="border: 1px solid #000; padding: 6px 8px; font-weight: bold; background-color: #f2f2f2; text-align: left;">
-              Part - B{{ forloop.counter }} : Low Side Installation Work - {{ group.ac_type }}
+              Part - B : {{ low_side_title }}
+            </td>
+          </tr>
+          
+          {% for group in low_side_groups %}
+          <!-- GROUP SUB-HEADER ROW -->
+          <tr style="font-weight: bold;">
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">{{ forloop.counter }}</td>
+            <td colspan="5" style="border: 1px solid #000; padding: 5px 8px; font-weight: bold; text-align: left; background-color: #fafafa;">
+              {{ group.ac_type }}
             </td>
           </tr>
           
           {% for item in group.items %}
           <tr>
-            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">{{ forloop.counter }}</td>
+            <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">{{ forloop.parentloop.counter }}.{{ forloop.counter }}</td>
             <td style="border: 1px solid #000; padding: 5px 8px;">{{ item.description }}</td>
             <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">{{ item.quantity|floatformat:0 }}</td>
             <td style="text-align: center; border: 1px solid #000; padding: 5px 8px;">{{ item.unit }}</td>
@@ -482,30 +490,24 @@
             <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">{{ item.amount|floatformat:2|intcomma }}</td>
           </tr>
           {% endfor %}
-
-          <!-- SUB TOTAL ROW -->
-          <tr style="font-weight: bold;">
-            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
-            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">(B{{ forloop.counter }}) Sub Total of Low Side Installation Work ({{ group.ac_type }}) :</td>
-            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">{{ group.subtotal|floatformat:2|intcomma }}</td>
-          </tr>
-          <!-- GST ROW -->
-          <tr style="font-weight: bold;">
-            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
-            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">GST @ {{ group.gst_percent|floatformat:0 }} % :</td>
-            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">{{ group.gst_total|floatformat:2|intcomma }}</td>
-          </tr>
-          <!-- TOTAL LOW SIDE ROW -->
-          <tr style="font-weight: bold; background-color: #d4edda; color: #155724;">
-            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
-            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px; font-size: 12px; font-weight: bold;">Total of Low Side Installation Work ({{ group.ac_type }}) (including GST) :</td>
-            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px; font-size: 12px; font-weight: bold;">{{ group.total_with_gst|floatformat:2|intcomma }}</td>
-          </tr>
           {% endfor %}
-          <!-- GRAND TOTAL OF ALL LOW SIDE INSTALLATION WORK -->
+
+          <!-- UNIFIED SUB TOTAL ROW -->
+          <tr style="font-weight: bold;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">Sub Total of {{ low_side_title }} :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">{{ low_side_subtotal|floatformat:2|intcomma }}</td>
+          </tr>
+          <!-- UNIFIED GST ROW -->
+          <tr style="font-weight: bold;">
+            <td style="border: 1px solid #000; padding: 5px 8px;"></td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 10px;">GST @ {{ low_side_gst_percent|floatformat:0 }} % :</td>
+            <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; padding-right: 15px;">{{ low_side_gst_total|floatformat:2|intcomma }}</td>
+          </tr>
+          <!-- UNIFIED GRAND TOTAL ROW -->
           <tr style="font-weight: bold; background-color: #c3e6cb; color: #155724; border-top: 2px solid #000;">
             <td style="border: 1px solid #000; padding: 6px 8px;"></td>
-            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 10px; font-size: 13px; font-weight: bold;">Grand Total of Low Side Installation Work (including GST) :</td>
+            <td colspan="4" style="text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 10px; font-size: 13px; font-weight: bold;">Total of {{ low_side_title }} (including GST) :</td>
             <td style="text-align: right; border: 1px solid #000; padding: 6px 8px; padding-right: 15px; font-size: 13px; font-weight: bold;">{{ low_side_grand_total|floatformat:2|intcomma }}</td>
           </tr>
         </tbody>

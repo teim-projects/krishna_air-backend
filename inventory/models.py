@@ -245,6 +245,70 @@ class PurchaseOrderProduct(models.Model):
         if self.purchase_order:
             self.purchase_order.calculate_totals()
 
+    @property
+    def complete_item_name(self):
+        if self.product_variant:
+            parts = []
+            product_variant = self.product_variant
+            product_model = getattr(product_variant, 'product_model', None)
+            ac_sub_type = getattr(product_model, 'ac_sub_type_id', None) if product_model else None
+            ac_type = getattr(ac_sub_type, 'ac_type_id', None) if ac_sub_type else None
+            
+            # AC Type
+            ac_type_name = getattr(ac_type, 'name', None)
+            if ac_type_name:
+                parts.append(ac_type_name.strip())
+                
+            # Capacity
+            capacity = getattr(product_variant, 'capacity', None)
+            if capacity not in (None, ''):
+                capacity_text = str(capacity).strip()
+                # Strip suffix
+                for suffix in ['TR', 'TON', 'T']:
+                    if capacity_text.upper().endswith(suffix):
+                        idx = capacity_text.upper().rfind(suffix)
+                        capacity_text = capacity_text[:idx].strip()
+                        break
+                unit = (getattr(product_variant, 'unit', '') or '').strip().upper()
+                unit_label = 'TR'
+                if unit == 'HP':
+                    unit_label = 'HP'
+                capacity_text = f"{capacity_text} {unit_label}".strip()
+                parts.append(capacity_text)
+                
+            # Star Rating
+            star_rating = getattr(product_variant, 'star_rating', None)
+            if star_rating:
+                parts.append(f"{star_rating} Star")
+                
+            # Inverter
+            inverter = getattr(product_model, 'inverter', None) if product_model else None
+            if inverter is True:
+                parts.append('Inverter')
+            elif inverter is False:
+                parts.append('Non-Inverter')
+                
+            return ' '.join(parts) if parts else self.product_variant.sku
+
+        if not self.item:
+            return ""
+        parts = []
+        if self.item.material_type_id and getattr(self.item.material_type_id, 'name', None):
+            parts.append(self.item.material_type_id.name.strip())
+        if self.item.item_type_id and getattr(self.item.item_type_id, 'name', None):
+            parts.append(self.item.item_type_id.name.strip())
+        if self.item.feature_type_id and getattr(self.item.feature_type_id, 'name', None):
+            parts.append(self.item.feature_type_id.name.strip())
+        if self.item.item_class_id and getattr(self.item.item_class_id, 'name', None):
+            parts.append(self.item.item_class_id.name.strip())
+        if self.item.size:
+            size_str = f"{self.item.size} {self.item.size_unit or ''}".strip()
+            parts.append(size_str)
+        if self.item.thickness:
+            thick_str = f"{self.item.thickness} {self.item.thickness_unit or ''}".strip()
+            parts.append(thick_str)
+        return " ".join(parts) if parts else self.item.item_code
+
 
 
 

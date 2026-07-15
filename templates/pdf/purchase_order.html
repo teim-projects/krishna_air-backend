@@ -263,9 +263,9 @@
             <td>{{ p.serial_no }}</td>
           <td>
             {% if p.item %}
-                  {{ p.item.item_code }}
+                  {{ p.complete_item_name }}
             {% elif p.product_variant %}
-                  {{ p.product_variant.sku }}
+                  {{ p.complete_item_name }}
             {% endif %}
             <br>
                 {{ p.description }}

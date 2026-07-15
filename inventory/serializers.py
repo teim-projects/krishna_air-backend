@@ -147,8 +147,9 @@ class PurchaseOrderProductSerializer(serializers.ModelSerializer):
         source="item.item_code",
         read_only=True,
         allow_null=True
-
     )
+    complete_item_name = serializers.CharField(read_only=True)
+
     class Meta:
         model = PurchaseOrderProduct
         fields = "__all__"
@@ -195,7 +196,21 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
         if terms_conditions:
             po.terms_conditions.set(terms_conditions)
 
-        for p in products_data:
+        section_counter = 0
+        child_counter = 0
+        for idx, p in enumerate(products_data):
+            p['sort_order'] = idx + 1
+            if p.get('is_section', False):
+                section_counter += 1
+                child_counter = 0
+                p['serial_no'] = str(section_counter)
+            else:
+                if section_counter > 0:
+                    child_counter += 1
+                    p['serial_no'] = f"{section_counter}.{child_counter}"
+                else:
+                    child_counter += 1
+                    p['serial_no'] = str(child_counter)
             PurchaseOrderProduct.objects.create(purchase_order=po, **p)
 
         return po
