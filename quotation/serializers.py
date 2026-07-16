@@ -261,6 +261,7 @@ class QuotationSerializer(serializers.ModelSerializer):
     
         version_subtotal = 0
         version_gst_total = 0
+        is_no_gst = (version.gst_type == "NO_GST")
     
         # =============================
         # HIGH SIDE
@@ -269,6 +270,9 @@ class QuotationSerializer(serializers.ModelSerializer):
     
             qty = item["quantity"]
             price = item["unit_price"]
+            
+            if is_no_gst:
+                item["gst_percent"] = 0
             gst_percent = item.get("gst_percent", 0)
     
             mathadi = item.get("mathadi_charges", 0)
@@ -299,7 +303,11 @@ class QuotationSerializer(serializers.ModelSerializer):
     
             qty = item["quantity"]
             price = item["unit_price"]
+            
+            if is_no_gst:
+                item["gst_percent"] = 0
             gst_percent = item.get("gst_percent", 0)
+            
             mathadi = item.get("mathadi_charges", 0)
     
             base_amount = qty * price
@@ -313,7 +321,6 @@ class QuotationSerializer(serializers.ModelSerializer):
             QuotationLowSideItem.objects.create(
                 quotation_version=version,
                 base_amount=base_amount,
-                
                 gst_amount=gst_value,
                 total_with_gst=total_with_gst,
                 **item
@@ -326,7 +333,11 @@ class QuotationSerializer(serializers.ModelSerializer):
             for item in service_items:
                 qty = item["quantity"]
                 price = item["unit_price"]
+                
+                if is_no_gst:
+                    item["gst_percentage"] = 0
                 gst_percent = item.get("gst_percentage", 18)
+                
                 mathadi = item.get("mathadi_charges", 0)
                 transport = item.get("transportation_charges", 0)
                 
@@ -348,7 +359,12 @@ class QuotationSerializer(serializers.ModelSerializer):
         # =============================
         # GST SPLIT
         # =============================
-        if version.gst_type == "CGST_SGST":
+        if is_no_gst:
+            version.cgst_amount = 0
+            version.sgst_amount = 0
+            version.igst_amount = 0
+            version_gst_total = 0
+        elif version.gst_type == "CGST_SGST":
             version.cgst_amount = version_gst_total / 2
             version.sgst_amount = version_gst_total / 2
             version.igst_amount = 0

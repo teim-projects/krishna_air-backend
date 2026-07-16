@@ -73,6 +73,8 @@ class LowSideInvoiceItemSerializer(serializers.ModelSerializer):
         read_only=True
     )
 
+    complete_item_name = serializers.CharField(read_only=True)
+
     class Meta:
         model = LowSideInvoiceItem
         fields = "__all__"

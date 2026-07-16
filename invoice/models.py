@@ -184,5 +184,26 @@ class LowSideInvoiceItem(models.Model):
         self.amount = self.quantity * self.rate
         super().save(*args,**kwargs)
 
+    @property
+    def complete_item_name(self):
+        if not self.item:
+            return ""
+        parts = []
+        if self.item.material_type_id and getattr(self.item.material_type_id, 'name', None):
+            parts.append(self.item.material_type_id.name.strip())
+        if self.item.item_type_id and getattr(self.item.item_type_id, 'name', None):
+            parts.append(self.item.item_type_id.name.strip())
+        if self.item.feature_type_id and getattr(self.item.feature_type_id, 'name', None):
+            parts.append(self.item.feature_type_id.name.strip())
+        if self.item.item_class_id and getattr(self.item.item_class_id, 'name', None):
+            parts.append(self.item.item_class_id.name.strip())
+        if self.item.size:
+            size_str = f"{self.item.size} {self.item.size_unit or ''}".strip()
+            parts.append(size_str)
+        if self.item.thickness:
+            thick_str = f"{self.item.thickness} {self.item.thickness_unit or ''}".strip()
+            parts.append(thick_str)
+        return " ".join(parts) if parts else self.item.item_code
+
 
 

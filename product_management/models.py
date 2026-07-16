@@ -78,46 +78,46 @@ class ProductVariant(models.Model):
     
     return f"{brand_code}-{model_code}-{capacity_code}-{star_code}-{unique_code}"
 
-def get_display_name_for_pdf(self):
-    try:
-        ac_type_name = None
-        if (self.product_model and 
-            self.product_model.ac_sub_type_id and 
-            self.product_model.ac_sub_type_id.ac_type_id):
-            ac_type_name = self.product_model.ac_sub_type_id.ac_type_id.name
-        
-        # Clean capacity and unit
-        capacity_text = str(self.capacity).strip()
-        for suffix in ['TR', 'TON', 'T']:
-            if capacity_text.upper().endswith(suffix):
-                idx = capacity_text.upper().rfind(suffix)
-                capacity_text = capacity_text[:idx].strip()
-                break
+  def get_display_name_for_pdf(self):
+      try:
+          ac_type_name = None
+          if (self.product_model and 
+              self.product_model.ac_sub_type_id and 
+              self.product_model.ac_sub_type_id.ac_type_id):
+              ac_type_name = self.product_model.ac_sub_type_id.ac_type_id.name
+          
+          # Clean capacity and unit
+          capacity_text = str(self.capacity).strip()
+          for suffix in ['TR', 'TON', 'T']:
+              if capacity_text.upper().endswith(suffix):
+                  idx = capacity_text.upper().rfind(suffix)
+                  capacity_text = capacity_text[:idx].strip()
+                  break
 
-        unit = (self.unit or '').strip().upper()
-        unit_label_map = {
-            'TR': 'TR',
-            'TON': 'Ton',
-            'T': 'TR',
-        }
-        unit_label = unit_label_map.get(unit, 'TR')
-        capacity_str = f"{capacity_text} {unit_label}".strip()
+          unit = (self.unit or '').strip().upper()
+          unit_label_map = {
+              'TR': 'TR',
+              'TON': 'Ton',
+              'T': 'TR',
+          }
+          unit_label = unit_label_map.get(unit, 'TR')
+          capacity_str = f"{capacity_text} {unit_label}".strip()
 
-        star_str = f"{self.star_rating} Star" if self.star_rating else ""
-        
-        inverter_str = ""
-        if self.product_model:
-            inverter_str = "Inverter" if self.product_model.inverter else "Non-Inverter"
-        
-        brand_name = self.product_model.brand_id.name if self.product_model and self.product_model.brand_id else ""
-        
-        parts = [brand_name, ac_type_name, capacity_str, star_str, inverter_str]
-        display_name = " ".join(part for part in parts if part)
-        
-        return display_name if display_name else self.sku
-        
-    except (AttributeError, TypeError) as e:
-        return self.sku
+          star_str = f"{self.star_rating} Star" if self.star_rating else ""
+          
+          inverter_str = ""
+          if self.product_model:
+              inverter_str = "Inverter" if self.product_model.inverter else "Non-Inverter"
+          
+          brand_name = self.product_model.brand_id.name if self.product_model and self.product_model.brand_id else ""
+          
+          parts = [brand_name, ac_type_name, capacity_str, star_str, inverter_str]
+          display_name = " ".join(part for part in parts if part)
+          
+          return display_name if display_name else self.sku
+          
+      except (AttributeError, TypeError) as e:
+          return self.sku
   
 INVENTORY_STATUS = [
             ('IN_STOCK', 'IN_STOCK'),

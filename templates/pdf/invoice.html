@@ -275,9 +275,9 @@
           
             <td>
               {% if p.item %}
-                {{ p.item.item_code }}
+                {{ p.complete_item_name }}
               {% elif p.product_variant %}
-                {{ p.product_variant.sku }}
+                {{ p.product_variant.get_display_name_for_pdf }}
               {% endif %}
               <br>
               {{ p.description }}

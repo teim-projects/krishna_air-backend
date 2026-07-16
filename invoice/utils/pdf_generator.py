@@ -342,7 +342,7 @@ class InvoicePDFGenerator:
             product_name = ""
             
             if item.product_variant:
-                product_name = item.product_variant.sku
+                product_name = item.product_variant.get_display_name_for_pdf() if item.product_variant else ""
             
             description = product_name
             

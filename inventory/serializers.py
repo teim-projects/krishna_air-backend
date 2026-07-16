@@ -4,7 +4,6 @@ from .service import create_new_po_version
 from django.db import transaction
 from django.db.models import Sum, F
 import uuid
-from product_management.models import get_display_name_for_pdf
 
 
 def get_inventory_item_display_name(inv):
@@ -15,7 +14,7 @@ def get_inventory_item_display_name(inv):
     if inv.product_variant_id:
         pv = inv.product_variant
         try:
-            name = get_display_name_for_pdf(pv)
+            name = pv.get_display_name_for_pdf()
             if name:
                 return name
         except Exception:

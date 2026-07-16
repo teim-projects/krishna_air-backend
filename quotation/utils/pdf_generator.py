@@ -260,7 +260,7 @@ def _build_quotation_pdf_context(quotation, version):
             'unit': item.unit,
             'rate': item.unit_price,
             'amount': _item_base_amount(item),
-            'sku': getattr(item.product_variant, 'sku', ''),
+            'sku': item.product_variant.get_display_name_for_pdf() if item.product_variant else '',
             'ac_type': ac_type_name_val or "AC Equipment"
         }
         if category == 'ODU':
@@ -427,7 +427,7 @@ def _build_quotation_pdf_context(quotation, version):
             'amount': _item_base_amount(item),
             'gst_amount': getattr(item, 'gst_amount', 0) or 0,
             'gst_percent': getattr(item, 'gst_percent', 18),
-            'sku': getattr(item.product_variant, 'sku', '')
+            'sku': item.product_variant.get_display_name_for_pdf() if item.product_variant else ''
         })
 
     high_side_groups = []
@@ -571,7 +571,7 @@ def _build_quotation_pdf_context(quotation, version):
                 'unit': item.unit,
                 'rate': item.unit_price,
                 'amount': _item_base_amount(item),
-                'sku': getattr(item.product_variant, 'sku', ''),
+                'sku': item.product_variant.get_display_name_for_pdf() if item.product_variant else '',
                 'ac_type': (
                     item.product_variant.product_model.ac_sub_type_id.ac_type_id.name
                     if (item.product_variant and
