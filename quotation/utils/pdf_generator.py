@@ -181,6 +181,10 @@ def _build_quotation_pdf_context(quotation, version):
     low_side_total = sum((_item_base_amount(i) for i in low_side_items), Decimal('0'))
     service_total = sum((_item_base_amount(i) for i in service_items), Decimal('0'))
 
+    high_side_grand_total = sum((i.total_with_gst for i in high_side_items), Decimal('0'))
+    low_side_grand_total = sum((i.total_with_gst for i in low_side_items), Decimal('0'))
+    service_grand_total = sum((i.total_with_gst for i in service_items), Decimal('0'))
+
     # Group High Side Items by AC Type for proposal summary
     high_side_groups = {}
     for item in high_side_items:
@@ -256,7 +260,7 @@ def _build_quotation_pdf_context(quotation, version):
             'unit': item.unit,
             'rate': item.unit_price,
             'amount': _item_base_amount(item),
-            'sku': getattr(item.product_variant, 'sku', ''),
+            'sku': item.product_variant.get_display_name_for_pdf() if item.product_variant else '',
             'ac_type': ac_type_name_val or "AC Equipment"
         }
         if category == 'ODU':
@@ -359,12 +363,14 @@ def _build_quotation_pdf_context(quotation, version):
                 }
                 for item in high_side_items
             ],
-            'subtotal': high_side_total,
+            'total': high_side_total,
+            'gst_amount': sum((getattr(i, 'gst_amount', Decimal('0')) or Decimal('0') for i in high_side_items), Decimal('0')),
+            'subtotal_with_gst': high_side_grand_total,
         })
 
     if low_side_items:
         summary_sections.append({
-            'title': 'Part B: Low Side Installation Work',
+            'title': 'Part B: Low Side Installation Work' if service_items else 'Part B: Low Side',
             'items': [
                 {
                     'description': _low_side_description(item),
@@ -372,20 +378,30 @@ def _build_quotation_pdf_context(quotation, version):
                 }
                 for item in low_side_items
             ],
-            'subtotal': low_side_total,
+            'total': low_side_total,
+            'gst_amount': sum((getattr(i, 'gst_amount', Decimal('0')) or Decimal('0') for i in low_side_items), Decimal('0')),
+            'subtotal_with_gst': low_side_grand_total,
         })
 
     if service_items:
+        grouped_items = {}
+        for item in service_items:
+            desc = f"{item.service.name} ({item.service.category})" if item.service and item.service.category else (item.service.name if item.service else "Service Work")
+            amount = _item_base_amount(item)
+            grouped_items[desc] = grouped_items.get(desc, Decimal('0')) + amount
+
         summary_sections.append({
-            'title': 'Part C: Services',
+            'title': 'Part B: Low Side Installation Work',
             'items': [
                 {
-                    'description': f"{item.service.name} ({item.service.category})",
-                    'amount': _item_base_amount(item),
+                    'description': desc,
+                    'amount': amount,
                 }
-                for item in service_items
+                for desc, amount in grouped_items.items()
             ],
-            'subtotal': service_total,
+            'total': service_total,
+            'gst_amount': sum((getattr(i, 'gst_amount', Decimal('0')) or Decimal('0') for i in service_items), Decimal('0')),
+            'subtotal_with_gst': service_grand_total,
         })
 
     # Group High Side Items by AC Type for table separation
@@ -410,18 +426,21 @@ def _build_quotation_pdf_context(quotation, version):
             'rate': item.unit_price,
             'amount': _item_base_amount(item),
             'gst_amount': getattr(item, 'gst_amount', 0) or 0,
-            'sku': getattr(item.product_variant, 'sku', '')
+            'gst_percent': getattr(item, 'gst_percent', 18),
+            'sku': item.product_variant.get_display_name_for_pdf() if item.product_variant else ''
         })
 
     high_side_groups = []
     for t_name, items in high_side_by_type.items():
         sub_total_val = sum(i['amount'] for i in items)
         gst_total_val = sum(i['gst_amount'] for i in items)
+        gst_percent_val = items[0]['gst_percent'] if items else 18
         high_side_groups.append({
             'ac_type': t_name,
             'items': items,
             'subtotal': sub_total_val,
             'gst_total': gst_total_val,
+            'gst_percent': gst_percent_val,
             'total_with_gst': sub_total_val + gst_total_val,
         })
 
@@ -458,17 +477,34 @@ def _build_quotation_pdf_context(quotation, version):
             'rate': item.unit_price,
             'amount': _item_base_amount(item),
             'gst_amount': getattr(item, 'gst_amount', 0) or 0,
+            'gst_percent': getattr(item, 'gst_percent', 18),
+        })
+
+    for item in service_items:
+        service_name = f"{item.service.name} ({item.service.category})" if item.service and item.service.category else (item.service.name if item.service else "Service Work")
+        if service_name not in low_side_by_type:
+            low_side_by_type[service_name] = []
+        low_side_by_type[service_name].append({
+            'description': item.description or (item.service.name if item.service else "Service Work"),
+            'quantity': item.quantity,
+            'unit': item.unit,
+            'rate': item.unit_price,
+            'amount': _item_base_amount(item),
+            'gst_amount': getattr(item, 'gst_amount', 0) or 0,
+            'gst_percent': getattr(item, 'gst_percentage', 18),
         })
 
     low_side_groups = []
     for t_name, items in low_side_by_type.items():
         sub_total_val = sum(i['amount'] for i in items)
         gst_total_val = sum(i['gst_amount'] for i in items)
+        gst_percent_val = items[0]['gst_percent'] if items else 18
         low_side_groups.append({
             'ac_type': t_name,
             'items': items,
             'subtotal': sub_total_val,
             'gst_total': gst_total_val,
+            'gst_percent': gst_percent_val,
             'total_with_gst': sub_total_val + gst_total_val,
         })
 
@@ -480,12 +516,16 @@ def _build_quotation_pdf_context(quotation, version):
             terms_by_type[t_type] = []
         terms_by_type[t_type].append(term.terms)
 
-    high_side_grand_total = sum((i.total_with_gst for i in high_side_items), Decimal('0'))
-    low_side_grand_total = sum((i.total_with_gst for i in low_side_items), Decimal('0'))
+    # Already calculated early in this function: high_side_grand_total, low_side_grand_total
 
     return {
         'high_side_groups': high_side_groups,
         'low_side_groups': low_side_groups,
+        'low_side_title': 'Low Side Installation Work' if service_items else 'Low Side',
+        'low_side_subtotal': low_side_total if not service_items else service_total,
+        'low_side_gst_total': (low_side_grand_total - low_side_total) if not service_items else (service_grand_total - service_total),
+        'low_side_grand_total': low_side_grand_total if not service_items else service_grand_total,
+        'low_side_gst_percent': low_side_groups[0].get('gst_percent', 18) if low_side_groups else 18,
         'payment_terms': terms_by_type.get("Quotation Payment", []),
         'validity_terms': terms_by_type.get("Quotation Validity", []),
         'warranty_terms': terms_by_type.get("Quotation Warranty", []),
@@ -505,7 +545,6 @@ def _build_quotation_pdf_context(quotation, version):
         'high_side_total': high_side_total,
         'low_side_total': low_side_total,
         'high_side_grand_total': high_side_grand_total,
-        'low_side_grand_total': low_side_grand_total,
         'service_total': service_total,
         'grand_total_without_gst': high_side_total + low_side_total + service_total,
         'ac_type_name': ac_type_name,
@@ -532,7 +571,7 @@ def _build_quotation_pdf_context(quotation, version):
                 'unit': item.unit,
                 'rate': item.unit_price,
                 'amount': _item_base_amount(item),
-                'sku': getattr(item.product_variant, 'sku', ''),
+                'sku': item.product_variant.get_display_name_for_pdf() if item.product_variant else '',
                 'ac_type': (
                     item.product_variant.product_model.ac_sub_type_id.ac_type_id.name
                     if (item.product_variant and

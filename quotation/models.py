@@ -53,6 +53,7 @@ class QuotationVersion(models.Model):
     GST_TYPE_CHOICES = (
         ("CGST_SGST", "CGST + SGST"),
         ("IGST", "IGST"),
+        ("NO_GST", "No GST"),
     )
 
     quotation = models.ForeignKey(

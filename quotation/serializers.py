@@ -69,12 +69,120 @@ class QuotationLowSideItemSerializer(serializers.ModelSerializer):
         read_only_fields = ("quotation_version",)
 
 # =====================================================
+# SERVICE SERIALIZERS
+# =====================================================
+class ServiceMasterSerializer(serializers.ModelSerializer):
+    # ✅ Add this to include linked items
+    items = serializers.SerializerMethodField()
+    item_code = serializers.SerializerMethodField()
+    item_name = serializers.SerializerMethodField()
+    item_description = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = ServiceMaster
+        fields = '__all__'
+    
+    # ✅ Add this method to return items data
+    def get_items(self, obj):
+        from product_management.serializers import ItemSerializer
+        return ItemSerializer(obj.items.all(), many=True).data
+    
+    def get_item_code(self, obj):
+        return ", ".join([i.item_code for i in obj.items.all()])
+        
+    def get_item_name(self, obj):
+        return ", ".join([i.item_code for i in obj.items.all()])
+    
+    def get_item_description(self, obj):
+        descriptions = []
+        for item in obj.items.all():
+            parts = []
+            if hasattr(item, 'material_type_id') and item.material_type_id:
+                parts.append(str(item.material_type_id))
+            if hasattr(item, 'item_type_id') and item.item_type_id:
+                parts.append(str(item.item_type_id))
+            if hasattr(item, 'feature_type_id') and item.feature_type_id:
+                parts.append(str(item.feature_type_id))
+            if hasattr(item, 'size') and item.size:
+                size_str = f"{item.size}{item.size_unit or ''}"
+                parts.append(size_str)
+            if hasattr(item, 'brand') and item.brand:
+                parts.append(str(item.brand))
+            desc = ' - '.join(parts) if parts else item.item_code
+            descriptions.append(desc)
+        return ", ".join(descriptions) if descriptions else None
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        items_data = []
+        if request and 'items' in request.data:
+            items_data = request.data.get('items', [])
+        elif 'items' in self.initial_data:
+            items_data = self.initial_data.get('items', [])
+
+        service_master = ServiceMaster.objects.create(**validated_data)
+        if items_data:
+            service_master.items.set(items_data)
+        return service_master
+
+    def update(self, instance, validated_data):
+        request = self.context.get("request")
+        items_data = None
+        if request and 'items' in request.data:
+            items_data = request.data.get('items', [])
+        elif 'items' in self.initial_data:
+            items_data = self.initial_data.get('items', [])
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        if items_data is not None:
+            instance.items.set(items_data)
+        return instance
+
+class QuotationServiceItemSerializer(serializers.ModelSerializer):
+    service_name = serializers.CharField(source='service.name', read_only=True)
+    service_type = serializers.CharField(source='service.service_type', read_only=True)
+    category_name = serializers.CharField(source='service.category', read_only=True)
+    subcategory_name = serializers.CharField(source='service.subcategory', read_only=True)
+    item_code = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = QuotationServiceItem
+        fields = '__all__'
+        read_only_fields = ['quotation_version', 'base_amount', 'gst_amount', 'total_with_gst']
+        
+    def get_item_code(self, obj):
+        if obj.service and obj.service.items.exists():
+            return ", ".join([i.item_code for i in obj.service.items.all()])
+        return ""
+
+class QuotationServiceItemCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QuotationServiceItem
+        fields = ['quotation_version', 'service', 'quantity', 'unit_price', 'description', 'gst_percentage', 'mathadi_charges', 'transportation_charges']
+    
+    def create(self, validated_data):
+        # Auto-set unit from service
+        service = validated_data['service']
+        validated_data['unit'] = service.unit
+        
+        # Auto-set unit_price if not provided
+        if not validated_data.get('unit_price'):
+            validated_data['unit_price'] = service.total_rate
+            
+        return super().create(validated_data)
+
+
+# =====================================================
 # VERSION SERIALIZER
 # =====================================================
 class QuotationVersionSerializer(serializers.ModelSerializer):
 
     high_side_items = QuotationHighSideItemSerializer(many=True)
     low_side_items = QuotationLowSideItemSerializer(many=True)
+    service_items = QuotationServiceItemSerializer(many=True, required=False)
     version_label = serializers.SerializerMethodField()
 
     class Meta:
@@ -149,10 +257,11 @@ class QuotationSerializer(serializers.ModelSerializer):
     # =====================================================
     # 🔥 CORE CALCULATION ENGINE
     # =====================================================
-    def calculate_totals(self, version, high_items, low_items):
+    def calculate_totals(self, version, high_items, low_items, service_items=None):
     
         version_subtotal = 0
         version_gst_total = 0
+        is_no_gst = (version.gst_type == "NO_GST")
     
         # =============================
         # HIGH SIDE
@@ -161,6 +270,9 @@ class QuotationSerializer(serializers.ModelSerializer):
     
             qty = item["quantity"]
             price = item["unit_price"]
+            
+            if is_no_gst:
+                item["gst_percent"] = 0
             gst_percent = item.get("gst_percent", 0)
     
             mathadi = item.get("mathadi_charges", 0)
@@ -191,7 +303,11 @@ class QuotationSerializer(serializers.ModelSerializer):
     
             qty = item["quantity"]
             price = item["unit_price"]
+            
+            if is_no_gst:
+                item["gst_percent"] = 0
             gst_percent = item.get("gst_percent", 0)
+            
             mathadi = item.get("mathadi_charges", 0)
     
             base_amount = qty * price
@@ -205,16 +321,50 @@ class QuotationSerializer(serializers.ModelSerializer):
             QuotationLowSideItem.objects.create(
                 quotation_version=version,
                 base_amount=base_amount,
-                
                 gst_amount=gst_value,
                 total_with_gst=total_with_gst,
                 **item
             )
+            
+        # =============================
+        # SERVICE ITEMS
+        # =============================
+        if service_items:
+            for item in service_items:
+                qty = item["quantity"]
+                price = item["unit_price"]
+                
+                if is_no_gst:
+                    item["gst_percentage"] = 0
+                gst_percent = item.get("gst_percentage", 18)
+                
+                mathadi = item.get("mathadi_charges", 0)
+                transport = item.get("transportation_charges", 0)
+                
+                base_amount = qty * price
+                gst_value = (base_amount * gst_percent) / 100
+                total_with_gst = base_amount + gst_value + mathadi + transport
+                
+                version_subtotal += base_amount + mathadi + transport
+                version_gst_total += gst_value
+                
+                QuotationServiceItem.objects.create(
+                    quotation_version=version,
+                    base_amount=base_amount,
+                    gst_amount=gst_value,
+                    total_with_gst=total_with_gst,
+                    **item
+                )
     
         # =============================
         # GST SPLIT
         # =============================
-        if version.gst_type == "CGST_SGST":
+        if is_no_gst:
+            version.cgst_amount = 0
+            version.sgst_amount = 0
+            version.igst_amount = 0
+            version_gst_total = 0
+        elif version.gst_type == "CGST_SGST":
             version.cgst_amount = version_gst_total / 2
             version.sgst_amount = version_gst_total / 2
             version.igst_amount = 0
@@ -247,7 +397,8 @@ class QuotationSerializer(serializers.ModelSerializer):
     
         high_items = version_data.pop("high_side_items")
         low_items = version_data.pop("low_side_items")
-        
+        service_items = version_data.pop("service_items", [])
+    
         # Validate that we have at least one high side item
         if not high_items:
             raise serializers.ValidationError("At least one high side item is required")
@@ -306,7 +457,7 @@ class QuotationSerializer(serializers.ModelSerializer):
             **version_data
         )        
         
-        self.calculate_totals(version, high_items, low_items)
+        self.calculate_totals(version, high_items, low_items, service_items)
     
         return quotation
     
@@ -348,6 +499,7 @@ class QuotationSerializer(serializers.ModelSerializer):
 
         high_items = version_data.pop("high_side_items")
         low_items = version_data.pop("low_side_items")
+        service_items = version_data.pop("service_items", [])
 
         terms_conditions = validated_data.pop("terms_conditions", None)
 
@@ -355,108 +507,13 @@ class QuotationSerializer(serializers.ModelSerializer):
             instance.terms_conditions.set(terms_conditions)
 
         new_version = QuotationVersion.objects.create(
-        quotation=instance,
-        version_no=new_version_no,
-        is_active=True,
-        created_by=request.user if request else None,
-        **version_data
-)
+            quotation=instance,
+            version_no=new_version_no,
+            is_active=True,
+            created_by=request.user if request else None,
+            **version_data
+        )
 
-        self.calculate_totals(new_version, high_items, low_items)
+        self.calculate_totals(new_version, high_items, low_items, service_items)
 
         return instance
-
-
-class ServiceMasterSerializer(serializers.ModelSerializer):
-    # Writable on create/update (IDs); nested objects returned in to_representation
-    items = serializers.PrimaryKeyRelatedField(
-        many=True,
-        queryset=ProductItem.objects.all(),
-        required=False,
-        allow_empty=True,
-    )
-    item_code = serializers.SerializerMethodField()
-    item_name = serializers.SerializerMethodField()
-    item_description = serializers.SerializerMethodField()
-
-    class Meta:
-        model = ServiceMaster
-        fields = "__all__"
-
-    def to_representation(self, instance):
-        from product_management.serializers import ItemSerializer
-
-        rep = super().to_representation(instance)
-        rep["items"] = ItemSerializer(instance.items.all(), many=True).data
-        return rep
-
-    def create(self, validated_data):
-        items = validated_data.pop("items", [])
-        instance = super().create(validated_data)
-        instance.items.set(items)
-        return instance
-
-    def update(self, instance, validated_data):
-        items = validated_data.pop("items", None)
-        instance = super().update(instance, validated_data)
-        if items is not None:
-            instance.items.set(items)
-        return instance
-
-    def get_item_code(self, obj):
-        return ", ".join([i.item_code for i in obj.items.all()])
-
-    def get_item_name(self, obj):
-        return ", ".join([i.item_code for i in obj.items.all()])
-
-    def get_item_description(self, obj):
-        descriptions = []
-        for item_obj in obj.items.all():
-            parts = []
-            if getattr(item_obj, "material_type_id", None):
-                parts.append(str(item_obj.material_type_id))
-            if getattr(item_obj, "item_type_id", None):
-                parts.append(str(item_obj.item_type_id))
-            if getattr(item_obj, "feature_type_id", None):
-                parts.append(str(item_obj.feature_type_id))
-            if getattr(item_obj, "size", None):
-                size_str = f"{item_obj.size}{item_obj.size_unit or ''}"
-                parts.append(size_str)
-            if getattr(item_obj, "brand", None):
-                parts.append(str(item_obj.brand))
-            desc = " - ".join(parts) if parts else item_obj.item_code
-            descriptions.append(desc)
-        return ", ".join(descriptions) if descriptions else None
-
-class QuotationServiceItemSerializer(serializers.ModelSerializer):
-    service_name = serializers.CharField(source='service.name', read_only=True)
-    service_type = serializers.CharField(source='service.service_type', read_only=True)
-    category_name = serializers.CharField(source='service.category', read_only=True)
-    subcategory_name = serializers.CharField(source='service.subcategory', read_only=True)
-    item_code = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = QuotationServiceItem
-        fields = '__all__'
-        read_only_fields = ['base_amount', 'gst_amount', 'total_with_gst']
-        
-    def get_item_code(self, obj):
-        if obj.service and obj.service.items.exists():
-            return ", ".join([i.item_code for i in obj.service.items.all()])
-        return ""
-
-class QuotationServiceItemCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = QuotationServiceItem
-        fields = ['quotation_version', 'service', 'quantity', 'unit_price', 'description', 'gst_percentage', 'mathadi_charges', 'transportation_charges']
-    
-    def create(self, validated_data):
-        # Auto-set unit from service
-        service = validated_data['service']
-        validated_data['unit'] = service.unit
-        
-        # Auto-set unit_price if not provided
-        if not validated_data.get('unit_price'):
-            validated_data['unit_price'] = service.total_rate
-            
-        return super().create(validated_data)

@@ -129,7 +129,29 @@ from .utils import format_amount_in_words
 def purchase_order_pdf(request, pk):
 
     po = PurchaseOrder.objects.get(pk=pk)
-    products = po.products.all()
+    products = list(po.products.select_related(
+        "item__material_type_id",
+        "item__item_type_id",
+        "item__feature_type_id",
+        "item__item_class_id",
+        "product_variant__product_model"
+    ).all())
+
+    # Dynamically renumber products for rendering/PDF display
+    section_counter = 0
+    child_counter = 0
+    for p in products:
+        if p.is_section:
+            section_counter += 1
+            child_counter = 0
+            p.serial_no = str(section_counter)
+        else:
+            if section_counter > 0:
+                child_counter += 1
+                p.serial_no = f"{section_counter}.{child_counter}"
+            else:
+                child_counter += 1
+                p.serial_no = str(child_counter)
 
     gst_amount = (po.subtotal * po.gst_percentage) / Decimal("100")
 

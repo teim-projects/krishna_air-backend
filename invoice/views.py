@@ -137,8 +137,16 @@ def invoice_pdf(request, pk):
 
     invoice = Invoice.objects.get(pk=pk)
 
-    high_items = list(invoice.high_side_items.all())
-    low_items = list(invoice.low_side_items.all())
+    high_items = list(invoice.high_side_items.select_related(
+        "product_variant__product_model__brand_id",
+        "product_variant__product_model__ac_sub_type_id__ac_type_id"
+    ).all())
+    low_items = list(invoice.low_side_items.select_related(
+        "item__material_type_id",
+        "item__item_type_id",
+        "item__feature_type_id",
+        "item__item_class_id"
+    ).all())
 
     products = high_items + low_items
 
