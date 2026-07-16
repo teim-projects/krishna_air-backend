@@ -7,7 +7,14 @@ User = get_user_model()
 
 # Customer
 class Customer(models.Model):
+  SALUTATION_CHOICES = [
+      ('Mr.', 'Mr.'),
+      ('Mrs.', 'Mrs.'),
+  ]
+
+  salutation = models.CharField(max_length=20, choices=SALUTATION_CHOICES, blank=True, null=True)
   name = models.CharField(max_length=200)
+  designation = models.CharField(max_length=200, blank=True, null=True)
   contact_number = models.CharField(max_length=20, blank=True, null=True , unique=True)
   secondary_contact_number = models.CharField(max_length=20, blank=True, null=True)
   email = models.EmailField(blank=True, null=True)
@@ -26,6 +33,7 @@ class Customer(models.Model):
   site_pin_code = models.CharField(max_length=10, blank=True, null=True)
   gst = models.CharField(max_length=15, blank=True, null=True)
   pan = models.CharField(max_length=10, blank=True, null=True)
+  remark = models.TextField(blank=True, null=True)
 
 
   def __str__(self):
