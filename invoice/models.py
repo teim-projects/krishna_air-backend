@@ -47,7 +47,7 @@ class Invoice(models.Model):
     # ===== BUYER SNAPSHOT =====
     buyer_name = models.CharField(max_length=255)
     buyer_address = models.TextField()
-    buyer_gstin = models.CharField(max_length=20)
+    buyer_gstin = models.CharField(max_length=20, blank = True, null = True)
     buyer_state = models.CharField(max_length=100, blank=True, null=True)
     buyer_state_code = models.CharField(max_length=10, blank=True, null=True)
 
