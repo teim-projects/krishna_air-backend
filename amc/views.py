@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, mixins
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -13,7 +13,7 @@ from .models import Customer
 from .serializers import CustomerSearchSerializer
 
 
-from .models import AMCContract, AMCRenewal, AMCSparePart, TechnicianWorkRecord
+from .models import AMCContract, AMCRenewal, AMCSparePart, TechnicianWorkRecord, AMCServiceVisit
 
 from .serializers import (
     AMCContractSerializer,
@@ -23,7 +23,10 @@ from .serializers import (
     TechnicianWorkRecordUpdateSerializer,
     TechnicianUserSerializer,
     TechnicianAllocationDraftSerializer,
+    AMCServiceVisitSerializer,
+    AMCServiceVisitUpdateSerializer,
 )
+from .visit_service import get_service_record_for_amc_contract, sync_amc_service_visits
 
 from .models import ServiceManagementRecord, ServiceManagementMaterial
 from .serializers import (
@@ -37,6 +40,10 @@ from inventory.models import InventoryItem
 from quotation.models import Quotation, QuotationVersion
 from .serializers import QuotationSerializer
 from api.models import CustomUser
+
+
+def _get_service_record_for_amc_contract(contract):
+    return get_service_record_for_amc_contract(contract)
 
 
 def _create_technician_work_record(request, service_record, data):
@@ -77,24 +84,15 @@ def _create_technician_work_record(request, service_record, data):
     return serializer.save()
 
 
-def _get_service_record_for_amc_contract(contract):
-    customer = contract.customer
-    if not customer:
-        return None
-
-    qs = ServiceManagementRecord.objects.filter(
-        contract_type='amc',
-        contract_status='active',
-    ).filter(
-        Q(customer_id=customer.id) | Q(customer_name__iexact=customer.name)
-    )
-
-    if contract.amc_type:
-        typed = qs.filter(amc_service_type=contract.amc_type)
-        if typed.exists():
-            qs = typed
-
-    return qs.order_by('-created_at').first()
+def _attach_service_record_to_amc_visits(record):
+    """When an AMC service management row is saved, link it to open planned visits."""
+    if record.contract_type != 'amc' or not record.customer_id:
+        return
+    AMCServiceVisit.objects.filter(
+        amc_contract__customer_id=record.customer_id,
+        service_record__isnull=True,
+        technician_work_record__isnull=True,
+    ).update(service_record=record)
 
 
 class CustomerViewSet(viewsets.ReadOnlyModelViewSet):
@@ -134,7 +132,12 @@ class ServiceManagementRecordViewSet(viewsets.ModelViewSet):
     search_fields = ['customer_name', 'customer_contact', 'subject']
     
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        record = serializer.save(created_by=self.request.user)
+        _attach_service_record_to_amc_visits(record)
+
+    def perform_update(self, serializer):
+        record = serializer.save()
+        _attach_service_record_to_amc_visits(record)
 
     def destroy(self, request, *args, **kwargs):
         """
@@ -305,6 +308,8 @@ class AMCContractViewSet(viewsets.ModelViewSet):
             customer=contract.customer,
             amc_type=contract.amc_type,
             visit_frequency=contract.visit_frequency,
+            total_visit_count=contract.total_visit_count,
+            schedule_note=contract.schedule_note,
             product_variant=contract.product_variant,
             sale_date=contract.sale_date,
             warranty_end_date=contract.warranty_end_date,
@@ -324,6 +329,8 @@ class AMCContractViewSet(viewsets.ModelViewSet):
             renewal_cost=new_contract.amc_cost,
             status='RENEWED'
         )
+
+        sync_amc_service_visits(new_contract)
         
         serializer = self.get_serializer(new_contract)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -507,6 +514,16 @@ class AMCContractViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED,
         )
 
+    @action(detail=True, methods=['get'], url_path='service-visits')
+    def service_visits(self, request, pk=None):
+        """List auto-generated AMC service visits for this contract."""
+        contract = self.get_object()
+        visits = contract.service_visits.select_related(
+            'service_record',
+            'technician_work_record__technician',
+        )
+        return Response(AMCServiceVisitSerializer(visits, many=True).data)
+
 
 class AMCRenewalViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AMCRenewal.objects.all()
@@ -551,3 +568,128 @@ class TechnicianWorkRecordViewSet(viewsets.ModelViewSet):
             is_active=True,
         ).order_by('first_name', 'last_name', 'email')
         return Response(TechnicianUserSerializer(technicians, many=True).data)
+
+
+class AMCServiceVisitViewSet(
+    mixins.RetrieveModelMixin,
+    mixins.ListModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet,
+):
+    """
+    Planned AMC visits (auto-created with the contract).
+    Use allocate-work-to-technician to create the existing TechnicianWorkRecord flow.
+    """
+    queryset = AMCServiceVisit.objects.select_related(
+        'amc_contract',
+        'amc_contract__customer',
+        'service_record',
+        'technician_work_record__technician',
+    ).all()
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['amc_contract', 'status']
+
+    def get_serializer_class(self):
+        if self.action in ('update', 'partial_update'):
+            return AMCServiceVisitUpdateSerializer
+        return AMCServiceVisitSerializer
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        instance.refresh_from_db()
+        return Response(AMCServiceVisitSerializer(instance).data)
+
+    def partial_update(self, request, *args, **kwargs):
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
+
+    @action(detail=True, methods=['get'], url_path='technician-allocation-draft')
+    def technician_allocation_draft(self, request, pk=None):
+        """Prefill data for Assign Technician modal for one planned visit."""
+        visit = self.get_object()
+        contract = visit.amc_contract
+        service_record = visit.service_record or get_service_record_for_amc_contract(contract)
+
+        if service_record:
+            data = TechnicianAllocationDraftSerializer(service_record).data
+            data['service_record'] = service_record.id
+        else:
+            customer = contract.customer
+            address_parts = [
+                customer.address,
+                customer.city,
+                customer.state,
+                customer.pin_code,
+            ]
+            data = {
+                'service_record': None,
+                'customer': customer.id,
+                'customer_name': customer.name,
+                'customer_phone': customer.contact_number or '',
+                'customer_address': ', '.join(part for part in address_parts if part),
+            }
+
+        # Per-visit share of AMC cost (not full amc_cost)
+        data['payment_amount'] = visit.amount
+        data['amc_service_visit_id'] = visit.id
+        data['visit_number'] = visit.visit_number
+        data['planned_date'] = visit.planned_date.isoformat()
+        data['work_description'] = visit.work_description or ''
+        data['amount'] = visit.amount
+        return Response(data)
+
+    @action(detail=True, methods=['post'], url_path='allocate-work-to-technician')
+    def allocate_work_to_technician(self, request, pk=None):
+        """Create TechnicianWorkRecord and link it to this planned visit."""
+        visit = self.get_object()
+        if visit.technician_work_record_id:
+            return Response(
+                {'detail': 'This visit is already allocated to a technician.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        service_record = visit.service_record or get_service_record_for_amc_contract(visit.amc_contract)
+        if not service_record:
+            return Response(
+                {
+                    'detail': (
+                        'No active AMC service management record found for this customer. '
+                        'Please create one in Service Management first.'
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        payload = dict(request.data)
+        payload['work_date'] = payload.get('work_date') or visit.planned_date
+        payload['work_description'] = payload.get('work_description', visit.work_description or '')
+        if 'payment_amount' not in payload or payload.get('payment_amount') in (None, ''):
+            payload['payment_amount'] = visit.amount
+
+        work_record = _create_technician_work_record(request, service_record, payload)
+
+        visit.technician_work_record = work_record
+        visit.service_record = service_record
+        visit.status = AMCServiceVisit.STATUS_ASSIGNED
+        if payload.get('work_description'):
+            visit.work_description = payload['work_description']
+        visit.save(update_fields=[
+            'technician_work_record',
+            'service_record',
+            'status',
+            'work_description',
+            'updated_at',
+        ])
+
+        return Response(
+            {
+                'visit': AMCServiceVisitSerializer(visit).data,
+                'work_record': TechnicianWorkRecordSerializer(work_record).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )

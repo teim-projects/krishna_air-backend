@@ -74,6 +74,10 @@ class ServiceManagementRecord(models.Model):
     )
     service_start_date = models.DateField(null=True, blank=True)
     service_end_date = models.DateField(null=True, blank=True)
+    # One-time: how many service visits are included
+    service_frequency_count = models.PositiveIntegerField(null=True, blank=True)
+    # Warranty: period in months from service start
+    warranty_period_months = models.PositiveIntegerField(null=True, blank=True)
     
     # Location
     state = models.CharField(max_length=100)
@@ -199,7 +203,15 @@ class AMCContract(models.Model):
         ('QUARTERLY', 'Quarterly'),
         ('HALF_YEARLY', 'Half Yearly'),
         ('YEARLY', 'Yearly'),
+        ('CUSTOM', 'Custom'),
     ]
+
+    VISITS_PER_YEAR = {
+        'MONTHLY': 12,
+        'QUARTERLY': 4,
+        'HALF_YEARLY': 2,
+        'YEARLY': 1,
+    }
     
     # Links
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='amc_contracts')
@@ -208,6 +220,16 @@ class AMCContract(models.Model):
         max_length=20,
         choices=VISIT_FREQUENCY_CHOICES,
         default='QUARTERLY'
+    )
+    total_visit_count = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text='Required when visit_frequency is CUSTOM (e.g. 4 visits in 6 months).',
+    )
+    schedule_note = models.TextField(
+        blank=True,
+        null=True,
+        help_text='Custom visit plan notes (e.g. all visits within first 6 months).',
     )
     product_variant = models.ForeignKey(ProductVariant, on_delete=models.PROTECT)
     
@@ -246,6 +268,48 @@ class AMCContract(models.Model):
             self.amc_start_date = self.warranty_end_date + timedelta(days=1)
         
         super().save(*args, **kwargs)
+
+    def get_expected_visit_count(self):
+        """Standard frequencies: derive count from AMC period; CUSTOM uses total_visit_count."""
+        if self.visit_frequency == 'CUSTOM':
+            return self.total_visit_count or 0
+        per_year = self.VISITS_PER_YEAR.get(self.visit_frequency)
+        if not per_year:
+            return 0
+        if not self.amc_start_date or not self.amc_end_date:
+            return per_year
+        days = (self.amc_end_date - self.amc_start_date).days + 1
+        if days <= 0:
+            return per_year
+        return max(1, round((days / 365.25) * per_year))
+
+    def get_amount_per_visit(self):
+        """AMC total cost split equally across expected visits (rounded to 2 decimals)."""
+        from decimal import Decimal, ROUND_HALF_UP
+
+        count = self.get_expected_visit_count()
+        if count < 1:
+            return Decimal('0.00')
+        total = Decimal(str(self.amc_cost or 0))
+        return (total / Decimal(count)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+    def split_visit_amounts(self):
+        """
+        Split amc_cost across visits so sum equals total.
+        Earlier visits get equal rounded amount; last visit gets remainder.
+        """
+        from decimal import Decimal, ROUND_HALF_UP
+
+        count = self.get_expected_visit_count()
+        if count < 1:
+            return []
+        total = Decimal(str(self.amc_cost or 0)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        if count == 1:
+            return [total]
+        per = (total / Decimal(count)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        amounts = [per] * (count - 1)
+        amounts.append(total - (per * (count - 1)))
+        return amounts
     
     def __str__(self):
         return f"{self.contract_number} - {self.customer.name}"
@@ -353,6 +417,70 @@ class AMCRenewal(models.Model):
     
     def __str__(self):
         return f"Renewal - {self.previous_contract.contract_number}"
+
+
+class AMCServiceVisit(models.Model):
+    """Planned AMC service visit; technician allocation links a work record."""
+
+    STATUS_SCHEDULED = 'SCHEDULED'
+    STATUS_ASSIGNED = 'ASSIGNED'
+    STATUS_COMPLETED = 'COMPLETED'
+    STATUS_CANCELLED = 'CANCELLED'
+
+    STATUS_CHOICES = [
+        (STATUS_SCHEDULED, 'Scheduled'),
+        (STATUS_ASSIGNED, 'Assigned'),
+        (STATUS_COMPLETED, 'Completed'),
+        (STATUS_CANCELLED, 'Cancelled'),
+    ]
+
+    amc_contract = models.ForeignKey(
+        AMCContract,
+        on_delete=models.CASCADE,
+        related_name='service_visits',
+    )
+    service_record = models.ForeignKey(
+        ServiceManagementRecord,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='amc_service_visits',
+    )
+    visit_number = models.PositiveIntegerField()
+    planned_date = models.DateField()
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text='Share of AMC cost for this visit (amc_cost / visit count).',
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_SCHEDULED,
+    )
+    work_description = models.TextField(blank=True, default='')
+    technician_work_record = models.OneToOneField(
+        'TechnicianWorkRecord',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='amc_service_visit',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['visit_number']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['amc_contract', 'visit_number'],
+                name='uniq_amc_contract_visit_number',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.amc_contract.contract_number} visit #{self.visit_number}"
 
 
 class TechnicianWorkRecord(models.Model):

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import (
     AMCContract, AMCRenewal, AMCSparePart, TechnicianWorkRecord,
-    ServiceManagementRecord, ServiceManagementMaterial
+    ServiceManagementRecord, ServiceManagementMaterial, AMCServiceVisit,
 )
 from lead_management.models import Customer
 from api.models import CustomUser
@@ -74,6 +74,7 @@ class ServiceManagementRecordSerializer(serializers.ModelSerializer):
             'id', 'customer', 'customer_contact', 'customer_name', 'customer_email', 'subject',
             'contract_type', 'contract_status', 'amc_service_type', 'segment',
             'service_start_date', 'service_end_date',
+            'service_frequency_count', 'warranty_period_months',
             'state', 'city', 'pincode', 'address',
             'apply_gst', 'gst_percentage', 'total_price_without_gst', 
             'gst_amount', 'total_price_with_gst', 'materials',
@@ -81,6 +82,38 @@ class ServiceManagementRecordSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['gst_amount', 'total_price_with_gst', 'created_at', 'updated_at']
+
+    def validate(self, attrs):
+        contract_type = attrs.get(
+            'contract_type',
+            getattr(self.instance, 'contract_type', None) if self.instance else None,
+        )
+        svc_count = attrs.get(
+            'service_frequency_count',
+            getattr(self.instance, 'service_frequency_count', None) if self.instance else None,
+        )
+        warranty_months = attrs.get(
+            'warranty_period_months',
+            getattr(self.instance, 'warranty_period_months', None) if self.instance else None,
+        )
+
+        if contract_type == 'one_time':
+            if not svc_count or svc_count < 1:
+                raise serializers.ValidationError({
+                    'service_frequency_count': 'Enter how many service visits are included (minimum 1).',
+                })
+            attrs['warranty_period_months'] = None
+        elif contract_type == 'warranty':
+            if not warranty_months or warranty_months < 1:
+                raise serializers.ValidationError({
+                    'warranty_period_months': 'Enter warranty period in months (minimum 1).',
+                })
+            attrs['service_frequency_count'] = None
+        else:
+            attrs['service_frequency_count'] = None
+            attrs['warranty_period_months'] = None
+
+        return attrs
 
     def get_assigned_technicians(self, obj):
         records = obj.technician_work_records.select_related('technician').all()
@@ -147,11 +180,54 @@ class AMCContractSerializer(serializers.ModelSerializer):
     uninvoiced_spare_parts_count = serializers.SerializerMethodField()
     customer_phone = serializers.CharField(source='customer.contact_number', read_only=True)
     service_record_id = serializers.SerializerMethodField()
+    expected_visit_count = serializers.SerializerMethodField()
+    amount_per_visit = serializers.SerializerMethodField()
 
     class Meta:
         model = AMCContract
         fields = '__all__'
         read_only_fields = ['contract_number']
+
+    def get_expected_visit_count(self, obj):
+        return obj.get_expected_visit_count()
+
+    def get_amount_per_visit(self, obj):
+        return obj.get_amount_per_visit()
+
+    def validate(self, attrs):
+        frequency = attrs.get(
+            'visit_frequency',
+            getattr(self.instance, 'visit_frequency', None) if self.instance else None,
+        )
+        total = attrs.get(
+            'total_visit_count',
+            getattr(self.instance, 'total_visit_count', None) if self.instance else None,
+        )
+
+        if frequency == 'CUSTOM':
+            if not total or int(total) < 1:
+                raise serializers.ValidationError({
+                    'total_visit_count': 'Enter total number of visits for custom frequency (minimum 1).',
+                })
+        else:
+            attrs['total_visit_count'] = None
+            attrs['schedule_note'] = None
+
+        return attrs
+
+    def create(self, validated_data):
+        from .visit_service import sync_amc_service_visits
+
+        contract = super().create(validated_data)
+        sync_amc_service_visits(contract)
+        return contract
+
+    def update(self, instance, validated_data):
+        from .visit_service import sync_amc_service_visits
+
+        contract = super().update(instance, validated_data)
+        sync_amc_service_visits(contract)
+        return contract
 
     def get_spare_parts_count(self, obj):
         return obj.spare_parts.count()
@@ -287,6 +363,7 @@ class TechnicianWorkRecordSerializer(serializers.ModelSerializer):
             validated_data['created_by'] = request.user
         work_record = super().create(validated_data)
         self._close_service_if_completed(work_record)
+        self._sync_amc_visit_status(work_record)
         return work_record
 
     def update(self, instance, validated_data):
@@ -294,7 +371,18 @@ class TechnicianWorkRecordSerializer(serializers.ModelSerializer):
             validated_data = self._autofill_customer_fields(validated_data)
         work_record = super().update(instance, validated_data)
         self._close_service_if_completed(work_record)
+        self._sync_amc_visit_status(work_record)
         return work_record
+
+    def _sync_amc_visit_status(self, work_record):
+        visit = getattr(work_record, 'amc_service_visit', None)
+        if not visit:
+            return
+        if work_record.payment_status == 'completed':
+            visit.status = AMCServiceVisit.STATUS_COMPLETED
+        elif visit.technician_work_record_id:
+            visit.status = AMCServiceVisit.STATUS_ASSIGNED
+        visit.save(update_fields=['status', 'updated_at'])
 
 
 class TechnicianWorkRecordUpdateSerializer(serializers.ModelSerializer):
@@ -320,6 +408,13 @@ class TechnicianWorkRecordUpdateSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         work_record = super().update(instance, validated_data)
+        visit = getattr(work_record, 'amc_service_visit', None)
+        if visit:
+            if work_record.payment_status == 'completed':
+                visit.status = AMCServiceVisit.STATUS_COMPLETED
+            else:
+                visit.status = AMCServiceVisit.STATUS_ASSIGNED
+            visit.save(update_fields=['status', 'updated_at'])
         if work_record.payment_status == 'completed':
             service = work_record.service_record
             if service and service.contract_type == 'amc' and service.contract_status != 'closed':
@@ -348,3 +443,82 @@ class TechnicianAllocationDraftSerializer(serializers.ModelSerializer):
             'customer_address',
             'payment_amount',
         ]
+
+
+class AMCServiceVisitSerializer(serializers.ModelSerializer):
+    amc_contract_number = serializers.CharField(
+        source='amc_contract.contract_number', read_only=True
+    )
+    service_record_id = serializers.IntegerField(source='service_record_id', read_only=True)
+    technician_work_record_id = serializers.IntegerField(
+        source='technician_work_record_id', read_only=True
+    )
+    technician_id = serializers.IntegerField(
+        source='technician_work_record.technician_id', read_only=True, allow_null=True
+    )
+    technician_name = serializers.SerializerMethodField()
+    work_date = serializers.DateField(
+        source='technician_work_record.work_date', read_only=True, allow_null=True
+    )
+    payment_status = serializers.CharField(
+        source='technician_work_record.payment_status', read_only=True, allow_null=True
+    )
+    is_allocated = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AMCServiceVisit
+        fields = [
+            'id',
+            'amc_contract',
+            'amc_contract_number',
+            'service_record',
+            'service_record_id',
+            'visit_number',
+            'planned_date',
+            'amount',
+            'status',
+            'work_description',
+            'technician_work_record',
+            'technician_work_record_id',
+            'technician_id',
+            'technician_name',
+            'work_date',
+            'payment_status',
+            'is_allocated',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = [
+            'amc_contract',
+            'visit_number',
+            'amount',
+            'status',
+            'technician_work_record',
+            'created_at',
+            'updated_at',
+        ]
+
+    def get_technician_name(self, obj):
+        tech = getattr(obj.technician_work_record, 'technician', None)
+        if not tech:
+            return None
+        full = f"{tech.first_name or ''} {tech.last_name or ''}".strip()
+        return full or tech.email
+
+    def get_is_allocated(self, obj):
+        return obj.technician_work_record_id is not None
+
+
+class AMCServiceVisitUpdateSerializer(serializers.ModelSerializer):
+    """Edit planned visit before technician is assigned."""
+
+    class Meta:
+        model = AMCServiceVisit
+        fields = ['planned_date', 'work_description']
+
+    def validate(self, attrs):
+        if self.instance.technician_work_record_id:
+            raise serializers.ValidationError(
+                'Cannot edit a visit that is already allocated to a technician.'
+            )
+        return attrs
