@@ -2,6 +2,26 @@
 from django.db import transaction
 from .models import PurchaseOrder, PurchaseOrderProduct
 
+PO_PRODUCT_WRITE_FIELDS = frozenset({
+    "product_variant",
+    "item",
+    "serial_no",
+    "sort_order",
+    "is_section",
+    "section_title",
+    "description",
+    "quantity",
+    "uom",
+    "rate",
+    "hsn_sac",
+})
+
+
+def sanitize_po_product_line(product):
+    data = dict(product)
+    return {k: v for k, v in data.items() if k in PO_PRODUCT_WRITE_FIELDS}
+
+
 @transaction.atomic
 def create_new_po_version(old_po, validated_data, products_data):
     # 🔒 Never let M2M go into create()
@@ -62,7 +82,7 @@ def create_new_po_version(old_po, validated_data, products_data):
 
         PurchaseOrderProduct.objects.create(
             purchase_order=new_po,
-            **product
+            **sanitize_po_product_line(product)
         )
 
     # calulate the totals and save

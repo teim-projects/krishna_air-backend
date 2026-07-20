@@ -13,8 +13,9 @@ from django.utils import timezone
 from .filters import LeadFilter
 from rest_framework.decorators import action
 from django.core.cache import cache
+from api.mixins import OptionalAllPaginationMixin
 
-class CustomerViewsets(viewsets.ModelViewSet):
+class CustomerViewsets(OptionalAllPaginationMixin, viewsets.ModelViewSet):
     queryset = Customer.objects.all().order_by('id')
     serializer_class = CustomerSerializer
     authentication_classes = [JWTAuthentication]   

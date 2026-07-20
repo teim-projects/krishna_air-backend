@@ -9,6 +9,7 @@ from django.db import transaction
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from api.mixins import OptionalAllPaginationMixin
 
 class VendorViewSet(ModelViewSet):
     queryset = Vendor.objects.all()
@@ -27,7 +28,7 @@ class VendorViewSet(ModelViewSet):
 # Terms Condition Viewsets
 # --------------------------------------------------------------------------------
 
-class TermsConditionTypeViewsets(ModelViewSet):
+class TermsConditionTypeViewsets(OptionalAllPaginationMixin, ModelViewSet):
     queryset = TermsConditionType.objects.all()
     serializer_class = TermsConditionTypeSerializer
     authentication_classes = [JWTAuthentication]
@@ -37,7 +38,7 @@ class TermsConditionTypeViewsets(ModelViewSet):
     # search_fields = ['name']
 
 
-class TermsConditionViewsets(ModelViewSet):
+class TermsConditionViewsets(OptionalAllPaginationMixin, ModelViewSet):
     queryset = TermsConditions.objects.all()
     serializer_class = TermsConditionsSerializer
     authentication_classes = [JWTAuthentication]
@@ -62,7 +63,7 @@ class TermsConditionViewsets(ModelViewSet):
         # Else normal single create
         return super().create(request, *args, **kwargs)
 
-class PurchaseOrderViewSet(ModelViewSet):
+class PurchaseOrderViewSet(OptionalAllPaginationMixin, ModelViewSet):
     queryset = PurchaseOrder.objects.filter(is_current=True).prefetch_related("products")
     serializer_class = PurchaseOrderSerializer
     
@@ -273,7 +274,7 @@ class GRNViewSet(ModelViewSet):
     
     
 
-class InventoryViewSet(ModelViewSet):
+class InventoryViewSet(OptionalAllPaginationMixin, ModelViewSet):
     queryset = InventoryItem.objects.all().order_by("-updated_at")
     serializer_class = InventorySerializer
     # permission_classes = [IsAuthenticated]
@@ -303,7 +304,7 @@ class InventoryViewSet(ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
     
-class MaterialIssueViewSet(ModelViewSet):
+class MaterialIssueViewSet(OptionalAllPaginationMixin, ModelViewSet):
     queryset = MaterialIssue.objects.all().prefetch_related(
         "items__inventory_item__product_variant__product_model__brand_id",
         "items__inventory_item__item__material_type_id",

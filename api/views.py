@@ -19,6 +19,7 @@ from .models import CustomUser, Role, BranchManagement, SiteManagement
 from .serializers import AddStaffSerializer, RoleSerializer, BranchSerializers, SiteSerializers
 from .permissions import IsAdminOrSubAdmin ,StaffObjectPermission
 from .pagination import StaffPagination
+from .mixins import OptionalAllPaginationMixin
 from rest_framework.decorators import action
 User = get_user_model()
 
@@ -153,7 +154,7 @@ class MeView(APIView):
 # Branch Management Viewsets
 # --------------------------------------------------------------------------------
 
-class BranchManagementViewSet(viewsets.ModelViewSet):
+class BranchManagementViewSet(OptionalAllPaginationMixin, viewsets.ModelViewSet):
     queryset = BranchManagement.objects.all()
     serializer_class = BranchSerializers
     authentication_classes = [JWTAuthentication]   
@@ -170,7 +171,7 @@ class BranchManagementViewSet(viewsets.ModelViewSet):
 # Site Management Viewsets
 # --------------------------------------------------------------------------------
 
-class SiteManagementViewSet(viewsets.ModelViewSet):
+class SiteManagementViewSet(OptionalAllPaginationMixin, viewsets.ModelViewSet):
     queryset = SiteManagement.objects.all()
     serializer_class = SiteSerializers
     authentication_classes = [JWTAuthentication]   

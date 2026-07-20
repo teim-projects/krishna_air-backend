@@ -8,9 +8,10 @@ from rest_framework import status , filters
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import *
 from .serializers import * 
+from api.mixins import OptionalAllPaginationMixin
 
 
-class acTypeViewSet(ModelViewSet):
+class acTypeViewSet(OptionalAllPaginationMixin, ModelViewSet):
     queryset = acType.objects.all()
     serializer_class = acTypeSerializer
     authentication_classes = [JWTAuthentication]
@@ -20,7 +21,7 @@ class acTypeViewSet(ModelViewSet):
 
 
 
-class acSubTypesViewSet(ModelViewSet):
+class acSubTypesViewSet(OptionalAllPaginationMixin, ModelViewSet):
     queryset = acSubTypes.objects.all()
     serializer_class = acSubTypesSerializer
     authentication_classes = [JWTAuthentication]
@@ -32,7 +33,7 @@ class acSubTypesViewSet(ModelViewSet):
 
 
 
-class brandViewSet(ModelViewSet):
+class brandViewSet(OptionalAllPaginationMixin, ModelViewSet):
     queryset = brand.objects.all()
     serializer_class = brandSerializer
     authentication_classes = [JWTAuthentication]
@@ -41,7 +42,7 @@ class brandViewSet(ModelViewSet):
     search_fields  = ['name']
 
 
-class productModelViewSet(ModelViewSet):
+class productModelViewSet(OptionalAllPaginationMixin, ModelViewSet):
     queryset = ProductModel.objects.all()
     serializer_class = productModelSerializer
     authentication_classes = [JWTAuthentication]
@@ -57,7 +58,7 @@ class productModelViewSet(ModelViewSet):
 ]
     search_fields  = ['name','model_no']
 
-class productVariabtViewSet(ModelViewSet):
+class productVariabtViewSet(OptionalAllPaginationMixin, ModelViewSet):
     queryset = ProductVariant.objects.all()
     serializer_class = productVariantSerializer
     authentication_classes = [JWTAuthentication]
@@ -121,7 +122,7 @@ class feature_typeViewSet(ModelViewSet):
     search_fields  = ['name']
     pagination_class = None  # Disable pagination for lookup tables
 
-class itemViewSet(ModelViewSet):
+class itemViewSet(OptionalAllPaginationMixin, ModelViewSet):
     queryset = item.objects.all()
     serializer_class = ItemSerializer
     authentication_classes = [JWTAuthentication]
@@ -129,18 +130,6 @@ class itemViewSet(ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['item_type_id','item_class_id','material_type_id','feature_type_id']
     search_fields  = ['=item_code']
-    
-    def get_paginated_response(self, data):
-        """Override to return all items when requested via query param"""
-        if self.request.query_params.get('all') == 'true':
-            return Response(data)
-        return super().get_paginated_response(data)
-    
-    def paginate_queryset(self, queryset):
-        """Skip pagination when 'all=true' is in query params"""
-        if self.request.query_params.get('all') == 'true':
-            return None
-        return super().paginate_queryset(queryset)
   
   
 class ACTypeMaterialViewSet(ModelViewSet):

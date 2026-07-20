@@ -53,6 +53,26 @@ class QuotationHighSideItemSerializer(serializers.ModelSerializer):
         fields = "__all__"
         read_only_fields = ("quotation_version",)
 
+def _item_display_name_from_master(item):
+    """Readable low-side label (same idea as AC materials / PO complete_item_name)."""
+    if not item:
+        return ""
+    parts = []
+    if item.material_type_id and getattr(item.material_type_id, "name", None):
+        parts.append(item.material_type_id.name.strip())
+    if item.item_type_id and getattr(item.item_type_id, "name", None):
+        parts.append(item.item_type_id.name.strip())
+    if item.feature_type_id and getattr(item.feature_type_id, "name", None):
+        parts.append(item.feature_type_id.name.strip())
+    if item.item_class_id and getattr(item.item_class_id, "name", None):
+        parts.append(item.item_class_id.name.strip())
+    if item.size:
+        parts.append(f"{item.size} {item.size_unit or ''}".strip())
+    if item.thickness:
+        parts.append(f"{item.thickness} {item.thickness_unit or ''}".strip())
+    return " ".join(parts) if parts else (item.item_code or "")
+
+
 # =====================================================
 # LOW SIDE SERIALIZER
 # =====================================================
@@ -62,6 +82,10 @@ class QuotationLowSideItemSerializer(serializers.ModelSerializer):
         source="item.item_code",
         read_only=True
     )
+    item_display_name = serializers.SerializerMethodField()
+
+    def get_item_display_name(self, obj):
+        return _item_display_name_from_master(obj.item)
 
     class Meta:
         model = QuotationLowSideItem

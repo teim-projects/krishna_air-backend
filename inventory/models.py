@@ -219,6 +219,7 @@ class PurchaseOrderProduct(models.Model):
 
     rate = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     amount = models.DecimalField(max_digits=12, decimal_places=2, editable=False, default=0)
+    hsn_sac = models.CharField(max_length=50, blank=True, null=True)
 
     class Meta:
         ordering = ["sort_order"]

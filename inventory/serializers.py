@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import *
-from .service import create_new_po_version
+from .service import create_new_po_version, sanitize_po_product_line
 from django.db import transaction
 from django.db.models import Sum, F
 import uuid
@@ -148,6 +148,26 @@ class PurchaseOrderProductSerializer(serializers.ModelSerializer):
         allow_null=True
     )
     complete_item_name = serializers.CharField(read_only=True)
+    ac_type_name = serializers.CharField(
+        source="product_variant.product_model.ac_sub_type_id.ac_type_id.name",
+        read_only=True,
+        allow_null=True,
+    )
+    ac_sub_type_name = serializers.CharField(
+        source="product_variant.product_model.ac_sub_type_id.name",
+        read_only=True,
+        allow_null=True,
+    )
+    brand_name = serializers.CharField(
+        source="product_variant.product_model.brand_id.name",
+        read_only=True,
+        allow_null=True,
+    )
+    model_no = serializers.CharField(
+        source="product_variant.product_model.model_no",
+        read_only=True,
+        allow_null=True,
+    )
 
     class Meta:
         model = PurchaseOrderProduct
@@ -210,7 +230,10 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
                 else:
                     child_counter += 1
                     p['serial_no'] = str(child_counter)
-            PurchaseOrderProduct.objects.create(purchase_order=po, **p)
+            PurchaseOrderProduct.objects.create(
+                purchase_order=po,
+                **sanitize_po_product_line(p),
+            )
 
         return po
 

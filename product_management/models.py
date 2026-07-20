@@ -51,7 +51,7 @@ class ProductVariant(models.Model):
   product_model = models.ForeignKey(ProductModel, on_delete=models.CASCADE, related_name='variants')
   capacity = models.CharField(max_length=50)
   unit = models.CharField(max_length=10, blank=True, null=True)
-  star_rating = models.IntegerField()
+  star_rating = models.IntegerField(blank=True, null=True)
  
   sku = models.CharField(max_length=100 , unique=True, blank=True)
   mrp = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
@@ -67,13 +67,13 @@ class ProductVariant(models.Model):
   def generate_sku(self):
     """
         Example SKU:
-        SAM-AR18-15-5-9F2A
+        SAM-AR18-1.5-5-9F2A
     """
 
     brand_code = self.product_model.brand_id.name[:3].upper()
     model_code = self.product_model.model_no[:5].upper()
-    capacity_code = str(self.capacity).replace('.', '')
-    star_code = str(self.star_rating)
+    capacity_code = str(self.capacity).strip()
+    star_code = str(self.star_rating) if self.star_rating is not None else "NA"
     unique_code = uuid.uuid4().hex[:4].upper()
     
     return f"{brand_code}-{model_code}-{capacity_code}-{star_code}-{unique_code}"
