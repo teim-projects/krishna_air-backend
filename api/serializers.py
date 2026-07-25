@@ -111,10 +111,9 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = PasswordResetTokenGenerator().make_token(user)
 
-        frontend_url = getattr(settings, "FRONTEND_URL", 
-                            #    "http://localhost:5173/password-reset-confirm"
-                            )
-        reset_link = f"{frontend_url}/{uid}/{token}/"
+        frontend_url = getattr(settings, "FRONTEND_URL", None) or "http://localhost:5173/password-reset-confirm"
+        frontend_url = frontend_url.rstrip("/")
+        reset_link = f"{frontend_url}/{uid}/{token}"
 
         subject = "Password Reset Request"
         context = {"user": user, "reset_link": reset_link}
