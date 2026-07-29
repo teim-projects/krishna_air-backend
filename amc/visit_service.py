@@ -118,3 +118,59 @@ def sync_amc_service_visits(contract):
     ).delete()
 
     return created_or_updated
+
+
+def close_amc_contract_if_all_visits_completed(contract):
+    """When every planned visit is COMPLETED, mark the AMC contract CLOSED."""
+    if not contract or contract.status == 'CLOSED':
+        return contract
+    total = contract.service_visits.count()
+    if total < 1:
+        return contract
+    pending = contract.service_visits.exclude(status=AMCServiceVisit.STATUS_COMPLETED).exists()
+    if not pending:
+        contract.status = 'CLOSED'
+        contract.save(update_fields=['status', 'updated_at'])
+    return contract
+
+
+def close_service_record_if_work_completed(work_record):
+    """
+    Close linked ServiceManagementRecord when work is completed.
+    - AMC: only after all planned visits on the AMC contract are COMPLETED
+    - one_time / warranty: when all work records are completed (and expected
+      visit count is met if service_frequency_count is set)
+    """
+    if not work_record or work_record.payment_status != 'completed':
+        return None
+
+    visit = getattr(work_record, 'amc_service_visit', None)
+    if visit:
+        close_amc_contract_if_all_visits_completed(visit.amc_contract)
+        if visit.amc_contract.service_visits.exclude(
+            status=AMCServiceVisit.STATUS_COMPLETED
+        ).exists():
+            return None
+
+    service = work_record.service_record
+    if not service or service.contract_status == 'closed':
+        return service
+
+    if service.contract_type == 'amc':
+        service.contract_status = 'closed'
+        service.save(update_fields=['contract_status', 'updated_at'])
+        return service
+
+    if service.contract_type in ('one_time', 'warranty'):
+        if service.technician_work_records.exclude(payment_status='completed').exists():
+            return None
+        expected = service.service_frequency_count or 0
+        if expected > 0:
+            done = service.technician_work_records.filter(payment_status='completed').count()
+            if done < expected:
+                return None
+        service.contract_status = 'closed'
+        service.save(update_fields=['contract_status', 'updated_at'])
+        return service
+
+    return None

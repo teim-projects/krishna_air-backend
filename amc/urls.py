@@ -8,6 +8,8 @@ from .views import (
     CustomerViewSet,
     TechnicianWorkRecordViewSet,
     AMCServiceVisitViewSet,
+    CompletedWorkListView,
+    CompletedWorkDetailView,
 )
 
 router = DefaultRouter()
@@ -21,6 +23,8 @@ router.register(r'service-visits', AMCServiceVisitViewSet, basename='amc-service
 
 
 urlpatterns = [
+    path('completed-work/', CompletedWorkListView.as_view(), name='completed-work-list'),
+    path('completed-work/<str:item_id>/', CompletedWorkDetailView.as_view(), name='completed-work-detail'),
     path('', include(router.urls)),
     path('lead-management/', include('lead_management.urls')),
     path('quotation/', include('quotation.urls')),

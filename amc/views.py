@@ -1,4 +1,5 @@
-from rest_framework import viewsets, status, mixins
+from rest_framework import viewsets, status, mixins, filters
+from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -6,16 +7,21 @@ from django.utils import timezone
 from datetime import timedelta
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Prefetch, Q
-from django.db.models import Prefetch, Q
-from rest_framework import filters
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from .models import Customer
-from .serializers import CustomerSearchSerializer
+from api.models import CustomUser
 
-
-from .models import AMCContract, AMCRenewal, AMCSparePart, TechnicianWorkRecord, AMCServiceVisit
-
+from .models import (
+    Customer,
+    AMCContract,
+    AMCRenewal,
+    AMCSparePart,
+    TechnicianWorkRecord,
+    AMCServiceVisit,
+    ServiceManagementRecord,
+    ServiceManagementMaterial,
+)
 from .serializers import (
+    CustomerSearchSerializer,
     AMCContractSerializer,
     AMCRenewalSerializer,
     AMCSparePartSerializer,
@@ -25,21 +31,20 @@ from .serializers import (
     TechnicianAllocationDraftSerializer,
     AMCServiceVisitSerializer,
     AMCServiceVisitUpdateSerializer,
-)
-from .visit_service import get_service_record_for_amc_contract, sync_amc_service_visits
-
-from .models import ServiceManagementRecord, ServiceManagementMaterial
-from .serializers import (
-    ServiceManagementRecordSerializer, 
+    ServiceManagementRecordSerializer,
     ServiceManagementMaterialSerializer,
-    ServiceManagementMaterialCreateSerializer
+    ServiceManagementMaterialCreateSerializer,
+    QuotationSerializer,
+)
+from .visit_service import (
+    get_service_record_for_amc_contract,
+    sync_amc_service_visits,
+    close_amc_contract_if_all_visits_completed,
 )
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from inventory.models import InventoryItem
 from quotation.models import Quotation, QuotationVersion
-from .serializers import QuotationSerializer
-from api.models import CustomUser
 
 
 def _get_service_record_for_amc_contract(contract):
@@ -245,6 +250,16 @@ class AMCContractViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['customer', 'status', 'amc_included_in_sale']
     search_fields = ['contract_number', 'customer__name', 'amc_type']
+
+    def perform_create(self, serializer):
+        contract = serializer.save()
+        # Backend safeguard: always sync planned visits after contract save.
+        sync_amc_service_visits(contract)
+
+    def perform_update(self, serializer):
+        contract = serializer.save()
+        # Backend safeguard: always sync planned visits after contract save.
+        sync_amc_service_visits(contract)
 
     def destroy(self, request, *args, **kwargs):
         """
@@ -518,6 +533,8 @@ class AMCContractViewSet(viewsets.ModelViewSet):
     def service_visits(self, request, pk=None):
         """List auto-generated AMC service visits for this contract."""
         contract = self.get_object()
+        if not contract.service_visits.exists():
+            sync_amc_service_visits(contract)
         visits = contract.service_visits.select_related(
             'service_record',
             'technician_work_record__technician',
@@ -589,6 +606,17 @@ class AMCServiceVisitViewSet(
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['amc_contract', 'status']
+
+    def list(self, request, *args, **kwargs):
+        amc_contract_id = request.query_params.get('amc_contract')
+        if amc_contract_id:
+            try:
+                contract = AMCContract.objects.get(pk=amc_contract_id)
+                if not contract.service_visits.exists():
+                    sync_amc_service_visits(contract)
+            except (AMCContract.DoesNotExist, ValueError):
+                pass
+        return super().list(request, *args, **kwargs)
 
     def get_serializer_class(self):
         if self.action in ('update', 'partial_update'):
@@ -693,3 +721,293 @@ class AMCServiceVisitViewSet(
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+def _technician_display_name(user):
+    if not user:
+        return '—'
+    full = f"{user.first_name or ''} {user.last_name or ''}".strip()
+    return full or user.email or user.mobile_no or f"User {user.id}"
+
+
+def _completion_date_for_work(work_record):
+    if work_record.work_date:
+        return work_record.work_date.isoformat()
+    return work_record.updated_at.date().isoformat()
+
+
+def _work_description_for_record(work_record):
+    visit = getattr(work_record, 'amc_service_visit', None)
+    if visit and visit.work_description:
+        return visit.work_description
+    return work_record.work_description or ''
+
+
+def _service_address_for_contract(contract):
+    service = get_service_record_for_amc_contract(contract)
+    if not service and contract.customer_id:
+        service = (
+            ServiceManagementRecord.objects.filter(
+                contract_type='amc',
+            )
+            .filter(
+                Q(customer_id=contract.customer_id)
+                | Q(customer_name__iexact=contract.customer.name)
+            )
+            .order_by('-updated_at')
+            .first()
+        )
+    if service and service.address:
+        return service.address
+    customer = contract.customer
+    if customer:
+        return customer.site_address or customer.address or ''
+    return ''
+
+
+class CompletedWorkListView(APIView):
+    """Completed technician jobs, closed one-time/warranty services, and closed AMC contracts."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        items = []
+
+        works = (
+            TechnicianWorkRecord.objects.filter(payment_status='completed')
+            .select_related('technician', 'service_record', 'amc_service_visit')
+            .order_by('-updated_at')
+        )
+        for work in works:
+            items.append({
+                'id': f'w-{work.id}',
+                'kind': 'service',
+                'contract_type': getattr(work.service_record, 'contract_type', None),
+                'customer_name': work.customer_name,
+                'technician_name': _technician_display_name(work.technician),
+                'completion_date': _completion_date_for_work(work),
+            })
+
+        # Closed one-time / warranty service management records (service provided)
+        closed_services = (
+            ServiceManagementRecord.objects.filter(
+                contract_status='closed',
+                contract_type__in=['one_time', 'warranty'],
+            )
+            .prefetch_related(
+                Prefetch(
+                    'technician_work_records',
+                    queryset=TechnicianWorkRecord.objects.select_related('technician').order_by(
+                        '-work_date', '-updated_at'
+                    ),
+                )
+            )
+            .order_by('-updated_at')
+        )
+        for service in closed_services:
+            works_for_service = list(service.technician_work_records.all())
+            tech_name = '—'
+            if works_for_service:
+                tech_name = _technician_display_name(works_for_service[0].technician)
+            items.append({
+                'id': f's-{service.id}',
+                'kind': 'one_time_service',
+                'contract_type': service.contract_type,
+                'customer_name': service.customer_name,
+                'technician_name': tech_name,
+                'completion_date': (
+                    service.service_end_date.isoformat()
+                    if service.service_end_date
+                    else service.updated_at.date().isoformat()
+                ),
+            })
+
+        completed_visits_prefetch = Prefetch(
+            'service_visits',
+            queryset=AMCServiceVisit.objects.filter(
+                status=AMCServiceVisit.STATUS_COMPLETED,
+            ).select_related(
+                'technician_work_record__technician',
+            ).order_by('-updated_at'),
+        )
+        contracts = (
+            AMCContract.objects.filter(status='CLOSED')
+            .select_related('customer')
+            .prefetch_related(completed_visits_prefetch)
+            .order_by('-updated_at')
+        )
+        for contract in contracts:
+            visits = list(contract.service_visits.all())
+            tech_name = '—'
+            if visits:
+                wr = visits[0].technician_work_record
+                if wr:
+                    tech_name = _technician_display_name(wr.technician)
+            items.append({
+                'id': f'c-{contract.id}',
+                'kind': 'amc_contract',
+                'contract_type': 'amc',
+                'customer_name': contract.customer.name if contract.customer_id else '—',
+                'technician_name': tech_name,
+                'completion_date': contract.updated_at.date().isoformat(),
+            })
+
+        items.sort(key=lambda row: row['completion_date'], reverse=True)
+        return Response(items)
+
+
+class CompletedWorkDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, item_id):
+        if item_id.startswith('w-'):
+            try:
+                pk = int(item_id[2:])
+            except ValueError:
+                return Response({'detail': 'Invalid id.'}, status=status.HTTP_400_BAD_REQUEST)
+            work = (
+                TechnicianWorkRecord.objects.filter(pk=pk, payment_status='completed')
+                .select_related('technician', 'service_record', 'amc_service_visit')
+                .first()
+            )
+            if not work:
+                return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+            visit = getattr(work, 'amc_service_visit', None)
+            status_label = 'Completed'
+            if visit:
+                status_label = visit.get_status_display()
+            return Response({
+                'id': item_id,
+                'kind': 'service',
+                'contract_type': getattr(work.service_record, 'contract_type', None),
+                'customer_name': work.customer_name,
+                'technician_name': _technician_display_name(work.technician),
+                'technician_mobile': work.technician.mobile_no or '',
+                'work_description': _work_description_for_record(work),
+                'work_address': work.customer_address,
+                'status': status_label,
+                'completion_date': _completion_date_for_work(work),
+                'technician_assigned': _technician_display_name(work.technician),
+            })
+
+        if item_id.startswith('s-'):
+            try:
+                pk = int(item_id[2:])
+            except ValueError:
+                return Response({'detail': 'Invalid id.'}, status=status.HTTP_400_BAD_REQUEST)
+            service = (
+                ServiceManagementRecord.objects.filter(
+                    pk=pk,
+                    contract_status='closed',
+                    contract_type__in=['one_time', 'warranty'],
+                )
+                .prefetch_related(
+                    Prefetch(
+                        'technician_work_records',
+                        queryset=TechnicianWorkRecord.objects.select_related('technician').order_by(
+                            'work_date', 'id'
+                        ),
+                    )
+                )
+                .first()
+            )
+            if not service:
+                return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+            works_for_service = list(service.technician_work_records.all())
+            descriptions = [
+                w.work_description.strip()
+                for w in works_for_service
+                if w.work_description and w.work_description.strip()
+            ]
+            work_description = '\n'.join(descriptions) if descriptions else (service.subject or '—')
+            techs = []
+            for w in works_for_service:
+                name = _technician_display_name(w.technician)
+                if name not in techs:
+                    techs.append(name)
+            lead = works_for_service[-1] if works_for_service else None
+            lead_user = lead.technician if lead else None
+            completion = (
+                service.service_end_date.isoformat()
+                if service.service_end_date
+                else service.updated_at.date().isoformat()
+            )
+            if lead:
+                completion = _completion_date_for_work(lead)
+
+            return Response({
+                'id': item_id,
+                'kind': 'one_time_service',
+                'contract_type': service.contract_type,
+                'customer_name': service.customer_name,
+                'technician_name': _technician_display_name(lead_user),
+                'technician_mobile': (lead_user.mobile_no or '') if lead_user else '',
+                'work_description': work_description,
+                'work_address': service.address or '',
+                'status': service.get_contract_status_display(),
+                'completion_date': completion,
+                'technician_assigned': ', '.join(techs) if techs else '—',
+            })
+
+        if item_id.startswith('c-'):
+            try:
+                pk = int(item_id[2:])
+            except ValueError:
+                return Response({'detail': 'Invalid id.'}, status=status.HTTP_400_BAD_REQUEST)
+            contract = (
+                AMCContract.objects.filter(pk=pk, status='CLOSED')
+                .select_related('customer')
+                .prefetch_related(
+                    Prefetch(
+                        'service_visits',
+                        queryset=AMCServiceVisit.objects.filter(
+                            status=AMCServiceVisit.STATUS_COMPLETED,
+                        ).select_related('technician_work_record__technician').order_by('visit_number'),
+                    )
+                )
+                .first()
+            )
+            if not contract:
+                return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+            visits = list(contract.service_visits.all())
+            if visits:
+                work_description = '\n'.join(
+                    f"Visit {v.visit_number}: {v.work_description.strip()}"
+                    for v in visits
+                    if v.work_description and v.work_description.strip()
+                )
+            else:
+                work_description = ''
+            if not work_description:
+                work_description = (
+                    f"AMC contract {contract.contract_number} — all scheduled visits completed."
+                )
+
+            techs = []
+            for v in visits:
+                wr = v.technician_work_record
+                if wr:
+                    name = _technician_display_name(wr.technician)
+                    if name not in techs:
+                        techs.append(name)
+            technician_assigned = ', '.join(techs) if techs else '—'
+            last_wr = visits[-1].technician_work_record if visits else None
+            lead_user = last_wr.technician if last_wr else None
+
+            return Response({
+                'id': item_id,
+                'kind': 'amc_contract',
+                'contract_type': 'amc',
+                'customer_name': contract.customer.name if contract.customer_id else '—',
+                'contract_number': contract.contract_number,
+                'technician_name': _technician_display_name(lead_user),
+                'technician_mobile': (lead_user.mobile_no or '') if lead_user else '',
+                'work_description': work_description,
+                'work_address': _service_address_for_contract(contract),
+                'status': contract.get_status_display(),
+                'completion_date': contract.updated_at.date().isoformat(),
+                'technician_assigned': technician_assigned,
+            })
+
+        return Response({'detail': 'Invalid id.'}, status=status.HTTP_400_BAD_REQUEST)

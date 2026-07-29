@@ -3,6 +3,7 @@ from .models import (
     AMCContract, AMCRenewal, AMCSparePart, TechnicianWorkRecord,
     ServiceManagementRecord, ServiceManagementMaterial, AMCServiceVisit,
 )
+from .visit_service import close_service_record_if_work_completed, close_amc_contract_if_all_visits_completed
 from lead_management.models import Customer
 from api.models import CustomUser
 
@@ -348,13 +349,8 @@ class TechnicianWorkRecordSerializer(serializers.ModelSerializer):
         return validated_data
 
     def _close_service_if_completed(self, work_record):
-        """When technician work is completed, mark linked AMC service as closed."""
-        if work_record.payment_status != 'completed':
-            return
-        service = work_record.service_record
-        if service and service.contract_type == 'amc' and service.contract_status != 'closed':
-            service.contract_status = 'closed'
-            service.save(update_fields=['contract_status', 'updated_at'])
+        """When technician work is completed, close one-time / warranty / AMC service."""
+        close_service_record_if_work_completed(work_record)
 
     def create(self, validated_data):
         validated_data = self._autofill_customer_fields(validated_data)
@@ -362,16 +358,16 @@ class TechnicianWorkRecordSerializer(serializers.ModelSerializer):
         if request and request.user and request.user.is_authenticated:
             validated_data['created_by'] = request.user
         work_record = super().create(validated_data)
-        self._close_service_if_completed(work_record)
         self._sync_amc_visit_status(work_record)
+        self._close_service_if_completed(work_record)
         return work_record
 
     def update(self, instance, validated_data):
         if 'service_record' in validated_data:
             validated_data = self._autofill_customer_fields(validated_data)
         work_record = super().update(instance, validated_data)
-        self._close_service_if_completed(work_record)
         self._sync_amc_visit_status(work_record)
+        self._close_service_if_completed(work_record)
         return work_record
 
     def _sync_amc_visit_status(self, work_record):
@@ -383,6 +379,8 @@ class TechnicianWorkRecordSerializer(serializers.ModelSerializer):
         elif visit.technician_work_record_id:
             visit.status = AMCServiceVisit.STATUS_ASSIGNED
         visit.save(update_fields=['status', 'updated_at'])
+        if work_record.payment_status == 'completed':
+            close_amc_contract_if_all_visits_completed(visit.amc_contract)
 
 
 class TechnicianWorkRecordUpdateSerializer(serializers.ModelSerializer):
@@ -415,11 +413,7 @@ class TechnicianWorkRecordUpdateSerializer(serializers.ModelSerializer):
             else:
                 visit.status = AMCServiceVisit.STATUS_ASSIGNED
             visit.save(update_fields=['status', 'updated_at'])
-        if work_record.payment_status == 'completed':
-            service = work_record.service_record
-            if service and service.contract_type == 'amc' and service.contract_status != 'closed':
-                service.contract_status = 'closed'
-                service.save(update_fields=['contract_status', 'updated_at'])
+        close_service_record_if_work_completed(work_record)
         return work_record
 
 
@@ -448,10 +442,6 @@ class TechnicianAllocationDraftSerializer(serializers.ModelSerializer):
 class AMCServiceVisitSerializer(serializers.ModelSerializer):
     amc_contract_number = serializers.CharField(
         source='amc_contract.contract_number', read_only=True
-    )
-    service_record_id = serializers.IntegerField(source='service_record_id', read_only=True)
-    technician_work_record_id = serializers.IntegerField(
-        source='technician_work_record_id', read_only=True
     )
     technician_id = serializers.IntegerField(
         source='technician_work_record.technician_id', read_only=True, allow_null=True
