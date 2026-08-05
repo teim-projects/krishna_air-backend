@@ -9,35 +9,36 @@ from django_filters.rest_framework import DjangoFilterBackend
 from .models import *
 from .serializers import * 
 from api.mixins import OptionalAllPaginationMixin
+from api.permissions import HasDocPermission
 
 
 class acTypeViewSet(OptionalAllPaginationMixin, ModelViewSet):
     queryset = acType.objects.all()
     serializer_class = acTypeSerializer
+    document_type = "High Side"
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasDocPermission]
     filter_backends = [filters.SearchFilter]
     search_fields  = ['name']
-
 
 
 class acSubTypesViewSet(OptionalAllPaginationMixin, ModelViewSet):
     queryset = acSubTypes.objects.all()
     serializer_class = acSubTypesSerializer
+    document_type = "High Side"
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasDocPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['ac_type_id']
     search_fields  = ['name']
 
 
-
-
 class brandViewSet(OptionalAllPaginationMixin, ModelViewSet):
     queryset = brand.objects.all()
     serializer_class = brandSerializer
+    document_type = "High Side"
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasDocPermission]
     filter_backends = [filters.SearchFilter]
     search_fields  = ['name']
 
@@ -45,12 +46,13 @@ class brandViewSet(OptionalAllPaginationMixin, ModelViewSet):
 class productModelViewSet(OptionalAllPaginationMixin, ModelViewSet):
     queryset = ProductModel.objects.all()
     serializer_class = productModelSerializer
+    document_type = "High Side"
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasDocPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = [
     'brand_id',
-    'ac_sub_type_id',      # ✅ ADD THIS
+    'ac_sub_type_id',
     'ac_sub_type_id__ac_type_id',
     'is_active',
     'inverter',
@@ -61,8 +63,9 @@ class productModelViewSet(OptionalAllPaginationMixin, ModelViewSet):
 class productVariabtViewSet(OptionalAllPaginationMixin, ModelViewSet):
     queryset = ProductVariant.objects.all()
     serializer_class = productVariantSerializer
+    document_type = "High Side"
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasDocPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['is_active','product_model__inverter','product_model__phase','product_model']
     search_fields  = ['sku','capacity']
@@ -78,82 +81,73 @@ class productInventoryViewSet(ModelViewSet):
                         'purchase_date',
                         'product_variant__product_model__brand_id__name'
                         ]
-    
     search_fields  = ['serial_no',
                       'product_variant__sku',
                       'product_variant__capacity'
                       ]
 
 
-
 class material_typeViewSet(ModelViewSet):
     queryset = material_type.objects.all()
     serializer_class = MaterialTypeSerializer
+    document_type = "Low Side"
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasDocPermission]
     filter_backends = [filters.SearchFilter]
     search_fields  = ['name']
-    pagination_class = None  # Disable pagination for lookup tables
+    pagination_class = None
 
 class item_typeViewSet(ModelViewSet):
     queryset = item_type.objects.all()
     serializer_class = ItemTypeSerializer
+    document_type = "Low Side"
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasDocPermission]
     filter_backends = [filters.SearchFilter]
     search_fields  = ['name']
-    pagination_class = None  # Disable pagination for lookup tables
+    pagination_class = None
 
 class item_classViewSet(ModelViewSet):
     queryset = item_class.objects.all()
     serializer_class = ItemClassSerializer
+    document_type = "Low Side"
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasDocPermission]
     filter_backends = [filters.SearchFilter]
     search_fields  = ['name']
-    pagination_class = None  # Disable pagination for lookup tables
+    pagination_class = None
 
 class feature_typeViewSet(ModelViewSet):
     queryset = feature_type.objects.all()
     serializer_class = FeatureTypeSerializer
+    document_type = "Low Side"
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasDocPermission]
     filter_backends = [filters.SearchFilter]
     search_fields  = ['name']
-    pagination_class = None  # Disable pagination for lookup tables
+    pagination_class = None
 
 class itemViewSet(OptionalAllPaginationMixin, ModelViewSet):
     queryset = item.objects.all()
     serializer_class = ItemSerializer
+    document_type = "Low Side"
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasDocPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['item_type_id','item_class_id','material_type_id','feature_type_id']
     search_fields  = ['=item_code']
-  
-  
+
+
 class ACTypeMaterialViewSet(ModelViewSet):
     queryset = AcMaterials.objects.select_related('ac_type', 'material')
     serializer_class = AcMaterialSerializer
+    document_type = "Installation Work"
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasDocPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     search_fields = ['ac_type__name']
     filterset_fields = ['ac_type']
-    pagination_class = None  # Disable pagination to return all materials
-    
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        objs = serializer.save()
-
-        return Response(
-            {
-                "message": "Materials mapped successfully",
-                "created_count": len(objs)
-            },
-            status=status.HTTP_201_CREATED
-        )
+    pagination_class = None
 
     # 🔥 BULK UPDATE (REPLACE)
     @action(detail=False, methods=['post'], url_path='bulk-update')

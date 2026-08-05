@@ -183,3 +183,38 @@ class SiteManagement(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.site_shortcut})"
+
+
+# --------------------------------------------------------------------------------
+# Role Permission Manager Model
+# --------------------------------------------------------------------------------
+
+class RolePermission(models.Model):
+    role = models.ForeignKey(Role, on_delete=models.CASCADE, related_name="permissions")
+    document_type = models.CharField(max_length=100)
+    parent_document_type = models.CharField(max_length=100, blank=True, null=True, help_text="Parent module for hierarchy (e.g., 'PO' has parent 'Inventory')")
+    level = models.IntegerField(default=0)
+
+    # Permission flags
+    select_permission = models.BooleanField(default=False)
+    read_permission = models.BooleanField(default=True)
+    write_permission = models.BooleanField(default=False)
+    create_permission = models.BooleanField(default=False)
+    delete_permission = models.BooleanField(default=False)
+    print_permission = models.BooleanField(default=False)
+    email_permission = models.BooleanField(default=False)
+    report_permission = models.BooleanField(default=False)
+    import_permission = models.BooleanField(default=False)
+    export_permission = models.BooleanField(default=False)
+    share_permission = models.BooleanField(default=False)
+    view_all_permission = models.BooleanField(default=False)
+    modify_all_permission = models.BooleanField(default=False)
+
+    only_if_creator = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('role', 'document_type', 'level')
+        ordering = ['document_type', 'role__name']
+
+    def __str__(self):
+        return f"{self.document_type} - {self.role.name} (Level {self.level})"

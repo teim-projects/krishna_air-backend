@@ -91,11 +91,14 @@ def subject_suggestions(request):
     return Response([{'id': q['id'], 'text': q['subject']} for q in quotations])
 
 
+from api.permissions import HasDocPermission
+
 class QuotationViewSet(viewsets.ModelViewSet):
 
     serializer_class = QuotationSerializer
+    document_type = "Quotation"
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasDocPermission]
 
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_class = QuotationFilter

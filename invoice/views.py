@@ -17,17 +17,15 @@ from rest_framework.views import APIView
 from rest_framework import status
 from django.shortcuts import get_object_or_404
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework.permissions import IsAuthenticated
-import jwt
-from django.conf import settings
-
+from api.permissions import HasDocPermission
 
 
 class InvoiceViewSet(viewsets.ModelViewSet):
 
     serializer_class = InvoiceSerializer
+    document_type = "Invoice"
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasDocPermission]
 
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_class = InvoiceFilter

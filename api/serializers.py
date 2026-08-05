@@ -9,7 +9,7 @@ from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from rest_framework import serializers
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
-from .models import CustomUser, Role, BranchManagement , SiteManagement
+from .models import CustomUser, Role, BranchManagement , SiteManagement, RolePermission
 from rest_framework.exceptions import ValidationError
 from django.core.validators import RegexValidator
 import re
@@ -156,6 +156,36 @@ class RoleSerializer(serializers.ModelSerializer):
         model = Role
         fields = ('id', 'name')
         read_only_fields = ('id',)
+
+# ---RolePermissionSerializer---
+class RolePermissionSerializer(serializers.ModelSerializer):
+    role_name = serializers.CharField(source='role.name', read_only=True)
+
+    class Meta:
+        model = RolePermission
+        fields = [
+            'id',
+            'role',
+            'role_name',
+            'document_type',
+            'parent_document_type',
+            'level',
+            'select_permission',
+            'read_permission',
+            'write_permission',
+            'create_permission',
+            'delete_permission',
+            'print_permission',
+            'email_permission',
+            'report_permission',
+            'import_permission',
+            'export_permission',
+            'share_permission',
+            'view_all_permission',
+            'modify_all_permission',
+            'only_if_creator',
+        ]
+
 
 # Staff Profile section
 class RoleFlexibleField(serializers.RelatedField):

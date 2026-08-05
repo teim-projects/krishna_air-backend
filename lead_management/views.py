@@ -2,10 +2,11 @@ from django.shortcuts import render
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication 
 from rest_framework.response import Response
-from rest_framework import status , filters
+from rest_framework import status, filters
 from rest_framework.filters import OrderingFilter
-from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
+from django_filters.rest_framework import DjangoFilterBackend
+from api.permissions import HasDocPermission
 from .models import Customer , lead_management , LeadFAQ ,LeadFollowUp
 from .serializers import CustomerSerializer , LeadSerializer ,   LeadFollowUpSerializer, LeadFAQSerializer
 from django.db.models import Q ,Case, When, Value, IntegerField
@@ -18,8 +19,9 @@ from api.mixins import OptionalAllPaginationMixin
 class CustomerViewsets(OptionalAllPaginationMixin, viewsets.ModelViewSet):
     queryset = Customer.objects.all().order_by('id')
     serializer_class = CustomerSerializer
+    document_type = "Customer"
     authentication_classes = [JWTAuthentication]   
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasDocPermission]
     filter_backends = [filters.SearchFilter]
     search_fields = [
         'name', '=email', 'secondary_email', 'contact_number',
@@ -30,8 +32,9 @@ class CustomerViewsets(OptionalAllPaginationMixin, viewsets.ModelViewSet):
 
 class LeadViewSet(viewsets.ModelViewSet):
     serializer_class = LeadSerializer
+    document_type = "Lead"
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasDocPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, OrderingFilter]
     filterset_class = LeadFilter
 

@@ -10,12 +10,14 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from api.mixins import OptionalAllPaginationMixin
+from api.permissions import HasDocPermission
 
 class VendorViewSet(ModelViewSet):
     queryset = Vendor.objects.all()
     serializer_class = VendorSerializer
+    document_type = "Inventory"
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasDocPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['is_active', 'state', 'supplier_category', 'company_type']
     search_fields = ['name', 'email', 'mobile', 'gst_details', 'pan_details', 'office_poc_name']
@@ -66,9 +68,9 @@ class TermsConditionViewsets(OptionalAllPaginationMixin, ModelViewSet):
 class PurchaseOrderViewSet(OptionalAllPaginationMixin, ModelViewSet):
     queryset = PurchaseOrder.objects.filter(is_current=True).prefetch_related("products")
     serializer_class = PurchaseOrderSerializer
-    
+    document_type = "Purchase Order (PO)"
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasDocPermission]
     filter_backends = [DjangoFilterBackend,  filters.SearchFilter]
     filterset_fields = ["branch",]
     search_fields = ['vendor__name', 'site__name',"purchase_order_no","quotation_ref_no","contact_name","contact_no"]
@@ -195,8 +197,9 @@ class GRNViewSet(ModelViewSet):
         "purchase_order__vendor"
     ).order_by("-id")
     serializer_class = GRNSerializer
+    document_type = "GRN"
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasDocPermission]
 
     # ── search & ordering ────────────────────────────────────────────────────────
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
@@ -277,7 +280,9 @@ class GRNViewSet(ModelViewSet):
 class InventoryViewSet(OptionalAllPaginationMixin, ModelViewSet):
     queryset = InventoryItem.objects.all().order_by("-updated_at")
     serializer_class = InventorySerializer
-    # permission_classes = [IsAuthenticated]
+    document_type = "Inventory"
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated, HasDocPermission]
 
     # 🔍 filtering & search
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
@@ -311,8 +316,9 @@ class MaterialIssueViewSet(OptionalAllPaginationMixin, ModelViewSet):
         "items__inventory_item__item__item_type_id",
     )
     serializer_class = MaterialIssueSerializer
+    document_type = "Material Issue"
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasDocPermission]
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -328,8 +334,9 @@ class MaterialIssueViewSet(OptionalAllPaginationMixin, ModelViewSet):
 class MaterialReturnViewSet(ModelViewSet):
     queryset = MaterialReturn.objects.all().prefetch_related("items")
     serializer_class = MaterialReturnSerializer
+    document_type = "Material Return"
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasDocPermission]
 
     # ✅ Create Return
     def create(self, request, *args, **kwargs):
@@ -393,9 +400,9 @@ class DeliveryChallanViewSet(ModelViewSet):
     )
 
     serializer_class = DeliveryChallanSerializer
-
+    document_type = "Delivery Challan"
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasDocPermission]
 
     filter_backends = [
         DjangoFilterBackend,

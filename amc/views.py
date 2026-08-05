@@ -9,6 +9,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Prefetch, Q
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from api.models import CustomUser
+from api.permissions import HasDocPermission
 
 from .models import (
     Customer,
@@ -130,7 +131,8 @@ class QuotationViewSet(viewsets.ModelViewSet):
 class ServiceManagementRecordViewSet(viewsets.ModelViewSet):
     queryset = ServiceManagementRecord.objects.all()
     serializer_class = ServiceManagementRecordSerializer
-    permission_classes = [IsAuthenticated]
+    document_type = "Service Management"
+    permission_classes = [IsAuthenticated, HasDocPermission]
     pagination_class = None
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['contract_type', 'customer', 'contract_status']
@@ -239,14 +241,16 @@ class ServiceManagementRecordViewSet(viewsets.ModelViewSet):
 class ServiceManagementMaterialViewSet(viewsets.ModelViewSet):
     queryset = ServiceManagementMaterial.objects.all()
     serializer_class = ServiceManagementMaterialSerializer
-    permission_classes = [IsAuthenticated]
+    document_type = "Service Management"
+    permission_classes = [IsAuthenticated, HasDocPermission]
     pagination_class = None
 
 
 class AMCContractViewSet(viewsets.ModelViewSet):
     queryset = AMCContract.objects.all()
     serializer_class = AMCContractSerializer
-    permission_classes = [IsAuthenticated]
+    document_type = "AMC"
+    permission_classes = [IsAuthenticated, HasDocPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['customer', 'status', 'amc_included_in_sale']
     search_fields = ['contract_number', 'customer__name', 'amc_type']
@@ -555,7 +559,8 @@ class TechnicianWorkRecordViewSet(viewsets.ModelViewSet):
         'technician', 'service_record'
     ).all()
     serializer_class = TechnicianWorkRecordSerializer
-    permission_classes = [IsAuthenticated]
+    document_type = "Service Management"
+    permission_classes = [IsAuthenticated, HasDocPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['technician', 'service_record', 'work_date']
     search_fields = ['customer_name', 'customer_phone', 'work_description']
@@ -603,7 +608,8 @@ class AMCServiceVisitViewSet(
         'service_record',
         'technician_work_record__technician',
     ).all()
-    permission_classes = [IsAuthenticated]
+    document_type = "AMC"
+    permission_classes = [IsAuthenticated, HasDocPermission]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['amc_contract', 'status']
 
