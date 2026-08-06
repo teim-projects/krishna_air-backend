@@ -13,6 +13,7 @@ from django.template.loader import render_to_string
 from weasyprint import HTML
 from decimal import Decimal
 from .models import Quotation
+from api.permissions import HasDocPermission
 # from rest_framework.decorators import api_view, authentication_classes, permission_classes
 # from rest_framework.permissions import IsAuthenticated
 # from rest_framework_simplejwt.authentication import JWTAuthentication
@@ -244,17 +245,21 @@ class QuotationViewSet(viewsets.ModelViewSet):
 class ServiceMasterViewSet(viewsets.ModelViewSet):
     queryset = ServiceMaster.objects.all().prefetch_related('items')
     serializer_class = ServiceMasterSerializer
-    pagination_class = None  # Disable pagination
+    document_type = "Installation Work"
+    authentication_classes = [JWTAuthentication]
+    pagination_class = None
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['service_type', 'is_active']
     search_fields = ['name', 'category', 'subcategory']
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasDocPermission]
 
 class ServiceMasterCreateViewSet(viewsets.ModelViewSet):
     queryset = ServiceMaster.objects.all().prefetch_related('items')
     serializer_class = ServiceMasterSerializer
+    document_type = "Installation Work"
+    authentication_classes = [JWTAuthentication]
     pagination_class = None
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasDocPermission]
 
 class QuotationServiceItemViewSet(viewsets.ModelViewSet):
     queryset = QuotationServiceItem.objects.all().select_related(

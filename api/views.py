@@ -17,7 +17,7 @@ from rest_framework import filters
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import CustomUser, Role, BranchManagement, SiteManagement, RolePermission
 from .serializers import AddStaffSerializer, RoleSerializer, BranchSerializers, SiteSerializers, RolePermissionSerializer
-from .permissions import IsAdminOrSubAdmin ,StaffObjectPermission
+from .permissions import IsAdminOrSubAdmin, StaffObjectPermission, HasDocPermission
 from .pagination import StaffPagination
 from .mixins import OptionalAllPaginationMixin
 from rest_framework.decorators import action
@@ -171,7 +171,8 @@ class RolePermissionViewSet(viewsets.ModelViewSet):
 
 class StaffViewSet(viewsets.ModelViewSet):
     serializer_class = AddStaffSerializer
-    permission_classes = [IsAuthenticated, IsAdminOrSubAdmin, StaffObjectPermission]
+    document_type = "Accounts"
+    permission_classes = [IsAuthenticated, HasDocPermission]
     authentication_classes = [JWTAuthentication]  
     pagination_class = StaffPagination 
     filter_backends = [DjangoFilterBackend , filters.SearchFilter]
@@ -253,11 +254,6 @@ class MeView(APIView):
                 {"error": "Failed to fetch user info", "details": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
-
-
-
-from .permissions import IsAdminOrSubAdmin, StaffObjectPermission, HasDocPermission
 
 
 # --------------------------------------------------------------------------------
