@@ -69,6 +69,8 @@ class HasDocPermission(BasePermission):
         'low side':         'Item Master',
         'installation work':'Item Master',
         'service management': 'AMC',
+        'work history':     'Accounts',
+        'completed work':   'Accounts',
     }
 
     # URL fallback map (for views without document_type set)
@@ -83,7 +85,8 @@ class HasDocPermission(BasePermission):
         '/amc/service-records': 'Service Management',
         '/amc/service-materials': 'Service Management',
         '/amc/service-visits': 'AMC',
-        '/amc/technician-work-records': 'Service Management',
+        '/amc/technician-work-records': 'Work History',
+        '/amc/completed-work': 'Completed Work',
         '/product/': 'Item Master',
     }
 

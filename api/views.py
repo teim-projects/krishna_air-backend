@@ -143,7 +143,8 @@ class RolePermissionViewSet(viewsets.ModelViewSet):
             "Item Master", "High Side", "Low Side", "Installation Work",
             "Inventory", "Purchase Order (PO)", "GRN", "Material Issue", "Material Return", "Delivery Challan",
             "AMC", "Service Management",
-            "Accounts", "Branch", "Site", "Role Permissions"
+            "Accounts", "Work History", "Completed Work",
+            "Branch", "Site", "Role Permissions"
         ]
         created_count = 0
         for r in roles:

@@ -24,6 +24,10 @@ class Command(BaseCommand):
         
         # AMC hierarchy
         'Service Management': 'AMC',
+        
+        # Accounts hierarchy
+        'Work History': 'Accounts',
+        'Completed Work': 'Accounts',
     }
 
     def handle(self, *args, **options):

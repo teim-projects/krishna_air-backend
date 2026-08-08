@@ -27,6 +27,8 @@ class Command(BaseCommand):
         'AMC',
         'Service Management',
         'Accounts',
+        'Work History',
+        'Completed Work',
         'Branch',
         'Site',
         'Role Permissions',

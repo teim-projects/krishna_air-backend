@@ -559,7 +559,7 @@ class TechnicianWorkRecordViewSet(viewsets.ModelViewSet):
         'technician', 'service_record'
     ).all()
     serializer_class = TechnicianWorkRecordSerializer
-    document_type = "Service Management"
+    document_type = "Work History"
     permission_classes = [IsAuthenticated, HasDocPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['technician', 'service_record', 'work_date']
@@ -773,7 +773,8 @@ def _service_address_for_contract(contract):
 
 class CompletedWorkListView(APIView):
     """Completed technician jobs, closed one-time/warranty services, and closed AMC contracts."""
-    permission_classes = [IsAuthenticated]
+    document_type = "Completed Work"
+    permission_classes = [IsAuthenticated, HasDocPermission]
 
     def get(self, request):
         items = []
@@ -862,7 +863,8 @@ class CompletedWorkListView(APIView):
 
 
 class CompletedWorkDetailView(APIView):
-    permission_classes = [IsAuthenticated]
+    document_type = "Completed Work"
+    permission_classes = [IsAuthenticated, HasDocPermission]
 
     def get(self, request, item_id):
         if item_id.startswith('w-'):
