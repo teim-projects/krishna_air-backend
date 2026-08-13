@@ -25,4 +25,5 @@ class QuotationFilter(django_filters.FilterSet):
         fields = [
             "date_from",
             "date_to",
+            "customer",
         ]
