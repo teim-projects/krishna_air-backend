@@ -218,3 +218,61 @@ class RolePermission(models.Model):
 
     def __str__(self):
         return f"{self.document_type} - {self.role.name} (Level {self.level})"
+
+
+class Notification(models.Model):
+    NOTIFICATION_TYPES = [
+        ('REQUEST', 'Request'),
+        ('FOLLOW_UP', 'Follow-up'),
+        ('LEAD', 'Lead'),
+        ('QUOTATION', 'Quotation'),
+        ('OTHER', 'Other'),
+    ]
+
+    recipient = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="notifications")
+    notification_type = models.CharField(max_length=50, choices=NOTIFICATION_TYPES, default='OTHER')
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    tag = models.CharField(max_length=50, blank=True, null=True)
+    is_read = models.BooleanField(default=False)
+    reference_id = models.IntegerField(blank=True, null=True)
+    reference_type = models.CharField(max_length=50, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.title} - {self.recipient.email}"
+
+
+class EmailLog(models.Model):
+    DOCUMENT_TYPES = [
+        ('QUOTATION', 'Quotation'),
+        ('INVOICE', 'Invoice'),
+        ('PURCHASE_ORDER', 'Purchase Order'),
+        ('OTHER', 'Other'),
+    ]
+    STATUS_CHOICES = [
+        ('SENT', 'Sent'),
+        ('FAILED', 'Failed'),
+    ]
+
+    sender = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='sent_emails')
+    recipient = models.CharField(max_length=500)  # Support multiple comma-separated emails
+    cc = models.CharField(max_length=500, blank=True, null=True)
+    bcc = models.CharField(max_length=500, blank=True, null=True)
+    subject = models.CharField(max_length=255)
+    body = models.TextField()
+    document_type = models.CharField(max_length=50, choices=DOCUMENT_TYPES, default='OTHER')
+    document_id = models.IntegerField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='SENT')
+    error_message = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.subject} to {self.recipient} ({self.status})"
+

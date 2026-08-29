@@ -10,7 +10,12 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Prefetch
 import logging
 from django.template.loader import render_to_string
-from weasyprint import HTML
+try:
+    from weasyprint import HTML
+except Exception as e:
+    HTML = None
+    import logging
+    logging.warning(f"WeasyPrint could not be imported in quotation views: {e}")
 from decimal import Decimal
 from .models import Quotation
 from api.permissions import HasDocPermission
@@ -211,6 +216,59 @@ class QuotationViewSet(viewsets.ModelViewSet):
                 f"Error generating PDF: {str(e)}",
                 status=500
             )
+
+    @action(detail=True, methods=['post'], url_path='send-email')
+    def send_email(self, request, pk=None):
+        try:
+            quotation = Quotation.objects.select_related('customer', 'site').get(pk=pk)
+            
+            # Allow specifying a specific version via request data
+            version_id = request.data.get('version_id')
+            if version_id:
+                version = get_object_or_404(QuotationVersion, pk=version_id, quotation=quotation)
+            else:
+                version = QuotationVersion.objects.filter(quotation=quotation, is_active=True).first()
+
+            if not version:
+                return Response({"error": "No active version found to email."}, status=status.HTTP_404_NOT_FOUND)
+
+            recipient = request.data.get('recipient') or (quotation.customer.email if quotation.customer else None)
+            if not recipient:
+                return Response({"error": "Recipient email address is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+            subject = request.data.get('subject') or f"Quotation {quotation.quotation_no} from Krishna Air"
+            body = request.data.get('body') or f"Dear Customer,\n\nPlease find attached Quotation {quotation.quotation_no} version {version.version_no} for your review.\n\nBest regards,\nKrishna Air Team"
+            cc = request.data.get('cc')
+            bcc = request.data.get('bcc')
+
+            # Generate PDF content
+            pdf_content = build_quotation_pdf(
+                quotation,
+                version,
+                base_url=request.build_absolute_uri('/'),
+            )
+
+            # Send Email
+            from api.utils.email_service import send_document_email
+            send_document_email(
+                recipient=recipient,
+                subject=subject,
+                body=body,
+                cc=cc,
+                bcc=bcc,
+                attachment_bytes=pdf_content,
+                attachment_name=f"Quotation_{quotation.quotation_no}_v{version.version_no}.pdf",
+                document_type='QUOTATION',
+                document_id=quotation.id,
+                sender=request.user if request.user.is_authenticated else None
+            )
+
+            return Response({"detail": "Email dispatch initiated successfully."}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error in Quotation send_email: {str(e)}")
+            return Response({"error": f"Failed to send email: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
     @action(detail=True, methods=["delete"], url_path="version/(?P<version_id>[^/.]+)/delete")
     def delete_version(self, request, pk=None, version_id=None):

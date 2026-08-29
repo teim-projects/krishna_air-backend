@@ -15,8 +15,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication 
 from rest_framework import filters
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import CustomUser, Role, BranchManagement, SiteManagement, RolePermission
-from .serializers import AddStaffSerializer, RoleSerializer, BranchSerializers, SiteSerializers, RolePermissionSerializer
+from .models import CustomUser, Role, BranchManagement, SiteManagement, RolePermission, Notification
+from .serializers import AddStaffSerializer, RoleSerializer, BranchSerializers, SiteSerializers, RolePermissionSerializer, NotificationSerializer
 from .permissions import IsAdminOrSubAdmin, StaffObjectPermission, HasDocPermission
 from .pagination import StaffPagination
 from .mixins import OptionalAllPaginationMixin
@@ -320,3 +320,116 @@ def invalidate_role_permissions_on_delete(sender, instance, **kwargs):
     except Exception:
         # If cache is unavailable, just continue - permissions will be fetched fresh next time
         pass
+
+
+class NotificationViewSet(viewsets.ModelViewSet):
+    serializer_class = NotificationSerializer
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    pagination_class = None
+
+    def get_queryset(self):
+        self.check_and_create_overdue_followups(self.request.user)
+        queryset = Notification.objects.filter(recipient=self.request.user)
+        ntype = self.request.query_params.get('type')
+        if ntype and ntype != 'ALL':
+            queryset = queryset.filter(notification_type=ntype)
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(recipient=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def mark_read(self, request, pk=None):
+        notification = self.get_object()
+        notification.is_read = True
+        notification.save()
+        return Response({'status': 'marked as read'})
+
+    @action(detail=False, methods=['post'])
+    def mark_all_read(self, request):
+        Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
+        return Response({'status': 'all marked as read'})
+
+    @action(detail=False, methods=['delete'])
+    def clear_all(self, request):
+        Notification.objects.filter(recipient=request.user).delete()
+        return Response({'status': 'all cleared'})
+
+    def check_and_create_overdue_followups(self, user):
+        try:
+            from lead_management.models import lead_management
+            import datetime
+
+            today = datetime.date.today()
+            
+            # Determine if the current user is admin/superuser
+            role_name = getattr(getattr(user, 'role', None), 'name', '') or ''
+            is_admin = user.is_superuser or role_name.lower() in ('admin', 'sub-admin')
+
+            # 1. Create overdue notifications
+            if is_admin:
+                # Admins see all overdue open/in_process leads
+                overdue_leads = lead_management.objects.filter(
+                    status__in=['open', 'in_process'],
+                    followup_date__lt=today
+                )
+            else:
+                # Salespersons only see their own
+                overdue_leads = lead_management.objects.filter(
+                    assign_to=user,
+                    status__in=['open', 'in_process'],
+                    followup_date__lt=today
+                )
+            
+            for lead in overdue_leads:
+                # Check if notification already exists
+                exists = Notification.objects.filter(
+                    recipient=user,
+                    notification_type='FOLLOW_UP',
+                    tag='OVERDUE',
+                    reference_type='lead',
+                    reference_id=lead.id
+                ).exists()
+                
+                if not exists:
+                    # Assignee name or unassigned
+                    assignee_name = lead.assign_to.first_name if lead.assign_to else "Unassigned"
+                    description = f"Follow-up with {lead.customer.name} was due on {lead.followup_date}."
+                    if is_admin and lead.assign_to != user:
+                        description += f" (Assigned to: {assignee_name})"
+
+                    Notification.objects.create(
+                        recipient=user,
+                        notification_type='FOLLOW_UP',
+                        tag='OVERDUE',
+                        title="Overdue Follow-up Required",
+                        description=description,
+                        reference_type='lead',
+                        reference_id=lead.id,
+                        is_read=False
+                    )
+
+            # 2. Delete notifications for leads that are no longer overdue, closed, or reassigned
+            existing_notifs = Notification.objects.filter(
+                recipient=user,
+                notification_type='FOLLOW_UP',
+                tag='OVERDUE',
+                reference_type='lead'
+            )
+            for notif in existing_notifs:
+                try:
+                    lead = lead_management.objects.get(id=notif.reference_id)
+                    should_delete = False
+                    if lead.followup_date >= today or lead.status == 'closed':
+                        should_delete = True
+                    elif not is_admin and lead.assign_to != user:
+                        should_delete = True
+
+                    if should_delete:
+                        notif.delete()
+                except lead_management.DoesNotExist:
+                    notif.delete()
+        except Exception as e:
+            import logging
+            logging.error(f"Error checking overdue followups: {e}")

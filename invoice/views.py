@@ -53,7 +53,46 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             )
             .order_by("-id")
         )
-    
+
+    @action(detail=True, methods=['post'], url_path='send-email')
+    def send_email(self, request, pk=None):
+        try:
+            invoice = self.get_object()
+            recipient = request.data.get('recipient') or (invoice.customer.email if invoice.customer else None)
+            if not recipient:
+                return Response({"error": "Recipient email address is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+            subject = request.data.get('subject') or f"Invoice {invoice.invoice_no} from Krishna Air"
+            body = request.data.get('body') or f"Dear Customer,\n\nPlease find attached Invoice {invoice.invoice_no} for your review.\n\nBest regards,\nKrishna Air Team"
+            cc = request.data.get('cc')
+            bcc = request.data.get('bcc')
+
+            # Generate PDF
+            pdf_content = generate_invoice_pdf_content(request, invoice)
+
+            # Send Email
+            from api.utils.email_service import send_document_email
+            send_document_email(
+                recipient=recipient,
+                subject=subject,
+                body=body,
+                cc=cc,
+                bcc=bcc,
+                attachment_bytes=pdf_content,
+                attachment_name=f"Invoice_{invoice.invoice_no}.pdf",
+                document_type='INVOICE',
+                document_id=invoice.id,
+                sender=request.user if request.user.is_authenticated else None
+            )
+
+            return Response({"detail": "Email dispatch initiated successfully."}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error in Invoice send_email: {str(e)}")
+            return Response({"error": f"Failed to send email: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
     # In views.py - update the download_pdf method
     # @action(detail=True, methods=['get'], url_path='pdf')
@@ -126,14 +165,19 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
 from django.http import HttpResponse
 from django.template.loader import render_to_string
-from weasyprint import HTML
+try:
+    from weasyprint import HTML
+except Exception as e:
+    HTML = None
+    import logging
+    logging.warning(f"WeasyPrint could not be imported: {e}")
 from decimal import Decimal
 from .models import Invoice
 from num2words import num2words
 
-def invoice_pdf(request, pk):
-
-    invoice = Invoice.objects.get(pk=pk)
+def generate_invoice_pdf_content(request, invoice):
+    if HTML is None:
+        raise Exception("WeasyPrint is not installed or configured correctly on this system.")
 
     high_items = list(invoice.high_side_items.select_related(
         "product_variant__product_model__brand_id",
@@ -150,12 +194,12 @@ def invoice_pdf(request, pk):
 
     total_qty = sum(p.quantity for p in products)
     invoice_payment_terms = invoice.terms_conditions.filter(
-    terms_condition_type__name="Invoice Payment"
-        )
+        terms_condition_type__name="Invoice Payment"
+    )
     
     invoice_delivery_terms = invoice.terms_conditions.filter(
-    terms_condition_type__name="Invoice Delivery"
-        )
+        terms_condition_type__name="Invoice Delivery"
+    )
     
     # Initialize
     cgst = None
@@ -165,10 +209,8 @@ def invoice_pdf(request, pk):
     if invoice.gst_type == "CGST_SGST":
         cgst = invoice.gst_percentage / Decimal(2)
         sgst = invoice.gst_percentage / Decimal(2)
-
     else:
         igst = invoice.gst_percentage
-
 
     total_tax_in_words = num2words(invoice.total_tax, lang='en').capitalize() + " Rupees Only"
     html_string = render_to_string(
@@ -183,7 +225,6 @@ def invoice_pdf(request, pk):
             "igst": igst,   
             "invoice_payment_terms": invoice_payment_terms,
             "invoice_delivery_terms": invoice_delivery_terms,
-
         }
     )
 
@@ -192,6 +233,16 @@ def invoice_pdf(request, pk):
         base_url=request.build_absolute_uri("/")
     ).write_pdf()
 
+    return pdf
+
+
+def invoice_pdf(request, pk):
+    try:
+        invoice = Invoice.objects.get(pk=pk)
+        pdf = generate_invoice_pdf_content(request, invoice)
+    except Exception as e:
+        return HttpResponse(f"Error: {str(e)}", status=500)
+
     response = HttpResponse(pdf, content_type="application/pdf")
 
     if request.GET.get("download"):
@@ -199,4 +250,4 @@ def invoice_pdf(request, pk):
     else:
         response["Content-Disposition"] = f'inline; filename="INV-{invoice.invoice_no}.pdf"'
 
-    return response
+    return response

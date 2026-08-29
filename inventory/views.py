@@ -89,6 +89,46 @@ class PurchaseOrderViewSet(OptionalAllPaginationMixin, ModelViewSet):
             status=status.HTTP_204_NO_CONTENT
         )
 
+    @action(detail=True, methods=['post'], url_path='send-email')
+    def send_email(self, request, pk=None):
+        try:
+            po = self.get_object()
+            recipient = request.data.get('recipient') or (po.vendor.email if po.vendor else None)
+            if not recipient:
+                return Response({"error": "Recipient email address is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+            subject = request.data.get('subject') or f"Purchase Order {po.purchase_order_no} from Krishna Air"
+            body = request.data.get('body') or f"Dear Partner,\n\nPlease find attached Purchase Order {po.purchase_order_no} for your reference.\n\nBest regards,\nKrishna Air Team"
+            cc = request.data.get('cc')
+            bcc = request.data.get('bcc')
+
+            # Generate PDF
+            pdf_content = generate_purchase_order_pdf_content(request, po)
+
+            # Send Email
+            from api.utils.email_service import send_document_email
+            send_document_email(
+                recipient=recipient,
+                subject=subject,
+                body=body,
+                cc=cc,
+                bcc=bcc,
+                attachment_bytes=pdf_content,
+                attachment_name=f"PurchaseOrder_{po.purchase_order_no}.pdf",
+                document_type='PURCHASE_ORDER',
+                document_id=po.id,
+                sender=request.user if request.user.is_authenticated else None
+            )
+
+            return Response({"detail": "Email dispatch initiated successfully."}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error in PurchaseOrder send_email: {str(e)}")
+            return Response({"error": f"Failed to send email: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 
 class PurchaseOrderHistoryViewSet(ReadOnlyModelViewSet):
     serializer_class = PurchaseOrderSerializer
@@ -123,15 +163,21 @@ class PurchaseOrderHistoryViewSet(ReadOnlyModelViewSet):
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.contrib.staticfiles import finders
-from weasyprint import HTML
+try:
+    from weasyprint import HTML
+except Exception as e:
+    HTML = None
+    import logging
+    logging.warning(f"WeasyPrint could not be imported in inventory views: {e}")
 from decimal import Decimal
 from .models import PurchaseOrder
 from .utils import format_amount_in_words
 
 
-def purchase_order_pdf(request, pk):
+def generate_purchase_order_pdf_content(request, po):
+    if HTML is None:
+        raise Exception("WeasyPrint is not installed or configured correctly on this system.")
 
-    po = PurchaseOrder.objects.get(pk=pk)
     products = list(po.products.select_related(
         "item__material_type_id",
         "item__item_type_id",
@@ -161,25 +207,30 @@ def purchase_order_pdf(request, pk):
     # Convert total amount to words
     total_in_words = format_amount_in_words(po.grand_total)
 
-    # logo_path = finders.find("images/ka-logo.png")
-
     html_string = render_to_string(
         "pdf/purchase_order.html",
         {
             "po": po,
             "products": products,
             "gst_amount": gst_amount,
-            "total_in_words": total_in_words,  # Add total in words
-            # "logo_path": logo_path,
+            "total_in_words": total_in_words,
         }
     )
-
-    # print("LOGO PATH:", logo_path)
 
     pdf = HTML(
         string=html_string,
         base_url=request.build_absolute_uri("/")
     ).write_pdf()
+
+    return pdf
+
+
+def purchase_order_pdf(request, pk):
+    try:
+        po = PurchaseOrder.objects.get(pk=pk)
+        pdf = generate_purchase_order_pdf_content(request, po)
+    except Exception as e:
+        return HttpResponse(f"Error: {str(e)}", status=500)
 
     response = HttpResponse(pdf, content_type="application/pdf")
     if request.GET.get("download"):
@@ -188,6 +239,7 @@ def purchase_order_pdf(request, pk):
         response["Content-Disposition"] = f'inline; filename="PO-{po.purchase_order_no}.pdf"'
 
     return response
+
 
 
 
@@ -465,14 +517,19 @@ class DeliveryChallanViewSet(ModelViewSet):
             {"message": "Delivery Completed"}
         )
 
-from django.http import HttpResponse
-from django.template.loader import render_to_string
-from weasyprint import HTML
+try:
+    from weasyprint import HTML
+except Exception as e:
+    HTML = None
+    import logging
+    logging.warning(f"WeasyPrint could not be imported for delivery challan: {e}")
 
 from .models import DeliveryChallan, PurchaseOrderProduct
 
 
 def delivery_challan_pdf(request, pk):
+    if HTML is None:
+        return HttpResponse("WeasyPrint is not installed or configured correctly on this system.", status=500)
 
     dc = DeliveryChallan.objects.select_related(
         "material_issue",
