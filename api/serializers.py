@@ -376,4 +376,12 @@ class NotificationSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'recipient', 'created_at']
 
+
+class EmailTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        from .models import EmailTemplate
+        model = EmailTemplate
+        fields = '__all__'
+
+
     

@@ -70,6 +70,15 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             # Generate PDF
             pdf_content = generate_invoice_pdf_content(request, invoice)
 
+            # Render HTML email body using the generic base wrapper
+            html_body = render_to_string(
+                "email/base_wrapper.html",
+                {
+                    "category_name": "INVOICE",
+                    "message_body": body
+                }
+            )
+
             # Send Email
             from api.utils.email_service import send_document_email
             send_document_email(
@@ -82,7 +91,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 attachment_name=f"Invoice_{invoice.invoice_no}.pdf",
                 document_type='INVOICE',
                 document_id=invoice.id,
-                sender=request.user if request.user.is_authenticated else None
+                sender=request.user if request.user.is_authenticated else None,
+                html_body=html_body
             )
 
             return Response({"detail": "Email dispatch initiated successfully."}, status=status.HTTP_200_OK)

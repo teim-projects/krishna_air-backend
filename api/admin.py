@@ -1,10 +1,14 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.utils.translation import gettext_lazy as _
-from .models import CustomUser , Role, EmailLog
+from .models import CustomUser , Role, EmailLog, EmailTemplate
  
- 
- 
+@admin.register(EmailTemplate)
+class EmailTemplateAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'channel', 'category', 'subject', 'created_at')
+    list_filter = ('channel', 'category', 'created_at')
+    search_fields = ('name', 'subject', 'body')
+
 @admin.register(EmailLog)
 class EmailLogAdmin(admin.ModelAdmin):
     list_display = ('id', 'subject', 'recipient', 'document_type', 'status', 'created_at')

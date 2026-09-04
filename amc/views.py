@@ -4,7 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
-from datetime import timedelta
+from datetime import datetime, timedelta
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Prefetch, Q
 from rest_framework_simplejwt.authentication import JWTAuthentication
@@ -252,8 +252,15 @@ class AMCContractViewSet(viewsets.ModelViewSet):
     document_type = "AMC"
     permission_classes = [IsAuthenticated, HasDocPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    filterset_fields = ['customer', 'status', 'amc_included_in_sale']
+    filterset_fields = ['customer', 'status', 'amc_included_in_sale', 'is_current']
     search_fields = ['contract_number', 'customer__name', 'amc_type']
+
+    def get_queryset(self):
+        qs = AMCContract.objects.all()
+        # Default to current contracts unless explicitly asking for all versions
+        if not self.request.query_params.get('include_all'):
+            qs = qs.filter(is_current=True)
+        return qs
 
     def perform_create(self, serializer):
         contract = serializer.save()
@@ -294,7 +301,7 @@ class AMCContractViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def active_contracts(self, request):
         """Get all active AMC contracts"""
-        contracts = self.queryset.filter(status='ACTIVE')
+        contracts = self.get_queryset().filter(status='ACTIVE')
         serializer = self.get_serializer(contracts, many=True)
         return Response(serializer.data)
     
@@ -304,7 +311,7 @@ class AMCContractViewSet(viewsets.ModelViewSet):
         today = timezone.now().date()
         expiry_date = today + timedelta(days=30)
         
-        contracts = self.queryset.filter(
+        contracts = self.get_queryset().filter(
             amc_end_date__lte=expiry_date,
             amc_end_date__gte=today,
             status='ACTIVE'
@@ -314,7 +321,7 @@ class AMCContractViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def create_renewal(self, request, pk=None):
-        """Create renewal for expiring contract"""
+        """Create renewal for expiring contract with version tracking and identical contract number"""
         contract = self.get_object()
         
         if AMCRenewal.objects.filter(previous_contract=contract, status='RENEWED').exists():
@@ -323,20 +330,48 @@ class AMCContractViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Read form inputs
+        start_date_val = request.data.get('amc_start_date')
+        end_date_val = request.data.get('amc_end_date')
+        cost = request.data.get('amc_cost', contract.amc_cost)
+        visit_freq = request.data.get('visit_frequency', contract.visit_frequency)
+        remarks = request.data.get('renewal_remarks', '')
+
+        if isinstance(start_date_val, str) and start_date_val:
+            new_start = datetime.strptime(start_date_val, '%Y-%m-%d').date()
+        else:
+            new_start = contract.amc_end_date + timedelta(days=1)
+
+        if isinstance(end_date_val, str) and end_date_val:
+            new_end = datetime.strptime(end_date_val, '%Y-%m-%d').date()
+        else:
+            new_end = new_start + timedelta(days=365)
+
+        # 1. Expire the previous contract
+        contract.status = 'EXPIRED'
+        contract.is_current = False
+        contract.save(update_fields=['status', 'is_current', 'updated_at'])
+
+        # 2. Create the renewed contract with SAME contract_number and incremented version
+        next_version = (contract.version or 1) + 1
         new_contract = AMCContract.objects.create(
             customer=contract.customer,
+            contract_number=contract.contract_number,
+            version=next_version,
+            is_current=True,
             amc_type=contract.amc_type,
-            visit_frequency=contract.visit_frequency,
-            total_visit_count=contract.total_visit_count,
-            schedule_note=contract.schedule_note,
+            visit_frequency=visit_freq,
+            total_visit_count=request.data.get('total_visit_count', contract.total_visit_count),
+            schedule_note=request.data.get('schedule_note', contract.schedule_note),
             product_variant=contract.product_variant,
             sale_date=contract.sale_date,
             warranty_end_date=contract.warranty_end_date,
-            amc_start_date=contract.amc_end_date + timedelta(days=1),
-            amc_end_date=contract.amc_end_date + timedelta(days=365),
+            amc_start_date=new_start,
+            amc_end_date=new_end,
             amc_included_in_sale=False,
             status='ACTIVE',
-            amc_cost=request.data.get('amc_cost', contract.amc_cost),
+            amc_cost=cost,
+            renewal_remarks=remarks,
             is_renewal=True,
             previous_contract=contract
         )
@@ -353,6 +388,25 @@ class AMCContractViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(new_contract)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['get'], url_path='version-history')
+    def version_history(self, request):
+        """Get version history for a given contract number or id, ordered newest first."""
+        contract_number = request.query_params.get('contract_number')
+        contract_id = request.query_params.get('contract_id')
+        if not contract_number and not contract_id:
+            return Response({'detail': 'contract_number or contract_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if contract_id and not contract_number:
+            contract = AMCContract.objects.filter(id=contract_id).first()
+            if contract:
+                contract_number = contract.contract_number
+            else:
+                return Response({'detail': 'Contract not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        versions = AMCContract.objects.filter(contract_number=contract_number).order_by('-version', '-created_at')
+        serializer = self.get_serializer(versions, many=True)
+        return Response(serializer.data)
 
     @action(detail=True, methods=['get'])
     def spare_parts(self, request, pk=None):

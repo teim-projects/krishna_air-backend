@@ -248,6 +248,15 @@ class QuotationViewSet(viewsets.ModelViewSet):
                 base_url=request.build_absolute_uri('/'),
             )
 
+            # Render HTML email body using the generic base wrapper
+            html_body = render_to_string(
+                "email/base_wrapper.html",
+                {
+                    "category_name": "QUOTATION",
+                    "message_body": body
+                }
+            )
+
             # Send Email
             from api.utils.email_service import send_document_email
             send_document_email(
@@ -260,7 +269,8 @@ class QuotationViewSet(viewsets.ModelViewSet):
                 attachment_name=f"Quotation_{quotation.quotation_no}_v{version.version_no}.pdf",
                 document_type='QUOTATION',
                 document_id=quotation.id,
-                sender=request.user if request.user.is_authenticated else None
+                sender=request.user if request.user.is_authenticated else None,
+                html_body=html_body
             )
 
             return Response({"detail": "Email dispatch initiated successfully."}, status=status.HTTP_200_OK)

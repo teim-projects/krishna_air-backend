@@ -433,3 +433,17 @@ class NotificationViewSet(viewsets.ModelViewSet):
         except Exception as e:
             import logging
             logging.error(f"Error checking overdue followups: {e}")
+
+
+class EmailTemplateViewSet(viewsets.ModelViewSet):
+    """
+    CRUD for EmailTemplate model.
+    """
+    from .models import EmailTemplate
+    from .serializers import EmailTemplateSerializer
+    queryset = EmailTemplate.objects.all()
+    serializer_class = EmailTemplateSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['channel', 'category']
+    search_fields = ['name', 'subject', 'body']

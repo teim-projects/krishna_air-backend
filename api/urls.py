@@ -1,7 +1,7 @@
 
 from django.urls import path, include
 from django.contrib.auth import views as auth_views
-from .views import GoogleLogin ,PasswordResetRequestView, PasswordResetConfirmView, StaffViewSet,RoleViewSet,RolePermissionViewSet,MeView, BranchManagementViewSet , SiteManagementViewSet, NotificationViewSet
+from .views import GoogleLogin ,PasswordResetRequestView, PasswordResetConfirmView, StaffViewSet,RoleViewSet,RolePermissionViewSet,MeView, BranchManagementViewSet , SiteManagementViewSet, NotificationViewSet, EmailTemplateViewSet
 from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
@@ -11,6 +11,7 @@ router.register(r'role-permissions', RolePermissionViewSet, basename='role-permi
 router.register(r'branch',BranchManagementViewSet, basename='branch')
 router.register(r'site', SiteManagementViewSet, basename='sites')
 router.register(r'notifications', NotificationViewSet, basename='notifications')
+router.register(r'email-templates', EmailTemplateViewSet, basename='email-templates')
 
 urlpatterns = [
     path('dj-rest-auth/', include('dj_rest_auth.urls')),

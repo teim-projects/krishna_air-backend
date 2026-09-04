@@ -105,6 +105,15 @@ class PurchaseOrderViewSet(OptionalAllPaginationMixin, ModelViewSet):
             # Generate PDF
             pdf_content = generate_purchase_order_pdf_content(request, po)
 
+            # Render HTML email body using the generic base wrapper
+            html_body = render_to_string(
+                "email/base_wrapper.html",
+                {
+                    "category_name": "PURCHASE ORDER",
+                    "message_body": body
+                }
+            )
+
             # Send Email
             from api.utils.email_service import send_document_email
             send_document_email(
@@ -117,7 +126,8 @@ class PurchaseOrderViewSet(OptionalAllPaginationMixin, ModelViewSet):
                 attachment_name=f"PurchaseOrder_{po.purchase_order_no}.pdf",
                 document_type='PURCHASE_ORDER',
                 document_id=po.id,
-                sender=request.user if request.user.is_authenticated else None
+                sender=request.user if request.user.is_authenticated else None,
+                html_body=html_body
             )
 
             return Response({"detail": "Email dispatch initiated successfully."}, status=status.HTTP_200_OK)

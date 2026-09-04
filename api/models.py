@@ -276,3 +276,27 @@ class EmailLog(models.Model):
     def __str__(self):
         return f"{self.subject} to {self.recipient} ({self.status})"
 
+
+class EmailTemplate(models.Model):
+    CHANNEL_CHOICES = [('EMAIL', 'Email'), ('WHATSAPP', 'WhatsApp')]
+    CATEGORY_CHOICES = [
+        ('LEADS', 'Leads / Enquiries'),
+        ('QUOTATIONS', 'Quotations'),
+        ('INVOICES', 'Invoices'),
+        ('PURCHASE_ORDERS', 'Purchase Orders'),
+    ]
+    name = models.CharField(max_length=255)
+    channel = models.CharField(max_length=20, choices=CHANNEL_CHOICES, default='EMAIL')
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='QUOTATIONS')
+    subject = models.CharField(max_length=255)
+    body = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name} ({self.channel})"
+
+

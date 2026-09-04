@@ -1,6 +1,6 @@
 import threading
 import logging
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMultiAlternatives
 from django.conf import settings
 from django.db import connection
 from api.models import EmailLog
@@ -31,10 +31,11 @@ def send_document_email(
     attachment_name=None,
     document_type='OTHER',
     document_id=None,
-    sender=None
+    sender=None,
+    html_body=None
 ):
     """
-    Sends an email with an optional PDF attachment.
+    Sends an email with an optional PDF attachment and optional HTML body.
     All email sending is offloaded to a background thread to prevent UI blocking.
     """
     def parse_emails(email_val):
@@ -69,8 +70,8 @@ def send_document_email(
         logger.error("Failed to send email: No valid recipient.")
         return email_log
 
-    # Create Django EmailMessage
-    email = EmailMessage(
+    # Create Django EmailMultiAlternatives
+    email = EmailMultiAlternatives(
         subject=subject,
         body=body,
         from_email=settings.DEFAULT_FROM_EMAIL,
@@ -78,6 +79,9 @@ def send_document_email(
         cc=cc_list,
         bcc=bcc_list,
     )
+
+    if html_body:
+        email.attach_alternative(html_body, "text/html")
 
     if attachment_bytes and attachment_name:
         email.attach(attachment_name, attachment_bytes, "application/pdf")

@@ -234,7 +234,10 @@ class AMCContract(models.Model):
     product_variant = models.ForeignKey(ProductVariant, on_delete=models.PROTECT)
     
     # Contract details
-    contract_number = models.CharField(max_length=50, unique=True)
+    contract_number = models.CharField(max_length=50)
+    version = models.PositiveIntegerField(default=1)
+    is_current = models.BooleanField(default=True)
+    renewal_remarks = models.TextField(blank=True, null=True)
     
     # Dates
     sale_date = models.DateField()
@@ -316,6 +319,7 @@ class AMCContract(models.Model):
     
     class Meta:
         ordering = ['-created_at']
+        unique_together = ('contract_number', 'version')
 
 
 class AMCSparePart(models.Model):
