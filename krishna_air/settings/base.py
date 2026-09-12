@@ -71,6 +71,7 @@ INSTALLED_APPS = [
     'invoice',
     'inventory',
     'amc',
+    'dashboard',
 ] 
 
 SITE_ID = 1

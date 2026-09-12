@@ -364,6 +364,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
             today = datetime.date.today()
             
             # Determine if the current user is admin/superuser
+            # NOTE: is_staff is set on ALL registered users, so we check role name instead
             role_name = getattr(getattr(user, 'role', None), 'name', '') or ''
             is_admin = user.is_superuser or role_name.lower() in ('admin', 'sub-admin')
 
@@ -446,4 +447,4 @@ class EmailTemplateViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['channel', 'category']
-    search_fields = ['name', 'subject', 'body']
+    search_fields = ['name', 'subject', 'body']
