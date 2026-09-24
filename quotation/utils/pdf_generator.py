@@ -1,6 +1,10 @@
-# quotation/utils/pdf_generator.py
 from django.template.loader import render_to_string
-from weasyprint import HTML
+try:
+    from weasyprint import HTML
+except Exception as e:
+    HTML = None
+    import logging
+    logging.warning(f"WeasyPrint could not be imported in pdf_generator: {e}")
 from decimal import Decimal
 from django.conf import settings
 import logging
@@ -600,6 +604,8 @@ def generate_quotation_pdf(quotation, version, base_url=None):
     """
     Generate quotation PDF using WeasyPrint with HTML template (existing design).
     """
+    if HTML is None:
+        raise RuntimeError("WeasyPrint is not installed or configured correctly on this system.")
     try:
         context = _build_quotation_pdf_context(quotation, version)
         html_string = render_to_string('pdf/quotation.html', context)

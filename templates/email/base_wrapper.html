@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #334155; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+        .banner { background-color: #0284c7; padding: 20px; text-align: center; color: #ffffff; font-size: 20px; font-weight: bold; }
+        .category-badge { display: inline-block; background-color: #fef3c7; color: #d97706; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 16px; }
+        .content { padding: 24px; line-height: 1.6; font-size: 15px; color: #1e293b; }
+        .message-body { white-space: pre-wrap; }
+        .footer { background-color: #f8fafc; padding: 20px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 12px; color: #64748b; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="banner">
+            KRISHNA AIR SYSTEMS
+        </div>
+        <div class="content">
+            {% if category_name %}
+            <span class="category-badge">{{ category_name }}</span>
+            {% endif %}
+            <div class="message-body">{{ message_body }}</div>
+        </div>
+        <div class="footer">
+            &copy; 2026 Krishna Air. All rights reserved.<br>
+            For support, contact us at connectteim@gmail.com
+        </div>
+    </div>
+</body>
+</html>

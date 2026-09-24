@@ -10,6 +10,7 @@ class ApiConfig(AppConfig):
         # Import signal handlers when the app is ready
         try:
             import api.views as views
+            import api.signals as signals
         except Exception as e:
             # Log but don't fail if signals can't be imported
             import logging

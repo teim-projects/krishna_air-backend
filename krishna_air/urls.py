@@ -51,6 +51,7 @@ urlpatterns = [
     path('quotation/', include('quotation.urls')),
     path('inventory/', include("inventory.urls")),
     path('amc/', include('amc.urls')),
+    path('dashboard/', include('dashboard.urls')),
 ]
 
 if settings.DEBUG:
