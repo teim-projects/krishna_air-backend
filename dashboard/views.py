@@ -37,6 +37,13 @@ from invoice.models import Invoice, HighSideInvoiceItem
 from product_management.models import acType, ProductVariant, ProductModel, ProductInventory
 from inventory.models import MaterialIssueItem
 from api.models import SiteManagement
+from analytics.customer_intelligence.feature_engineering import (
+    build_customer_features,
+)
+from analytics.customer_intelligence.rfm import calculate_rfm
+from analytics.customer_intelligence.rule_segmentation import (
+    segment_customers,
+)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -844,18 +851,13 @@ class CustomerIntelligenceView(APIView):
         # ---------------------------------------------------------
         # 3. Build customer feature set
         # ---------------------------------------------------------
+        customer_feature_rows = build_customer_features()
+
+        # Add latest follow-up information from the CRM adapter.
         customer_features = {}
 
-        for customer in customers:
-            customer_id = customer.id
-
-            lead_info = lead_features.get(
-                customer_id,
-                {
-                    "lead_count": 0,
-                    "active_leads": 0,
-                }
-            )
+        for row in customer_feature_rows:
+            customer_id = row["customer_id"]
 
             followup_info = followup_features.get(
                 customer_id,
@@ -865,164 +867,41 @@ class CustomerIntelligenceView(APIView):
                 }
             )
 
-            transaction_info = transaction_features.get(
-                customer_id,
-                {
-                    "transaction_count": 0,
-                    "monetary": Decimal("0"),
-                    "latest_invoice": None,
-                }
-            )
-
-            has_transaction = transaction_info["transaction_count"] > 0
-
-            # -----------------------------------------------------
-            # RFM
-            # -----------------------------------------------------
-            rfm = None
-
-            if has_transaction:
-                latest_invoice = transaction_info["latest_invoice"]
-
-                recency = (
-                    ANALYSIS_DATE - latest_invoice
-                ).days
-
-                frequency = transaction_info["transaction_count"]
-
-                monetary = float(transaction_info["monetary"])
-
-                rfm = {
-                    "recency": recency,
-                    "frequency": frequency,
-                    "monetary": monetary,
-                }
-
             customer_features[customer_id] = {
                 "customer_id": customer_id,
-                "customer": customer.name,
-
-                "lead_count": lead_info["lead_count"],
-                "active_leads": lead_info["active_leads"],
-
-                "followup_count": followup_info["followup_count"],
+                "customer": row["customer_name"],
+                "lead_count": row["lead_count"],
+                "active_leads": row["active_leads"],
+                "followup_count": row["followup_count"],
                 "latest_followup": followup_info["latest_followup"],
-
-                "transaction_count": transaction_info["transaction_count"],
-                "has_transaction": has_transaction,
-
-                "rfm": rfm,
+                "transaction_count": row["transaction_count"],
+                "has_transaction": row["transaction_count"] > 0,
             }
 
         # ---------------------------------------------------------
-        # 4. Rank-based RFM scoring
+        # 4. Reusable RFM calculation
         # ---------------------------------------------------------
-        rfm_customers = [
-            (customer_id, data)
-            for customer_id, data in customer_features.items()
-            if data["rfm"] is not None
-        ]
+        rfm_results = calculate_rfm(
+            transaction_features,
+            ANALYSIS_DATE,
+        )
 
-        if rfm_customers:
-
-            # Recency: lower days = better
-            recency_sorted = sorted(
-                rfm_customers,
-                key=lambda x: (x[1]["rfm"]["recency"], x[0])
-            )
-
-            # Frequency: higher = better
-            frequency_sorted = sorted(
-                rfm_customers,
-                key=lambda x: (x[1]["rfm"]["frequency"], -x[0])
-            )
-
-            # Monetary: higher = better
-            monetary_sorted = sorted(
-                rfm_customers,
-                key=lambda x: (x[1]["rfm"]["monetary"], x[0])
-            )
-
-            total_rfm_customers = len(rfm_customers)
-
-            for position, (customer_id, data) in enumerate(recency_sorted, start=1):
-                data["rfm"]["R"] = total_rfm_customers - position + 2
-
-            for position, (customer_id, data) in enumerate(
-                reversed(frequency_sorted), start=1
-            ):
-                data["rfm"]["F"] = total_rfm_customers - position + 2
-
-            for position, (customer_id, data) in enumerate(
-                reversed(monetary_sorted), start=1
-            ):
-                data["rfm"]["M"] = total_rfm_customers - position + 2
-
-            for customer_id, data in rfm_customers:
-
-                rfm_data = data["rfm"]
-
-                rfm_data["rfm_score"] = (
-                    f"{rfm_data['R']}"
-                    f"{rfm_data['F']}"
-                    f"{rfm_data['M']}"
-                )
-
-                total_score = (
-                    rfm_data["R"]
-                    + rfm_data["F"]
-                    + rfm_data["M"]
-                )
-
-                if total_score >= 12:
-                    data["customer_value"] = "High Value"
-                elif total_score >= 9:
-                    data["customer_value"] = "Medium Value"
-                else:
-                    data["customer_value"] = "Low Value"
-
-        # Customers without transactions
+        # Add RFM results to customer features.
         for customer_id, data in customer_features.items():
-            if "customer_value" not in data:
-                data["customer_value"] = None
+            data["rfm"] = rfm_results.get(customer_id)
 
         # ---------------------------------------------------------
-        # 5. Week 2 segmentation
+        # 5. Reusable rule-based segmentation
         # ---------------------------------------------------------
-        for customer_id, data in customer_features.items():
+        segmented_customers = segment_customers(
+            list(customer_features.values()),
+            rfm_results=rfm_results,
+        )
 
-            if data["customer_value"] == "High Value":
-                segment = "High Value"
-
-            elif data["active_leads"] > 0:
-                segment = "Active"
-
-            elif (
-                data["lead_count"] > 0
-                and not data["has_transaction"]
-            ):
-                segment = "Prospect/New"
-
-            elif (
-                data["has_transaction"]
-                and data["active_leads"] == 0
-            ):
-                segment = "At Risk"
-
-            elif data["customer_value"] == "Low Value":
-                segment = "Low Value"
-
-            elif (
-                data["lead_count"] == 0
-                and not data["has_transaction"]
-            ):
-                segment = "Unengaged"
-
-            else:
-                segment = "Unclassified"
-
-            data["segment"] = segment
-
+        customer_features = {
+            data["customer_id"]: data
+            for data in segmented_customers
+        }
         # ---------------------------------------------------------
         # 6. KPI calculation
         # ---------------------------------------------------------
