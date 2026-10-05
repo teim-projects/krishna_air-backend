@@ -46,6 +46,24 @@ from analytics.customer_intelligence.rule_segmentation import (
 )
 
 
+from analytics.customer_intelligence.preprocessing import (
+    prepare_customer_features,
+)
+
+from analytics.customer_intelligence.segmentation import (
+    evaluate_kmeans,
+    select_best_k,
+    fit_kmeans,
+)
+
+from analytics.customer_intelligence.profiling import (
+    profile_clusters,
+)
+
+from analytics.customer_intelligence.comparison import (
+    compare_rule_and_ml_segments,
+)
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Helpers
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -902,6 +920,54 @@ class CustomerIntelligenceView(APIView):
             data["customer_id"]: data
             for data in segmented_customers
         }
+
+                # ---------------------------------------------------------
+        # 5A. K-Means customer segmentation
+        # ---------------------------------------------------------
+        ml_customer_features = build_customer_features()
+
+        prepared = prepare_customer_features(
+            ml_customer_features
+        )
+
+        evaluation_results = evaluate_kmeans(
+            prepared["X_scaled"],
+            k_range=range(2, 7),
+        )
+
+        selected_k = select_best_k(
+            evaluation_results
+        )
+
+        kmeans_result = fit_kmeans(
+            prepared["X_scaled"],
+            n_clusters=selected_k,
+        )
+
+        cluster_profiles = profile_clusters(
+            ml_customer_features,
+            kmeans_result["labels"],
+            prepared["feature_names"],
+        )
+
+        # Add rule-based segments to the generic
+        # customer feature rows for comparison.
+        segment_lookup = {
+            customer["customer_id"]: customer["segment"]
+            for customer in customer_features.values()
+        }
+
+        for customer in ml_customer_features:
+            customer["segment"] = segment_lookup.get(
+                customer["customer_id"],
+                "Unclassified",
+            )
+
+        rule_ml_comparison = compare_rule_and_ml_segments(
+            ml_customer_features,
+            kmeans_result["labels"],
+        )
+
         # ---------------------------------------------------------
         # 6. KPI calculation
         # ---------------------------------------------------------
@@ -976,6 +1042,15 @@ class CustomerIntelligenceView(APIView):
             },
 
             "segments": segments,
+
+            "ml_segmentation": {
+                "selected_k": selected_k,
+                "customer_count": len(ml_customer_features),
+                "feature_names": prepared["feature_names"],
+                "evaluation": evaluation_results,
+                "cluster_profiles": cluster_profiles,
+                "rule_ml_comparison": rule_ml_comparison,
+            },
 
             "customers": customer_rows,
         })
