@@ -4,6 +4,7 @@ from .views import (
     SalesOverviewView,
     LeadManagementView,
     CustomerManagementView,
+    CustomerIntelligenceView,
     FollowupManagementView,
     ProductServiceView,
     QuotationManagementView,
@@ -17,6 +18,11 @@ urlpatterns = [
     path("sales-overview/",  SalesOverviewView.as_view(),      name="dashboard-sales-overview"),
     path("leads/",           LeadManagementView.as_view(),     name="dashboard-leads"),
     path("customers/",       CustomerManagementView.as_view(), name="dashboard-customers"),
+    path(
+    "customer-intelligence/",
+    CustomerIntelligenceView.as_view(),
+    name="dashboard-customer-intelligence"
+    ),
     path("followups/",       FollowupManagementView.as_view(), name="dashboard-followups"),
     path("products/",        ProductServiceView.as_view(),     name="dashboard-products"),
     path("quotations/",      QuotationManagementView.as_view(),name="dashboard-quotations"),

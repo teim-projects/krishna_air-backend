@@ -23,7 +23,7 @@ Filter applicability per tab:
 import calendar as _calendar
 from decimal import Decimal
 
-from django.db.models import Count, Sum, Q, F, Min
+from django.db.models import Count, Sum, Q, F, Min, Max
 from django.db.models.functions import TruncMonth, Coalesce, ExtractYear, ExtractMonth
 from django.utils.dateparse import parse_date
 from rest_framework.views import APIView
@@ -765,4 +765,338 @@ class InvoiceManagementView(APIView):
             "revenue_by_customer":    rev_by_customer_data,
             "invoice_count_by_month": monthly_count_data,
             "monthly_revenue":        monthly_revenue_data,
+        })
+
+
+class CustomerIntelligenceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        ANALYSIS_DATE = parse_date("2026-10-02")
+
+        customers = Customer.objects.all()
+
+        # ---------------------------------------------------------
+        # 1. Customer-level lead and follow-up features
+        # ---------------------------------------------------------
+        lead_data = (
+            Lead.objects
+            .values("customer_id")
+            .annotate(
+                lead_count=Count("id"),
+                active_leads=Count(
+                    "id",
+                    filter=Q(status__in=["open", "in_process"])
+                ),
+            )
+        )
+
+        lead_features = {
+            row["customer_id"]: {
+                "lead_count": row["lead_count"],
+                "active_leads": row["active_leads"],
+            }
+            for row in lead_data
+        }
+
+        followup_data = (
+            LeadFollowUp.objects
+            .values("lead__customer_id")
+            .annotate(
+                followup_count=Count("id"),
+                latest_followup=Max("followup_date"),
+            )
+        )
+
+        followup_features = {
+            row["lead__customer_id"]: {
+                "followup_count": row["followup_count"],
+                "latest_followup": row["latest_followup"],
+            }
+            for row in followup_data
+        }
+
+        # ---------------------------------------------------------
+        # 2. Invoice / transaction features
+        # ---------------------------------------------------------
+        invoice_data = (
+            Invoice.objects
+            .values("customer_id")
+            .annotate(
+                transaction_count=Count("id"),
+                monetary=Coalesce(
+                    Sum("grand_total"),
+                    Decimal("0")
+                ),
+                latest_invoice=Max("invoice_date"),
+            )
+        )
+
+        transaction_features = {
+            row["customer_id"]: {
+                "transaction_count": row["transaction_count"],
+                "monetary": row["monetary"],
+                "latest_invoice": row["latest_invoice"],
+            }
+            for row in invoice_data
+        }
+
+        # ---------------------------------------------------------
+        # 3. Build customer feature set
+        # ---------------------------------------------------------
+        customer_features = {}
+
+        for customer in customers:
+            customer_id = customer.id
+
+            lead_info = lead_features.get(
+                customer_id,
+                {
+                    "lead_count": 0,
+                    "active_leads": 0,
+                }
+            )
+
+            followup_info = followup_features.get(
+                customer_id,
+                {
+                    "followup_count": 0,
+                    "latest_followup": None,
+                }
+            )
+
+            transaction_info = transaction_features.get(
+                customer_id,
+                {
+                    "transaction_count": 0,
+                    "monetary": Decimal("0"),
+                    "latest_invoice": None,
+                }
+            )
+
+            has_transaction = transaction_info["transaction_count"] > 0
+
+            # -----------------------------------------------------
+            # RFM
+            # -----------------------------------------------------
+            rfm = None
+
+            if has_transaction:
+                latest_invoice = transaction_info["latest_invoice"]
+
+                recency = (
+                    ANALYSIS_DATE - latest_invoice
+                ).days
+
+                frequency = transaction_info["transaction_count"]
+
+                monetary = float(transaction_info["monetary"])
+
+                rfm = {
+                    "recency": recency,
+                    "frequency": frequency,
+                    "monetary": monetary,
+                }
+
+            customer_features[customer_id] = {
+                "customer_id": customer_id,
+                "customer": customer.name,
+
+                "lead_count": lead_info["lead_count"],
+                "active_leads": lead_info["active_leads"],
+
+                "followup_count": followup_info["followup_count"],
+                "latest_followup": followup_info["latest_followup"],
+
+                "transaction_count": transaction_info["transaction_count"],
+                "has_transaction": has_transaction,
+
+                "rfm": rfm,
+            }
+
+        # ---------------------------------------------------------
+        # 4. Rank-based RFM scoring
+        # ---------------------------------------------------------
+        rfm_customers = [
+            (customer_id, data)
+            for customer_id, data in customer_features.items()
+            if data["rfm"] is not None
+        ]
+
+        if rfm_customers:
+
+            # Recency: lower days = better
+            recency_sorted = sorted(
+                rfm_customers,
+                key=lambda x: (x[1]["rfm"]["recency"], x[0])
+            )
+
+            # Frequency: higher = better
+            frequency_sorted = sorted(
+                rfm_customers,
+                key=lambda x: (x[1]["rfm"]["frequency"], -x[0])
+            )
+
+            # Monetary: higher = better
+            monetary_sorted = sorted(
+                rfm_customers,
+                key=lambda x: (x[1]["rfm"]["monetary"], x[0])
+            )
+
+            total_rfm_customers = len(rfm_customers)
+
+            for position, (customer_id, data) in enumerate(recency_sorted, start=1):
+                data["rfm"]["R"] = total_rfm_customers - position + 2
+
+            for position, (customer_id, data) in enumerate(
+                reversed(frequency_sorted), start=1
+            ):
+                data["rfm"]["F"] = total_rfm_customers - position + 2
+
+            for position, (customer_id, data) in enumerate(
+                reversed(monetary_sorted), start=1
+            ):
+                data["rfm"]["M"] = total_rfm_customers - position + 2
+
+            for customer_id, data in rfm_customers:
+
+                rfm_data = data["rfm"]
+
+                rfm_data["rfm_score"] = (
+                    f"{rfm_data['R']}"
+                    f"{rfm_data['F']}"
+                    f"{rfm_data['M']}"
+                )
+
+                total_score = (
+                    rfm_data["R"]
+                    + rfm_data["F"]
+                    + rfm_data["M"]
+                )
+
+                if total_score >= 12:
+                    data["customer_value"] = "High Value"
+                elif total_score >= 9:
+                    data["customer_value"] = "Medium Value"
+                else:
+                    data["customer_value"] = "Low Value"
+
+        # Customers without transactions
+        for customer_id, data in customer_features.items():
+            if "customer_value" not in data:
+                data["customer_value"] = None
+
+        # ---------------------------------------------------------
+        # 5. Week 2 segmentation
+        # ---------------------------------------------------------
+        for customer_id, data in customer_features.items():
+
+            if data["customer_value"] == "High Value":
+                segment = "High Value"
+
+            elif data["active_leads"] > 0:
+                segment = "Active"
+
+            elif (
+                data["lead_count"] > 0
+                and not data["has_transaction"]
+            ):
+                segment = "Prospect/New"
+
+            elif (
+                data["has_transaction"]
+                and data["active_leads"] == 0
+            ):
+                segment = "At Risk"
+
+            elif data["customer_value"] == "Low Value":
+                segment = "Low Value"
+
+            elif (
+                data["lead_count"] == 0
+                and not data["has_transaction"]
+            ):
+                segment = "Unengaged"
+
+            else:
+                segment = "Unclassified"
+
+            data["segment"] = segment
+
+        # ---------------------------------------------------------
+        # 6. KPI calculation
+        # ---------------------------------------------------------
+        total_customers = len(customer_features)
+
+        customers_with_leads = sum(
+            1
+            for data in customer_features.values()
+            if data["lead_count"] > 0
+        )
+
+        active_lead_customers = sum(
+            1
+            for data in customer_features.values()
+            if data["active_leads"] > 0
+        )
+
+        customers_with_followups = sum(
+            1
+            for data in customer_features.values()
+            if data["followup_count"] > 0
+        )
+
+        customers_with_transactions = sum(
+            1
+            for data in customer_features.values()
+            if data["has_transaction"]
+        )
+
+        # ---------------------------------------------------------
+        # 7. Segment distribution
+        # ---------------------------------------------------------
+        segments = {}
+
+        for data in customer_features.values():
+            segment = data["segment"]
+            segments[segment] = segments.get(segment, 0) + 1
+
+        # ---------------------------------------------------------
+        # 8. Customer table
+        # ---------------------------------------------------------
+        customer_rows = []
+
+        for data in customer_features.values():
+
+            customer_rows.append({
+                "customer_id": data["customer_id"],
+                "customer": data["customer"],
+                "lead_count": data["lead_count"],
+                "active_leads": data["active_leads"],
+                "followup_count": data["followup_count"],
+                "has_transaction": data["has_transaction"],
+                "transaction_count": data["transaction_count"],
+                "customer_value": data["customer_value"],
+                "segment": data["segment"],
+                "rfm": data["rfm"],
+            })
+
+        customer_rows.sort(
+            key=lambda x: x["customer_id"]
+        )
+
+        return Response({
+            "analysis_date": ANALYSIS_DATE,
+
+            "kpi": {
+                "total_customers": total_customers,
+                "customers_with_leads": customers_with_leads,
+                "active_lead_customers": active_lead_customers,
+                "customers_with_followups": customers_with_followups,
+                "customers_with_transactions": customers_with_transactions,
+            },
+
+            "segments": segments,
+
+            "customers": customer_rows,
         })
