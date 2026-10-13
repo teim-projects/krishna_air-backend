@@ -52,6 +52,7 @@ urlpatterns = [
     path('inventory/', include("inventory.urls")),
     path('amc/', include('amc.urls')),
     path('dashboard/', include('dashboard.urls')),
+    path('sales-intelligence/', include('sales_intelligence.urls')),
 ]
 
 if settings.DEBUG:
